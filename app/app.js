@@ -442,7 +442,7 @@ $('createBtn').addEventListener('click', async () => {
   let left, right, thumb = null;
   try { thumb = audioOnly ? null : await videoThumb(offset); if (thumb) $('procThumb').innerHTML = `<img src="${thumb}" alt="">`; [left, right] = await regionAt44k(src.buf, region.s, region.e); }
   catch (e) { procRunning = false; await dialog('File non leggibile', textEl('Non riesco a preparare l\'audio di questa parte.'), [['OK', 0, true]]); return go('home'); }
-  releaseSource();
+  const srcDur = src.buf.duration; releaseSource();
   const wD = COST.demucs, wG = withG ? COST.guira : 0; let tWork = Date.now(); const est = estimateMinutes(dur, withG);
   worker = NATIVE ? nativeWorker() : new Worker('worker.js?v=22');
   worker.onmessage = async ev => {
@@ -473,11 +473,11 @@ $('createBtn').addEventListener('click', async () => {
       await dialog('Qualcosa è andato storto', textEl(net ? 'Non riesco a scaricare i modelli: controlla la connessione e riprova.' : 'La separazione si è fermata (' + m.message + '). Prova con una parte più corta.'), [['OK', 0, true]]);
       go('home');
     }
-    if (m.type === 'done') {
+    if (m.type === 'done') try {
       if (worker) { worker.terminate(); worker = null; }
       const workS = (Date.now() - tWork) / 1000; ls.set(SPEED_KEY(), Math.max(0.05, Math.min(10, workS / (dur * (wD + wG)))));
       clearInterval(procClock); setSteps(steps, steps.length - 1); $('procStage').textContent = 'Trovo il ritmo e salvo…'; $('procWhat').textContent = 'Ritmo'; $('procLeft').textContent = 'quasi fatto'; setProgress(1, 0.5);
-      const args = { name, stems: m.stems, dur, offset, srcDur: src.buf.duration, withG, kind, file, thumb };
+      const args = { name, stems: m.stems, dur, offset, srcDur, withG, kind, file, thumb };
       for (;;) {
         try { const id = await saveNew(args); procRunning = false; history.replaceState(null, '', '#player'); openPlayer(id); return; }
         catch (e) {
@@ -486,6 +486,9 @@ $('createBtn').addEventListener('click', async () => {
           if (!again) { procRunning = false; releaseWake(); return go('home'); }
         }
       }
+    } catch (e) {
+      procRunning = false; releaseWake();
+      await dialog('Salvataggio non riuscito', textEl('Errore alla fine della separazione: ' + (e && e.message || e)), [['OK', 0, true]]); go('home');
     }
   };
   worker.onerror = e => { if (worker) worker.onmessage({ data: { type: 'error', message: e.message || 'errore interno' } }); };

@@ -329,6 +329,8 @@ Il conteggio sparisce: si ascolta e si tocca.
 
 ## Registro modifiche
 
+- **25/11/2026**: corretto il blocco a 100% su "Trovo il ritmo e salvo" (introdotto con il testo sincronizzato). Un errore alla fine della separazione ora mostra un messaggio invece di restare fermo.
+
 - **25/11/2026**: testo sincronizzato nella mappa (LRCLIB, oppure Whisper sulla voce separata con riconoscimento della lingua), correzione delle righe, traduzione sul telefono con Opus-MT (italiano di default, lingua nelle Impostazioni). Nel player le forme d'onda degli strumenti sono sostituite da una linea per il volume.
 
 - **25/11/2026**: nuovo design ispirato a Moises, disegnato con Claude.
