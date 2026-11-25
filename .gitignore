@@ -3,7 +3,7 @@ __pycache__/
 *.wav
 *.mp3
 *.mp4
-*.png
+test/*.png
 _test/
 node_modules/
 .DS_Store
