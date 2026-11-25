@@ -31,7 +31,7 @@ Bachata Lab è un'app per studiare la **musicalità in bachata**. Carichi una ca
 ## 2. Home (Progetti)
 
 **Intestazione e spazio**
-- Riquadro "Elaborazione 100% sul telefono" con lo spazio usato e quello disponibile del browser (es. "37 MB / 10,8 GB") e una barra.
+- Riquadro "Elaborazione 100% sul telefono" con lo spazio occupato dai progetti (es. "37 MB usati"). Non c'è un limite dell'app: lo spazio disponibile dipende solo dalla memoria libera del telefono.
 - "Gestisci" apre le **Impostazioni**.
 
 **Nuovo progetto**
@@ -61,7 +61,7 @@ Bachata Lab è un'app per studiare la **musicalità in bachata**. Carichi una ca
 - Lab e Allenati sono disattivati finché non c'è un progetto.
 
 **Impostazioni**
-- Mostra: progetti salvati, spazio usato e disponibile, se i modelli sono già scaricati, versione.
+- Mostra: progetti salvati, spazio usato, quanti core del processore ha usato l'ultima separazione, se i modelli sono già scaricati, versione.
 - **Elimina i modelli scaricati** (circa 160 MB): si riscaricano al prossimo progetto.
 - **Mostra di nuovo i suggerimenti**.
 
@@ -105,6 +105,12 @@ Il passaggio in corso ha una barra sua. Quelli finiti sono segnati FATTO, quelli
 - Riga di stato (es. "Separo gli strumenti: parte 3 di 8").
 - Tempo trascorso, tempo rimanente stimato e parte in lavorazione.
 - "Schermo acceso" compare quando il telefono tiene lo schermo acceso (wake lock).
+
+**Velocità**
+- **Nell'app Android** la separazione gira in codice nativo (ONNX Runtime per Android) su 4 core: nei test è circa 5 volte più veloce della versione nel browser. La prima volta l'app prepara i modelli (qualche secondo), poi li riusa. Se la separazione nativa non parte o si blocca, l'app passa da sola a quella nel browser (più lenta) e lo dice.
+- **Nel browser** usa WebAssembly: più core solo se la pagina è "isolata" (non succede nell'anteprima di Claude), altrimenti uno.
+- La güira si calcola a finestre di 5 s con 0,5 s di contesto per lato (4 s utili per finestra): un quarto di lavoro in meno rispetto a prima, con un risultato praticamente identico.
+- La stima del tempo impara la velocità reale del telefono dopo ogni progetto (separatamente per app e browser).
 
 **Regole**
 - Bisogna restare nella pagina con lo schermo acceso: se il telefono va in standby il lavoro si ferma.
@@ -267,7 +273,7 @@ Stesse funzioni dell'audio, con queste differenze:
 - Ogni cambio di BPM spegne il loop attivo.
 
 **L'1 è qui!**
-- Con il brano in riproduzione, tocca esattamente sull'1. L'app sposta il conteggio sul tempo più vicino al tuo tocco, tenendo conto di circa 0,15 s di ritardo di reazione.
+- Con il brano in riproduzione, tocca esattamente sull'1. L'app sposta il conteggio sul tempo più vicino al tuo tocco, tenendo conto del ritardo calibrato (o di 0,15 s se non hai calibrato).
 - Il loop 4 o 8 attivo si riallinea. Vibra e conferma.
 
 **Velocità di studio**
@@ -300,6 +306,8 @@ Il conteggio sparisce: si ascolta e si tocca.
 - **Parametri sessione** (ricordati per tutti i brani):
   - **Guida audio**: Basso + güira (default; senza güira separata usa basso e bongo), Tutti, oppure Mix attuale.
   - **Durata**: 4 frasi (32 tempi) oppure 8 frasi (64 tempi). Se il brano è più corto si usano le frasi disponibili.
+- **Calibra il ritardo di cuffie e casse**: suonano 16 click e tu tocchi su ognuno (i primi 4 servono per prendere il ritmo). L'app misura il ritardo tipico tra suono e tocco (Bluetooth e reazione compresi) e lo toglie da ogni tocco negli esercizi e in "L'1 è qui!". Va rifatta quando cambi cuffie o casse. Senza calibrazione: 0 ms negli esercizi e 150 ms per "L'1 è qui!".
+  - Se a fine esercizio arrivi sempre in ritardo di oltre 60 ms e non hai calibrato, il risultato suggerisce di farlo.
 - Durante l'esercizio il **metronomo è spento**. La guida audio vale solo per l'esercizio: alla fine torna il mix del progetto.
 - "Torna al player" chiude.
 
@@ -312,6 +320,8 @@ Il conteggio sparisce: si ascolta e si tocca.
   - **barra di precisione** da −150 a +150 ms, con il segno dell'ultimo tocco e la scritta "A tempo", "In anticipo di X ms" o "In ritardo di +X ms";
   - il grande **pad da toccare**: diventa ciano se il tocco va a segno, rosso se è sbagliato ("Quello era il 6", "Già preso").
 - Un tocco vale se cade entro il 30% di un tempo dal tempo giusto. Entro ±30 ms è "Perfetto".
+- Se tocchi il tempo giusto ma troppo presto o troppo tardi, l'app lo dice ("Era il 1, ma troppo tardi") e mostra di quanti ms, invece di dire che non era quel tempo.
+- Al ritardo di ogni tocco viene tolto il **ritardo calibrato** (vedi sotto).
 - **Pausa/Riprendi**, **Ricomincia**, **Esci** (torna alla scelta dell'esercizio).
 
 ### 9.3 Risultato
@@ -335,7 +345,7 @@ Il conteggio sparisce: si ascolta e si tocca.
   - La descrizione testuale della güira ("guiro scraping metal scraper") è calcolata una volta e salvata dentro il modello.
   - Lavora a 32 kHz a finestre di 5 s.
   - Poi la traccia delle percussioni viene divisa con una maschera morbida: **güira** = la parte che somiglia alla güira, **bongo** = il resto.
-- **Motore**: ONNX Runtime Web (WebAssembly, 1 thread) in un Web Worker.
+- **Motore**: nell'app Android ONNX Runtime nativo su 4 core (plugin `SeparatorPlugin`, codice in `android/.../Separator.java`, verificato identico alla versione JavaScript); nel browser ONNX Runtime Web (WebAssembly) in un Web Worker.
   - Modelli a metà precisione: circa 60 MB l'uno, scaricati una volta e conservati nel browser.
   - In memoria i pesi sono a piena precisione. Il picco misurato durante la separazione è di circa 3,6 GB (consigliati telefoni da 6–8 GB).
 - **Ritmo**: i battiti si trovano dal flusso spettrale di basso, bongo e güira, con una preferenza per tempi intorno ai 128 BPM.
@@ -348,7 +358,8 @@ Il conteggio sparisce: si ascolta e si tocca.
 ## 11. App Android (APK)
 
 - L'APK contiene la stessa app web, impacchettata con **Capacitor** (Android 7.0 o più recente).
-- I **modelli sono dentro l'app** (APK di circa 120 MB): niente download al primo progetto e nessuna seconda copia nella cache. Le Impostazioni lo indicano ("dentro l'app") e nascondono "Elimina i modelli scaricati".
+- I **modelli sono dentro l'app** (APK di circa 160 MB): niente download al primo progetto e nessuna seconda copia nella cache. Al primo progetto vengono preparati una volta nella memoria dell'app. Le Impostazioni lo indicano ("dentro l'app") e nascondono "Elimina i modelli scaricati".
+- La **separazione è nativa** e molto più veloce (vedi §4). Solo telefoni a 64 bit (arm64), cioè praticamente tutti quelli con 6 GB di RAM o più.
 - Lo **schermo resta acceso** durante la separazione e con un progetto aperto, tramite il plugin KeepAwake.
 - Il tasto Indietro di Android segue la stessa navigazione dell'app (chiude pannelli e overlay, poi torna alla home).
 - I font si scaricano da Internet la prima volta; senza connessione l'app usa i font di sistema.
@@ -370,6 +381,8 @@ Il conteggio sparisce: si ascolta e si tocca.
 ---
 
 ## Registro modifiche
+
+- **25/11/2026**: separazione nativa nell'app Android (ONNX Runtime su 4 core, circa 5 volte più veloce), finestre della güira più efficienti (−25% di lavoro), ripiego automatico sulla versione nel browser. Calibrazione del ritardo di cuffie e casse per esercizi e "L'1 è qui!"; messaggio chiaro quando il tempo è giusto ma il tocco è in anticipo o in ritardo. Tolto il "limite" di spazio dalla home: si vede solo lo spazio usato.
 
 - **25/11/2026**: app Android (APK) con Capacitor, costruita da GitHub Actions e pubblicata nelle Release. Modelli inclusi nell'APK, schermo sempre acceso con il plugin KeepAwake, icona dell'app.
 

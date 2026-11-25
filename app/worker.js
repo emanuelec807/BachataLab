@@ -46,9 +46,10 @@ async function fetchModel(name, onProgress) {
 }
 
 async function init(needGuira) {
-  if (sessions && (!needGuira || sessions.guira)) return post({ type: 'ready', provider: 'wasm' });
+  if (sessions && (!needGuira || sessions.guira)) return post({ type: 'ready', provider: 'wasm', threads: ort.env.wasm.numThreads });
   ort.env.wasm.wasmPaths = new URL('./', self.location.href).href;
-  ort.env.wasm.numThreads = self.crossOriginIsolated ? Math.min(4, navigator.hardwareConcurrency || 2) : 1;
+  // Threads need SharedArrayBuffer (a cross-origin isolated page); otherwise one thread.
+  ort.env.wasm.numThreads = self.crossOriginIsolated && typeof SharedArrayBuffer !== 'undefined' ? Math.max(1, Math.min(4, (navigator.hardwareConcurrency || 2) - 1)) : 1;
   const names = needGuira ? ['demucs', 'guira'] : ['demucs'];
   const totalMB = Math.round(names.reduce((a, n) => a + MODELS[n].size, 0) * 4 / 3 / 1e6);
   const totalParts = names.reduce((a, n) => a + MODELS[n].parts.length, 0);
@@ -66,7 +67,7 @@ async function init(needGuira) {
   const opts = { executionProviders: ['wasm'], graphOptimizationLevel: 'basic', enableCpuMemArena: false };
   sessions = sessions || {};
   for (const name of names) if (!sessions[name]) sessions[name] = await ort.InferenceSession.create(bytes[name], opts);
-  post({ type: 'ready', provider: 'wasm' });
+  post({ type: 'ready', provider: 'wasm', threads: ort.env.wasm.numThreads });
 }
 
 self.onmessage = async (ev) => {

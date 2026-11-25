@@ -21,7 +21,7 @@ const PRESETS = [
 ];
 // Seconds of work per second of audio, measured in desktop Chromium (WebAssembly, 1 thread).
 // Before the first run on this phone the estimate assumes a phone is about twice as slow.
-const COST = { demucs: 2.4, guira: 3.2 };
+const COST = { demucs: 2.4, guira: 2.4 };
 const MARK_NAMES = ['Intro', 'Derecho', 'Majao', 'Mambo', 'Break', 'Finale'];
 const SR = 44100, MAX_REGION = 180, MAX_FILE = 350e6, TAP_LAG = 0.15;
 const fmt = t => { t = Math.max(0, t || 0); const m = Math.floor(t / 60), s = Math.floor(t % 60); return m + ':' + String(s).padStart(2, '0'); };
@@ -172,9 +172,7 @@ async function renderHome() {
   if (list.length && !shown.length) $('projects').innerHTML = '<p class="mute" style="padding:14px 4px">Nessun progetto trovato.</p>';
   try {
     const e = await navigator.storage.estimate(), mb = v => v >= 1e9 ? (v / 1e9).toFixed(1) + ' GB' : Math.round(v / 1e6) + ' MB';
-    $('storageUse').textContent = mb(e.usage || 0) + ' / ' + mb(e.quota || 0);
-    const f = Math.min(1, (e.usage || 0) / (e.quota || 1)), w = Math.max(f * 100, e.usage ? 2 : 0);
-    $('useBar').innerHTML = `<i style="width:${w * 0.5}%;background:var(--acc)"></i><i style="width:${w * 0.3}%;background:var(--cy)"></i><i style="width:${w * 0.2}%;background:var(--am)"></i>`;
+    $('storageUse').textContent = mb(e.usage || 0) + ' usati';
   } catch (e) {}
 }
 $('sortBtn').addEventListener('click', () => { homeSort = homeSort === 'name' ? 'recent' : 'name'; ls.set('homeSort', homeSort); renderHome(); });
@@ -215,7 +213,7 @@ async function openSettings() {
   try { est = await navigator.storage.estimate(); } catch (e) {}
   try { models = (await caches.keys()).filter(k => k.startsWith('bachata-models')); } catch (e) {}
   const row = (a, b) => `<div class="setrow"><span>${a}</span><b>${b}</b></div>`;
-  wrap.innerHTML = row('Progetti salvati', homeList.length) + row('Spazio usato', mb(est.usage || 0)) + row('Spazio disponibile', mb(est.quota || 0)) +
+  wrap.innerHTML = row('Progetti salvati', homeList.length) + row('Spazio usato', mb(est.usage || 0)) + row('Core usati per separare', ls.get('lastThreads', null) == null ? '–' : ls.get('lastThreads')) +
     row('Modelli di separazione', NATIVE ? "dentro l'app" : models.length ? 'scaricati' : 'non ancora') + row('Versione', 'Bachata Lab 5' + (NATIVE ? ' · app Android' : ''));
   const b1 = document.createElement('button'); b1.className = 'setbtn'; b1.innerHTML = ico('close') + 'Elimina i modelli scaricati (circa 160 MB)'; b1.disabled = !models.length; b1.hidden = NATIVE;
   b1.onclick = async () => { for (const k of models) { try { await caches.delete(k); } catch (e) {} } ls.set('modelsCached', false); b1.disabled = true; toast('Modelli eliminati: si riscaricano al prossimo progetto'); };
@@ -262,8 +260,10 @@ function computePeaks() {
 }
 let vseekT = 0;
 function seekPreview(t) { if (!src || src.kind !== 'video' || preview) return; clearTimeout(vseekT); vseekT = setTimeout(() => { try { $('vprev').currentTime = t; } catch (e) {} }, 60); }
+// speedFactor: phone time / desktop WebAssembly time, learned after each project (separately for the Android app).
+const SPEED_KEY = () => NATIVE ? 'speedFactorNative' : 'speedFactor';
 function estimateMinutes(dur, withG) {
-  const speed = ls.get('speedFactor', 2);
+  const speed = ls.get(SPEED_KEY(), NATIVE ? 0.6 : 2);
   return Math.max(1, Math.round(dur * (COST.demucs + (withG ? COST.guira : 0)) * speed / 60));
 }
 function drawRegion() {
@@ -292,7 +292,7 @@ function drawRegion() {
   $('rdS').innerHTML = `${Math.round(dur)} secondi<br>${dur < 30 ? 'una frase' : dur <= 90 ? 'ideale per studiare' : 'sezione lunga'}`;
   const first = !NATIVE && !ls.get('modelsCached', false);
   $('estMin').textContent = '~' + estimateMinutes(dur, withG) + ' min';
-  $('est').innerHTML = `<div class="nt">${ico(first ? 'dl' : 'shield')}<span>${first ? '<b style="color:var(--ink)">Primo utilizzo:</b> scarico anche i modelli di separazione (circa 160 MB, una volta sola, meglio con il Wi‑Fi). Poi tutto funziona senza Internet.' : 'Tutto avviene su questo telefono, senza Internet e senza caricare il brano da nessuna parte.'}${ls.get('speedFactor', null) == null ? ' La stima si corregge dopo il primo progetto.' : ''}</span></div>`;
+  $('est').innerHTML = `<div class="nt">${ico(first ? 'dl' : 'shield')}<span>${first ? '<b style="color:var(--ink)">Primo utilizzo:</b> scarico anche i modelli di separazione (circa 160 MB, una volta sola, meglio con il Wi‑Fi). Poi tutto funziona senza Internet.' : 'Tutto avviene su questo telefono, senza Internet e senza caricare il brano da nessuna parte.'}${ls.get(SPEED_KEY(), null) == null ? ' La stima si corregge dopo il primo progetto.' : ''}</span></div>`;
   $('regionWarn').innerHTML = dur > MAX_REGION ? `<div class="alert">${ico('warn')}<span><b>Massimo 3 minuti:</b> accorcia la parte.</span></div>`
     : dur > 120 ? `<div class="alert">${ico('warn')}<span><b>Attenzione:</b> le parti oltre i 2 minuti richiedono più memoria e più tempo di calcolo sul telefono.</span></div>` : '';
   $('createBtn').disabled = dur < 8 || dur > MAX_REGION;
@@ -398,7 +398,7 @@ $('createBtn').addEventListener('click', async () => {
   $('createBtn').disabled = true; procRunning = true; stopPreview();
   const name = $('pname').value.trim() || src.name, withG = $('optGuira').checked;
   const dur = region.e - region.s, offset = region.s, kind = src.kind, file = src.file;
-  const steps = ['Scarico i modelli', 'Separo voce, chitarra, basso, percussioni', ...(withG ? ['Isolo la güira'] : []), 'Trovo il ritmo e salvo'];
+  const steps = [NATIVE ? 'Preparo i modelli' : 'Scarico i modelli', 'Separo voce, chitarra, basso, percussioni', ...(withG ? ['Isolo la güira'] : []), 'Trovo il ritmo e salvo'];
   history.replaceState(null, '', '#elabora'); show('proc'); keepAwake();
   $('procThumb').innerHTML = ico(kind === 'video' ? 'video' : 'note');
   $('procTitle').textContent = name; setProgress(0); setSteps(steps, 0);
@@ -410,7 +410,7 @@ $('createBtn').addEventListener('click', async () => {
   catch (e) { procRunning = false; await dialog('File non leggibile', textEl('Non riesco a preparare l\'audio di questa parte.'), [['OK', 0, true]]); return go('home'); }
   releaseSource();
   const wD = COST.demucs, wG = withG ? COST.guira : 0; let tWork = Date.now(); const est = estimateMinutes(dur, withG);
-  worker = new Worker('worker.js?v=21');
+  worker = NATIVE ? nativeWorker() : new Worker('worker.js?v=22');
   worker.onmessage = async ev => {
     const m = ev.data;
     if (m.type === 'download') {
@@ -418,7 +418,7 @@ $('createBtn').addEventListener('click', async () => {
       setProgress(0, m.frac);
     }
     if (m.type === 'loading') $('procStage').textContent = 'Preparo i modelli…';
-    if (m.type === 'ready') { ls.set('modelsCached', true); setSteps(steps, 1); tWork = Date.now(); setProgress(0); $('procWhat').textContent = 'Separazione'; $('procStage').textContent = 'Separo gli strumenti…'; }
+    if (m.type === 'ready') { ls.set('modelsCached', true); ls.set('lastThreads', m.threads || 1); setSteps(steps, 1); tWork = Date.now(); setProgress(0); $('procWhat').textContent = 'Separazione'; $('procStage').textContent = 'Separo gli strumenti…'; }
     if (m.type === 'progress') {
       let frac = null, part = null;
       if (m.stage === 'demucs') { frac = wD / (wD + wG) * m.i / m.n; part = m.i / m.n; $('procStage').textContent = `Separo gli strumenti: parte ${m.i} di ${m.n}`; $('procPart').textContent = m.i + '/' + m.n; }
@@ -440,7 +440,7 @@ $('createBtn').addEventListener('click', async () => {
     }
     if (m.type === 'done') {
       if (worker) { worker.terminate(); worker = null; }
-      const workS = (Date.now() - tWork) / 1000; ls.set('speedFactor', Math.max(0.2, Math.min(10, workS / (dur * (wD + wG)))));
+      const workS = (Date.now() - tWork) / 1000; ls.set(SPEED_KEY(), Math.max(0.05, Math.min(10, workS / (dur * (wD + wG)))));
       clearInterval(procClock); setSteps(steps, steps.length - 1); $('procStage').textContent = 'Trovo il ritmo e salvo…'; $('procWhat').textContent = 'Ritmo'; $('procLeft').textContent = '0:00'; setProgress(1, 0.5);
       const args = { name, stems: m.stems, dur, offset, withG, kind, file, thumb };
       for (;;) {
@@ -456,6 +456,53 @@ $('createBtn').addEventListener('click', async () => {
   worker.onerror = e => { if (worker) worker.onmessage({ data: { type: 'error', message: e.message || 'errore interno' } }); };
   worker.postMessage({ type: 'separate', left, right, guira: withG, noCache: NATIVE }, [left.buffer, right.buffer]);
 });
+// In the Android app the separation runs natively (SeparatorPlugin, ONNX Runtime on several cores).
+// This object speaks the same messages as worker.js, so the processing screen does not change.
+function i16b64(x) { const u8 = new Uint8Array(toInt16(x).buffer); let s = ''; for (let k = 0; k < u8.length; k += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(k, k + 0x8000)); return btoa(s); }
+function nativeWorker() {
+  const call = (m, o) => window.Capacitor.nativePromise('Separator', m, o || {});
+  const w = { onmessage: null, onerror: null, stopped: false,
+    terminate() { w.stopped = true; call('cancel').catch(() => {}); if (w.real) w.real.terminate(); },
+    async postMessage(msg) {
+      const emit = d => { if (!w.stopped && w.onmessage) w.onmessage({ data: d }); };
+      try {
+        const n = msg.left.length, CH = 1 << 19; await call('begin', { frames: n });
+        emit({ type: 'loading' });
+        for (const [ch, x] of [[0, msg.left], [1, msg.right]]) for (let off = 0; off < n; off += CH) {
+          if (w.stopped) return;
+          await call('append', { ch, offset: off, data: i16b64(x.subarray(off, off + CH)) });
+        }
+        await call('run', { guira: msg.guira });
+        let ready = false;
+        for (;;) {
+          await new Promise(r => setTimeout(r, 400)); if (w.stopped) return;
+          const s = await call('status');
+          if (s.state === 'running' && !ready) { ready = true; emit({ type: 'ready', threads: s.threads }); }
+          if (s.state === 'running' && ['demucs', 'guira', 'resample', 'split'].includes(s.stage)) emit({ type: 'progress', stage: s.stage, i: s.i, n: s.n });
+          if (s.state === 'error') return fallback(s.error || 'errore');
+          if (s.state === 'cancelled') return;
+          if (s.state === 'done') {
+            if (!ready) emit({ type: 'ready', threads: s.threads });
+            const stems = {};
+            for (const id in s.files) {
+              const a = new Int16Array(await (await fetch(window.Capacitor.convertFileSrc(s.files[id]))).arrayBuffer()), h = a.length / 2;
+              stems[id] = [toF32(a.subarray(0, h)), toF32(a.subarray(h))];
+            }
+            call('cleanup').catch(() => {});
+            return emit({ type: 'done', stems });
+          }
+        }
+      } catch (e) { fallback(String(e && e.message || e)); }
+      // If the native separator is missing or fails, the slower WebAssembly worker does the job.
+      function fallback(why) {
+        if (w.stopped) return; console.warn('native separation failed:', why); toast('Uso la separazione nel browser (più lenta)');
+        const real = w.real = new Worker('worker.js?v=22');
+        real.onmessage = ev => emit(ev.data); real.onerror = e => emit({ type: 'error', message: e.message || 'errore interno' });
+        real.postMessage(msg);
+      }
+    } };
+  return w;
+}
 $('cancelBtn').addEventListener('click', async () => {
   if (!procRunning) return;
   if (await dialog('Annullare?', textEl('Perdi il lavoro fatto finora.'), [['Continua', false], ['Annulla separazione', true, true]])) cancelProcessing();
@@ -1001,9 +1048,12 @@ $('metBtn').addEventListener('click', () => { if (!cur) return; if (!hasBeats())
 $('metVol').addEventListener('input', e => { cur.met.vol = +e.target.value; $('metVolV').textContent = cur.met.vol + '%'; applyMet(); persist(); });
 document.querySelectorAll('[data-acc]').forEach(b => b.addEventListener('click', () => { cur.met.acc = b.dataset.acc; renderAcc(); applyMet(); persist(); }));
 // The tap comes a little after the 1 is heard: take the beat nearest to (tap time − reaction lag).
+// Measured delay between a sound and the tap on it (speakers, Bluetooth, reaction), or null if never calibrated.
+const tapOffset = () => ls.get('tapOffset', null);
 function setOneHere() {
   if (!hasBeats() || !player) return;
-  const i = nearestBeat(player.position - (player.isPlaying ? TAP_LAG : 0)); if (i < 0) return;
+  const lag = tapOffset() != null ? tapOffset() : TAP_LAG;
+  const i = nearestBeat(player.position - (player.isPlaying ? lag : 0)); if (i < 0) return;
   cur.oneIdx = ((i % 8) + 8) % 8; lastCount = -1; applyMet(); drawTimelineStatic(); computePhrases(); renderGrid(); persist();
   if (loopMode === 4 || loopMode === 8) { const n = loopMode; loopMode = null; beatLoop(n); }
   toast('Ok, l\'1 è qui'); vibrate(15);
@@ -1183,14 +1233,40 @@ function renderTrainMenu() {
   document.querySelectorAll('[data-guide]').forEach(b => b.classList.toggle('on', b.dataset.guide === o.guide));
   document.querySelectorAll('[data-len]').forEach(b => b.classList.toggle('on', +b.dataset.len === o.len));
 }
+function renderCal() { const o = tapOffset();
+  $('calTxt').textContent = o == null ? "Non calibrato. Rifallo quando cambi cuffie o casse (il Bluetooth aggiunge ritardo)." : `Calibrato: ${Math.round(o * 1000)} ms tra suono e tocco.`; }
+// Plays 16 clicks and measures how late the dancer's taps land on them: that delay is then
+// taken off every tap in the exercises and in "L'1 è qui!".
+async function calibrate() {
+  const c = audioCtx(); await c.resume(); if (player && player.isPlaying) pausePlayer();
+  const per = 0.6, N = 16, t0 = c.currentTime + 1, clicks = [], taps = [];
+  for (let k = 0; k < N; k++) {
+    const t = t0 + k * per, o = c.createOscillator(), g = c.createGain();
+    o.frequency.value = k % 4 === 0 ? 1600 : 1100; g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.7, t + 0.002); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.06);
+    o.connect(g); g.connect(c.destination); o.start(t); o.stop(t + 0.08); clicks.push(t);
+  }
+  const wrap = document.createElement('div'), p = textEl('Tocca il riquadro esattamente su ogni click, come se fosse il tempo. I primi 4 servono per prendere il ritmo.'); p.className = 'mute small';
+  const pad = document.createElement('div'); pad.className = 'calpad'; pad.textContent = 'Tocca sul click';
+  pad.addEventListener('pointerdown', e => { e.preventDefault(); taps.push(c.currentTime); pad.classList.add('flash'); setTimeout(() => pad.classList.remove('flash'), 90); vibrate(8); });
+  wrap.append(p, pad);
+  const timer = setTimeout(() => closeDialog('done'), (t0 - c.currentTime + N * per + 0.6) * 1000);
+  const v = await dialog('Calibra il ritardo', wrap, [['Annulla', false]]); clearTimeout(timer);
+  if (v !== 'done') return;
+  const d = []; for (const t of taps) { let best = null; for (let k = 4; k < N; k++) { const x = t - clicks[k]; if (best == null || Math.abs(x) < Math.abs(best)) best = x; } if (best != null && Math.abs(best) < 0.35) d.push(best); }
+  if (d.length < 6) return dialog('Calibrazione non riuscita', textEl('Servono almeno 6 tocchi vicini ai click. Riprova con calma.'), [['OK', 0, true]]);
+  d.sort((x, y) => x - y); const lat = c.outputLatency > 0 ? c.outputLatency : (c.baseLatency || 0);
+  const off = Math.max(-0.1, Math.min(0.5, d[Math.floor(d.length / 2)] - lat));
+  ls.set('tapOffset', off); renderCal(); toast('Ritardo misurato: ' + Math.round(off * 1000) + ' ms');
+}
 function openTraining() {
   if (!hasBeats()) return toast('Serve il ritmo: questo brano non ce l\'ha');
-  renderTrainMenu(); showTrain('trainMenu'); $('train').classList.add('on'); if (location.hash !== '#allenamento') location.hash = 'allenamento';
+  renderTrainMenu(); renderCal(); showTrain('trainMenu'); $('train').classList.add('on'); if (location.hash !== '#allenamento') location.hash = 'allenamento';
 }
 function closeTraining(fromNav) { stopTraining(); $('train').classList.remove('on'); if (!fromNav && location.hash === '#allenamento') history.back(); }
 $('trainBtn').addEventListener('click', openTraining);
 $('trainClose').addEventListener('click', () => (training || !$('trainMenu').hidden ? closeTraining() : (stopTraining(), renderTrainMenu(), showTrain('trainMenu'))));
 $('trainBack').addEventListener('click', () => closeTraining());
+$('calBtn').addEventListener('click', calibrate);
 $('games').addEventListener('click', e => { const b = e.target.closest('[data-game]'); if (b) startTraining(b.dataset.game); });
 document.querySelectorAll('[data-guide]').forEach(b => b.addEventListener('click', () => { ls.set('trainOpts', Object.assign(trainOpts(), { guide: b.dataset.guide })); renderTrainMenu(); }));
 document.querySelectorAll('[data-len]').forEach(b => b.addEventListener('click', () => { ls.set('trainOpts', Object.assign(trainOpts(), { len: +b.dataset.len })); renderTrainMenu(); }));
@@ -1243,7 +1319,7 @@ function trainTick(t) {
 }
 $('tpad').addEventListener('pointerdown', e => {
   e.preventDefault(); const tr = training; if (!tr || tr.done || !player.isPlaying) return;
-  const t = player.position; if (t < tr.startT - 0.3) return;
+  const t = player.position - (tapOffset() || 0); if (t < tr.startT - 0.3) return;
   tr.taps++;
   const per = 60 / cur.bpm, i = nearestBeat(t), dt = t - beatTime(i), target = tr.targets.find(x => x.i === i);
   const pad = $('tpad'); pad.classList.remove('hit', 'miss'); void pad.offsetWidth;
@@ -1254,7 +1330,15 @@ $('tpad').addEventListener('pointerdown', e => {
     $('tLate').className = 'late' + (ok ? ' ok' : ''); $('tLate').innerHTML = '<i></i>' + (ok ? 'A tempo' : dt < 0 ? 'In anticipo di ' + -ms + ' ms' : 'In ritardo di +' + ms + ' ms');
     $('tMark').style.display = 'block'; $('tMark').style.left = (50 + Math.max(-150, Math.min(150, ms)) / 3) + '%';
     $('tLast').textContent = 'Ultimo tocco sul ' + countOf(i);
-  } else { tr.wrong++; pad.classList.add('miss'); $('tMsg').textContent = target && target.hit ? 'Già preso' : 'Quello era il ' + countOf(i); }
+  } else {
+    tr.wrong++; pad.classList.add('miss'); const ms = Math.round(dt * 1000);
+    if (target && target.hit) $('tMsg').textContent = 'Già preso';
+    else if (target) { // right count, too far from it: say how far, so a late tap on the 1 is not reported as "not the 1"
+      $('tMsg').textContent = `Era il ${countOf(i)}, ma troppo ${dt < 0 ? 'presto' : 'tardi'}`;
+      $('tLate').className = 'late'; $('tLate').innerHTML = '<i></i>' + (dt < 0 ? 'In anticipo di ' + -ms + ' ms' : 'In ritardo di +' + ms + ' ms');
+      $('tMark').style.display = 'block'; $('tMark').style.left = (50 + Math.max(-150, Math.min(150, ms)) / 3) + '%';
+    } else $('tMsg').textContent = 'Quello era il ' + countOf(i);
+  }
   const h = tr.targets.filter(x => x.hit != null).length; $('tHits').textContent = h + '/' + tr.targets.length;
   if (tr.errs.length) $('tErr').textContent = Math.round(tr.errs.reduce((a, b) => a + Math.abs(b), 0) / tr.errs.length);
   vibrate(10);
@@ -1280,7 +1364,7 @@ function finishTraining() {
   const pc = v => E.length ? Math.round(100 * v / E.length) : 0;
   $('tDist').innerHTML = `<span class="k">Distribuzione dei tocchi · ${E.length} a segno</span>` + [['Anticipo', early, 'var(--am)'], ['Perfetto (±30 ms)', ok, 'var(--cy)'], ['Ritardo', late, 'var(--pri)']]
     .map(([l, v, c]) => `<div class="row" style="--dc:${c}"><span><i></i>${l}</span><span>${pc(v)}% (${v})</span></div><div class="bar" style="--dc:${c}"><i style="width:${pc(v)}%"></i></div>`).join('');
-  $('tTrend').innerHTML = E.length >= 3 && Math.abs(bias) > 25 ? `${ico('trend')}<div><span class="k">Tendenza ritmica</span><p><b style="color:var(--am)">Tendi ad arrivare ${bias < 0 ? 'in anticipo' : 'in ritardo'}</b> nel ${pc(bias < 0 ? early : late)}% dei tocchi, in media di ${Math.round(Math.abs(bias))} ms. ${bias < 0 ? 'Aspetta un attimo di più.' : 'Anticipa leggermente.'}</p></div>`
+  $('tTrend').innerHTML = E.length >= 3 && Math.abs(bias) > 25 ? `${ico('trend')}<div><span class="k">Tendenza ritmica</span><p><b style="color:var(--am)">Tendi ad arrivare ${bias < 0 ? 'in anticipo' : 'in ritardo'}</b> nel ${pc(bias < 0 ? early : late)}% dei tocchi, in media di ${Math.round(Math.abs(bias))} ms. ${bias < 0 ? 'Aspetta un attimo di più.' : 'Anticipa leggermente.'}${bias > 60 && tapOffset() == null ? ' Se usi cuffie o casse Bluetooth, prova "Calibra": parte del ritardo può essere dell\'audio.' : ''}</p></div>`
     : E.length >= 3 ? `${ico('check')}<div><span class="k" style="color:var(--cy)">Tendenza ritmica</span><p>Sei centrato: né in anticipo né in ritardo.${tr.wrong ? ' Tocchi fuori bersaglio: ' + tr.wrong + '.' : ''}</p></div>` : '';
   $('tTipT').textContent = GAMES[tr.game].tipT; $('tResTip').textContent = GAMES[tr.game].tip + (tr.wrong && !(E.length >= 3 && Math.abs(bias) <= 25) ? ` Tocchi fuori bersaglio: ${tr.wrong}.` : '');
   showTrain('trainDone');

@@ -577,6 +577,8 @@ input[type=range]:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 3px var(-
 .dlg .chips button{min-height:36px}
 .dlg .setrow{display:flex;justify-content:space-between;gap:8px;padding:10px 0;border-bottom:1px solid var(--edge);font-size:14px}
 .dlg .setrow b{font:700 13px var(--mono)}
+.calpad{margin-top:12px;height:180px;border-radius:var(--r3);background:var(--s0);border:2px solid var(--acc);display:grid;place-items:center;font:700 22px var(--disp);text-transform:uppercase;touch-action:manipulation;user-select:none}
+.calpad.flash{background:rgba(255,78,123,.25)}
 .dlg .setbtn{width:100%;margin-top:8px;justify-content:flex-start;font:600 14px var(--body);letter-spacing:0}
 .toast{position:fixed;left:50%;bottom:calc(84px + var(--sab));transform:translateX(-50%);background:var(--s4);border:1px solid var(--edge2);color:var(--ink);
   padding:10px 16px;border-radius:var(--r2);z-index:50;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw;text-align:center;font-weight:600;font-size:14px}
@@ -652,7 +654,7 @@ body:has(#s-player.on) .toast{bottom:auto;top:calc(var(--sat) + 56px)}
   <header class="hbar"><div class="logo"><svg class="i"><use href="#i-eq"/></svg></div><div class="ht"><b>BACHATA LAB</b><small>Studio di musicalità</small></div></header>
   <div class="panel privacy">
     <div class="row"><svg class="i"><use href="#i-shield"/></svg><span class="k grow" style="color:var(--ink)">Elaborazione 100% sul telefono</span><span class="mono small" id="storageUse"></span></div>
-    <div class="ubar" id="useBar"></div>
+    <div class="ubar" id="useBar" hidden></div>
     <div class="row" style="align-items:center"><p id="storage">I brani e i modelli non lasciano mai questo telefono.</p><button class="link" id="manageBtn">Gestisci</button></div>
   </div>
   <button class="newcard" id="newBtn"><span class="plus"><svg class="i"><use href="#i-plus"/></svg></span><span><b>NUOVO PROGETTO</b><span>Carica una canzone o un video dal telefono</span></span><svg class="i"><use href="#i-folder"/></svg></button>
@@ -851,6 +853,8 @@ body:has(#s-player.on) .toast{bottom:auto;top:calc(var(--sat) + 56px)}
       <div class="seg" id="guideSeg"><button data-guide="bg">Basso + güira</button><button data-guide="all">Tutti</button><button data-guide="mix">Mix attuale</button></div>
       <span class="k" style="display:block;margin:14px 0 8px">Durata esercizio</span>
       <div class="seg" id="lenSeg"><button data-len="4">4 frasi (32 tempi)</button><button data-len="8">8 frasi (64 tempi)</button></div>
+      <span class="k" style="display:block;margin:14px 0 8px">Ritardo di cuffie e casse</span>
+      <div class="row"><span class="grow small mute" id="calTxt"></span><button id="calBtn" style="flex:none"><svg class="i" style="width:16px;height:16px"><use href="#i-timer"/></svg>Calibra</button></div>
       <p class="mute small" style="margin-top:10px">Durante l'esercizio il metronomo è spento: si ascolta solo la musica.</p>
     </div>
     <button id="trainBack" style="width:100%;min-height:52px;margin-top:14px;font:700 13px var(--mono);letter-spacing:.1em"><svg class="i"><use href="#i-back"/></svg>TORNA AL PLAYER</button>

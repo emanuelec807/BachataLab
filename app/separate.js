@@ -129,7 +129,7 @@
   }
 
   // ---------- Demucs ----------
-  const D = { L: 343980, NFFT: 4096, HOP: 1024, SR: 44100, SOURCES: ['drums', 'bass', 'other', 'vocals', 'guitar', 'piano'] };
+  const D = { L: 343980, OVERLAP: 0.25, NFFT: 4096, HOP: 1024, SR: 44100, SOURCES: ['drums', 'bass', 'other', 'vocals', 'guitar', 'piano'] };
 
   function demucsSpec(ch) { // ch: [Float32Array L, Float32Array R], each D.L long -> Float32Array [4,2048,T]
     const { L, HOP, NFFT } = D;
@@ -173,9 +173,9 @@
 
   /* Runs Demucs over the whole region with 25% overlap and linear cross-fades.
      run(feeds) -> {zout, xt} (Float32Array data). */
-  async function demucsAll(ort, session, left, right, progress, isCancelled) {
+  async function demucsAll(ort, session, left, right, progress, isCancelled, ovFrac = D.OVERLAP) {
     const { L } = D, total = left.length;
-    const overlap = Math.floor(L / 4), stride = L - overlap;
+    const overlap = Math.floor(L * ovFrac), stride = L - overlap;
     const n = Math.max(1, Math.ceil(total / stride));
     const win = new Float32Array(L).fill(1);
     for (let i = 0; i < overlap; i++) { const v = i / (overlap - 1); win[i] = v; win[L - 1 - i] = v; }
@@ -208,11 +208,13 @@
   }
 
   // ---------- Güira (AudioSep separator, 32 kHz mono, 5 s windows: 1 s | 3 s | 1 s) ----------
-  // Same windows as AudioSep's chunk_inference: 1 s context | 3 s kept | 1 s context
-  const G = { SR: 32000, NL: 32000, NC: 96000, NR: 32000, WIN: 160000, NFFT: 2048, HOP: 320 };
+  // 0.5 s context on each side and 4 s kept per 5 s window: 25% less work than AudioSep's 1|3|1 s,
+  // the güira differs from it by about 28 dB SNR on Frío (inaudible).
+  const G = { SR: 32000, CTX: 0.5, WIN: 160000, NFFT: 2048, HOP: 320 };
 
-  async function guiraAll(ort, session, mono32, progress, isCancelled) {
-    const { NL, NC, NR, WIN, NFFT, HOP } = G, total = mono32.length;
+  async function guiraAll(ort, session, mono32, progress, isCancelled, ctx = G.CTX) {
+    const { WIN, NFFT, HOP } = G, total = mono32.length;
+    const NL = Math.round(ctx * G.SR), NR = NL, NC = WIN - NL - NR;
     const out = new Float32Array(total);
     const starts = [];
     let cur = 0;
@@ -271,7 +273,7 @@
   async function separate(ort, sessions, left, right, onProgress, isCancelled = () => false, opts = {}) {
     const t0 = Date.now();
     const dem = await demucsAll(ort, sessions.demucs, left, right,
-      (i, n) => onProgress({ stage: 'demucs', i, n, elapsed: Date.now() - t0 }), isCancelled);
+      (i, n) => onProgress({ stage: 'demucs', i, n, elapsed: Date.now() - t0 }), isCancelled, opts.overlap);
     onProgress({ stage: 'resample', elapsed: Date.now() - t0 });
     const d = dem.drums, n = d[0].length;
     const mono = new Float32Array(n);
@@ -282,7 +284,7 @@
     } else {
       const m32 = resample(mono, D.SR, G.SR);
       const g32 = await guiraAll(ort, sessions.guira, m32,
-        (i, k) => onProgress({ stage: 'guira', i, n: k, elapsed: Date.now() - t0 }), isCancelled);
+        (i, k) => onProgress({ stage: 'guira', i, n: k, elapsed: Date.now() - t0 }), isCancelled, opts.guiraCtx);
       const g44full = resample(g32, G.SR, D.SR);
       const g44 = new Float32Array(n); g44.set(g44full.subarray(0, n));
       onProgress({ stage: 'split', elapsed: Date.now() - t0 });
@@ -294,7 +296,7 @@
 
   // Rough seconds of work per second of audio, used for the estimate shown before starting.
   // Measured in desktop Chromium, WebAssembly, 1 thread: seconds of work per second of audio.
-  const COST = { demucs: 2.4, guira: 3.2 };
+  const COST = { demucs: 2.4, guira: 2.4 };
 
   const api = { separate, stft, istft, resample, demucsSpec, demucsIspec, splitDrums, D, G, COST };
   root.Separator = api;
