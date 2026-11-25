@@ -248,7 +248,21 @@
 
   /* Splits the stereo drum stem into güira and the rest ("bongo") with a soft
      spectral mask from the güira estimate. */
-  function splitDrums(drums, guira44) {
+  // The güira mask is computed on blocks of ~30 s plus 8 hops of context per side: STFT frames line up
+  // with the whole-song ones, so the result is the same, but memory no longer grows with the song.
+  const SPLIT_SEG = 512 * 2560, SPLIT_PAD = 512 * 8;
+  function splitDrums(drums, guira44, seg = SPLIT_SEG) {
+    const n = drums[0].length;
+    if (n <= seg + 2 * SPLIT_PAD) return splitBlock(drums, guira44);
+    const gu = [new Float32Array(n), new Float32Array(n)], bo = [new Float32Array(n), new Float32Array(n)];
+    for (let s = 0; s < n; s += seg) {
+      const a = Math.max(0, s - SPLIT_PAD), b = Math.min(n, s + seg + SPLIT_PAD), cnt = Math.min(seg, n - s);
+      const r = splitBlock([drums[0].slice(a, b), drums[1].slice(a, b)], guira44.slice(a, b));
+      for (let c = 0; c < 2; c++) { gu[c].set(r.guira[c].subarray(s - a, s - a + cnt), s); bo[c].set(r.bongo[c].subarray(s - a, s - a + cnt), s); }
+    }
+    return { guira: gu, bongo: bo };
+  }
+  function splitBlock(drums, guira44) {
     const NFFT = 2048, HOP = 512, n = drums[0].length;
     const g = stft(guira44, NFFT, HOP, false);
     const gm = new Float32Array(g.re.length);
@@ -290,7 +304,7 @@
       onProgress({ stage: 'split', elapsed: Date.now() - t0 });
       sp = splitDrums(d, g44);
     }
-    const altro = [0, 1].map(c => { const a = new Float32Array(n), o = dem.other[c], p = dem.piano[c]; for (let i = 0; i < n; i++) a[i] = o[i] + p[i]; return a; });
+    const altro = dem.other; for (let c = 0; c < 2; c++) { const o = altro[c], p = dem.piano[c]; for (let i = 0; i < n; i++) o[i] += p[i]; } // in place: saves memory
     // piano also comes back on its own: the app keeps it as a track only if it really plays (otherwise it stays in altro)
     return { vocals: dem.vocals, guitar: dem.guitar, bass: dem.bass, bongo: sp.bongo, guira: sp.guira, altro, piano: dem.piano };
   }
@@ -299,7 +313,7 @@
   // Measured in desktop Chromium, WebAssembly, 1 thread: seconds of work per second of audio.
   const COST = { demucs: 2.4, guira: 2.4 };
 
-  const api = { separate, stft, istft, resample, demucsSpec, demucsIspec, splitDrums, D, G, COST };
+  const api = { separate, stft, istft, resample, demucsSpec, demucsIspec, splitDrums, splitBlock, D, G, COST };
   root.Separator = api;
   if (typeof module !== 'undefined') module.exports = api;
 })(typeof self !== 'undefined' ? self : this);
