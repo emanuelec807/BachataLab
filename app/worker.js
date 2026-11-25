@@ -26,7 +26,10 @@ function b64ToBytes(s, out, off) {
 }
 
 async function fetchModel(name, onProgress) {
-  const spec = MODELS[name], out = new Uint8Array(spec.size), cache = await openCache();
+  const spec = MODELS[name];
+  // In the Android app the build stores each model as one raw .onnx file (smaller APK) instead of base64 parts
+  try { const r = await fetch(spec.parts[0].replace(/\.0\.b64\.txt$/, '.onnx')); if (r.ok) { const u = new Uint8Array(await r.arrayBuffer()); if (u.length === spec.size) { onProgress(spec.parts.length, spec.parts.length, true); return u; } } } catch (e) {}
+  const out = new Uint8Array(spec.size), cache = await openCache();
   let off = 0;
   for (let k = 0; k < spec.parts.length; k++) {
     const url = spec.parts[k];
@@ -57,9 +60,10 @@ async function init(needGuira) {
   const bytes = {};
   for (const name of names) {
     if (sessions && sessions[name]) { done += MODELS[name].parts.length; continue; }
+    let last = 0;
     bytes[name] = await fetchModel(name, (k, n, fromCache) => {
       if (!fromCache) anyNetwork = true;
-      done++;
+      done += k - last; last = k;
       post({ type: 'download', loaded: Math.round(totalMB * done / totalParts), total: totalMB, frac: done / totalParts, network: anyNetwork });
     });
   }

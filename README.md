@@ -63,6 +63,7 @@ I modelli si scaricano una volta e restano nella cache del browser. Il picco di 
 - [Transformers.js](https://github.com/huggingface/transformers.js) (Apache-2.0), in `app/asr/`, con il runtime di [ONNX Runtime Web](https://github.com/microsoft/onnxruntime) (MIT). Il modello Whisper e il runtime WebAssembly vengono scaricati dal workflow durante la build dell'APK (non sono nel repository).
 - [Whisper base](https://huggingface.co/Xenova/whisper-base) (MIT) per trascrivere la voce; [Opus-MT](https://huggingface.co/Helsinki-NLP) (CC-BY 4.0) per tradurre.
 - Testi sincronizzati da [LRCLIB](https://lrclib.net).
+- [YAMNet](https://github.com/tensorflow/models/tree/master/research/audioset/yamnet) (Apache-2.0, Google), conversione ONNX fp16 di [audiojs/yamnet](https://huggingface.co/audiojs/yamnet), in `app/models/yamnet.b64.txt`: riconosce lo strumento dentro "Altro".
 - [lamejs](https://github.com/zhuker/lamejs) (LGPL-3.0), in `app/lame.min.js`, per creare l'MP3 del mix.
 - Plugin Capacitor `@capacitor/filesystem` e `@capacitor/share` (MIT), per salvare e condividere l'MP3 nell'app Android.
 

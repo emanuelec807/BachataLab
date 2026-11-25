@@ -76,7 +76,10 @@ Bachata Lab è un'app per studiare la **musicalità in bachata**. Carichi una ca
    - File oltre i 350 MB vengono rifiutati con un messaggio. Un file che il telefono non riesce a leggere dà un messaggio chiaro.
 5. **6 tracce separate**: Voce, Chitarra, Basso, Bongo, Güira, Altro. La **güira è sempre separata** dal bongo: non è più un'opzione.
    - Il modello riconosce anche il **piano**. Se nel brano il piano suona davvero (almeno il 3% del suono del brano e il 35% di "Altro"), diventa una **settima traccia** "Piano"; altrimenti resta dentro "Altro". Nella bachata di solito non c'è (su "Frío" è 0%).
-   - Tutto quello che il modello non riconosce (synth, archi, fiati, fisarmonica, effetti) va in "Altro".
+   - Tutto quello che il modello non riconosce (requinto, synth, archi, fiati, fisarmonica, effetti) va in "Altro".
+   - **"Altro" prende il nome di quello che c'è dentro.** Dopo la separazione YAMNet (Google, 7,5 MB, dentro l'app) ascolta le parti dove "Altro" suona e riconosce la famiglia: **Requinto** (corde pizzicate acute), **Fisarmonica**, **Tastiere**, **Archi** o **Fiati**. La traccia prende quel nome solo se una famiglia vince nettamente; altrimenti resta "Altro". Su "Pobre de Mí" (Mickey Then) diventa "Requinto"; su "Frío" resta "Altro".
+   - Il requinto viene diviso dal modello in due: una parte resta in "Chitarra", il resto (gli arpeggi più acuti) va in questa traccia. Separarlo del tutto dalla chitarra ritmica non è possibile con questi modelli: con AudioSep e descrizioni come "mandolino" o "chitarra solista" non si distinguono le due chitarre (provato).
+   - I progetti fatti prima vengono riconosciuti la prima volta che si aprono.
 6. **Tempo stimato**: impara la velocità reale del telefono dopo ogni progetto (separatamente per app e browser). Nel browser, al primo utilizzo, avvisa che scarica anche i modelli (circa 160 MB, una volta sola).
 7. **Separa gli strumenti** avvia la separazione. La freccia indietro torna alla home.
 
@@ -336,6 +339,8 @@ Il conteggio sparisce: si ascolta e si tocca.
 ---
 
 ## Registro modifiche
+
+- **25/11/2026**: "Altro" prende il nome dello strumento riconosciuto (Requinto, Fisarmonica, Tastiere, Archi, Fiati) con YAMNet. APK più leggero: modelli di separazione come file .onnx unici invece del base64 e libreria di ONNX Runtime compressa (circa 50 MB in meno).
 
 - **25/11/2026**: separazione nativa senza tetto di memoria (tracce in file mappati: 3:20 separati con 300 MB di heap, risultati identici). Whisper dentro l'app: trascrizione automatica dopo ogni import, senza download, sul processore (corretto l'errore "Cannot set properties of null" sul telefono). Traduzione solo a richiesta. Indietro/swipe di Android gestiti dall'app.
 

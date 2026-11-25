@@ -2,6 +2,8 @@ apply plugin: 'com.android.application'
 
 android {
     namespace = "com.emanuelec807.bachatalab"
+    // ONNX Runtime's .so compressed inside the APK (about 22 MB smaller download); Android extracts it on install
+    packaging { jniLibs { useLegacyPackaging = true } }
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
         applicationId "com.emanuelec807.bachatalab"

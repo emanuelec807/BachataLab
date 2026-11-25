@@ -13,7 +13,11 @@ const ALL_STEMS = [
   { id: 'altro', n: 'Altro', d: 'synth, archi, fiati' },
 ];
 const STEMS = [];
-function useStems(piano) { STEMS.length = 0; for (const s of ALL_STEMS) if (s.id !== 'piano' || piano) STEMS.push(s); }
+// altroName: the instrument family recognised in Altro (e.g. "Requinto"), shown as the track's name
+function useStems(piano, altroName) {
+  STEMS.length = 0;
+  for (const s of ALL_STEMS) { if (s.id === 'piano' && !piano) continue; STEMS.push(s.id === 'altro' && altroName ? Object.assign({}, s, { n: altroName, d: 'riconosciuto in Altro' }) : s); }
+}
 useStems(false);
 const PRESETS = [
   { n: 'Completo', g: [100, 100, 100, 100, 100, 100] },
@@ -451,7 +455,7 @@ $('createBtn').addEventListener('click', async () => {
   catch (e) { procRunning = false; await dialog('File non leggibile', textEl('Non riesco a preparare l\'audio di questa parte.'), [['OK', 0, true]]); return go('home'); }
   const srcDur = src.buf.duration; releaseSource();
   const wD = COST.demucs, wG = withG ? COST.guira : 0; let tWork = Date.now(); const est = estimateMinutes(dur, withG);
-  worker = NATIVE ? nativeWorker() : new Worker('worker.js?v=22');
+  worker = NATIVE ? nativeWorker() : new Worker('worker.js?v=23');
   worker.onmessage = async ev => {
     const m = ev.data;
     if (m.type === 'download') {
@@ -541,7 +545,7 @@ function nativeWorker() {
       // If the native separator is missing or fails, the slower WebAssembly worker does the job.
       function fallback(why) {
         if (w.stopped) return; console.warn('native separation failed:', why); toast('Uso la separazione nel browser (più lenta)');
-        const real = w.real = new Worker('worker.js?v=22');
+        const real = w.real = new Worker('worker.js?v=23');
         real.onmessage = ev => emit(ev.data); real.onerror = e => emit({ type: 'error', message: e.message || 'errore interno' });
         real.postMessage(msg);
       }
@@ -605,9 +609,24 @@ function splitPiano(stems, n) {
   else delete stems.piano;
   return keep;
 }
+// YAMNet (tagworker.js) says which instrument family plays in Altro; null when no family clearly wins.
+async function nameAltro(altro, n) {
+  try {
+    const buf = new AudioBuffer({ length: n, numberOfChannels: 1, sampleRate: SR }), ch = buf.getChannelData(0), [L, R] = altro;
+    for (let i = 0; i < n; i++) ch[i] = (L[i] + R[i]) * 0.5;
+    const oc = new OfflineAudioContext(1, Math.ceil(n * 16000 / SR), 16000), bs = oc.createBufferSource();
+    bs.buffer = buf; bs.connect(oc.destination); bs.start();
+    const x = (await oc.startRendering()).getChannelData(0).slice();
+    const r = await new Promise(res => {
+      const w = new Worker('tagworker.js?v=1'), done = v => { clearTimeout(to); w.terminate(); res(v || {}); }, to = setTimeout(() => done({}), 90000);
+      w.onmessage = e => done(e.data); w.onerror = () => done({}); w.postMessage({ audio: x }, [x.buffer]);
+    });
+    return r.name || null;
+  } catch (e) { return null; }
+}
 async function saveNew({ name, stems, dur, offset, srcDur, withG, kind, file, thumb }) {
   const n = stems.vocals[0].length, id = 'p' + Date.now().toString(36);
-  const piano = splitPiano(stems, n); useStems(piano);
+  const piano = splitPiano(stems, n), altroName = await nameAltro(stems.altro, n); useStems(piano, altroName);
   let bt = { bpm: 0, beats: new Float64Array(0), confidence: 0 };
   try { bt = BeatTracker.analyze(rhythmMono(stems, n), SR); } catch (e) {}
   const beats = Array.from(bt.beats), oneIdx = guessOne(stems, beats, n);
@@ -615,7 +634,7 @@ async function saveNew({ name, stems, dur, offset, srcDur, withG, kind, file, th
   try {
     await tx('stems', 'readwrite', s => s.put({ id, n, sr: SR, data }));
     if (kind === 'video') await tx('media', 'readwrite', s => s.put({ id, blob: file, type: file.type || 'video/mp4' }));
-    const p = normalize({ id, name, kind, thumb, dur, offset, srcDur, piano, created: Date.now(), updated: Date.now(), withGuira: withG,
+    const p = normalize({ id, name, kind, thumb, dur, offset, srcDur, piano, altroName, created: Date.now(), updated: Date.now(), withGuira: withG,
       bpm: bt.bpm, bpmDetected: bt.bpm, beats, beatsDetected: beats.slice(), confidence: bt.confidence, oneIdx, oneDetected: oneIdx,
       env: envelopes(stems, n), envRate: 20, mirror: kind === 'video', oneAlgo: 2 });
     try { await navigator.storage.persist(); } catch (e) {}
@@ -661,7 +680,7 @@ async function openPlayer(id) {
   if (my !== opening) return;
   if (!p || !st) { busy(); toast('Progetto non leggibile'); return go('home'); }
   try {
-    useStems(!!st.data.piano);
+    useStems(!!st.data.piano, p.altroName);
     cur = normalize(p);
     const stems = {}; for (const s of STEMS) stems[s.id] = [toF32(st.data[s.id][0]), toF32(st.data[s.id][1])];
     st = null;
@@ -691,6 +710,10 @@ async function openPlayer(id) {
     if (!ls.get('padTipSeen', false)) { ls.set('padTipSeen', true); setTimeout(() => toast(isVideo() ? 'Tocca uno strumento per spegnerlo, tienilo premuto per sentirlo da solo' : 'M spegne uno strumento, S lo fa sentire da solo, il nome regola il volume'), 600); }
     requestAnimationFrame(() => { drawTimelineStatic(); syncVideo(true); });
     raf = requestAnimationFrame(tick);
+    // projects made before the naming: listen to Altro once, in the background
+    if (cur.altroName === undefined) { const proj = cur; nameAltro(stems.altro, stems.altro[0].length).then(nm => {
+      proj.altroName = nm || null; if (cur !== proj) return putProject(proj).catch(() => {});
+      persist(); if (nm) { useStems(!!stems.piano, nm); renderPads(); if (mapOpen()) renderMapHeads(true); toast('In Altro c\'è soprattutto: ' + nm); } }); }
   } catch (e) {
     busy(); closePlayer(true); await dialog('Progetto non leggibile', textEl('Non riesco ad aprire questo progetto (' + (e && e.message || e) + ').'), [['OK', 0, true]]); go('home');
   }

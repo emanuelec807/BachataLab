@@ -161,6 +161,13 @@ public class SeparatorPlugin extends Plugin {
         File out = new File(dir, name + ".onnx");
         if (out.exists() && out.length() > 1_000_000) return out;
         File tmp = new File(dir, name + ".tmp");
+        // the APK build stores the model as one raw file (smaller download); base64 parts are the fallback
+        try (InputStream is = ctx.getAssets().open("public/models/" + name + ".onnx");
+             OutputStream os = new BufferedOutputStream(new FileOutputStream(tmp), 1 << 20)) {
+            byte[] buf = new byte[1 << 20]; int r;
+            while ((r = is.read(buf)) > 0) os.write(buf, 0, r);
+        } catch (java.io.FileNotFoundException e) { tmp.delete(); }
+        if (tmp.exists() && tmp.length() > 1_000_000) { if (!tmp.renameTo(out)) throw new Exception("model " + name); return out; }
         try (OutputStream os = new BufferedOutputStream(new FileOutputStream(tmp), 1 << 20)) {
             for (int k = 0; ; k++) {
                 String path = "public/models/" + name + "." + k + ".b64.txt";
