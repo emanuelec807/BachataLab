@@ -235,7 +235,24 @@ public final class Separator {
         return out;
     }
 
+    // The güira mask is computed on blocks of ~30 s (plus 8 hops of context on each side, more than a
+    // window): the STFT frames line up with the whole-song ones, so the result is the same, but the
+    // memory no longer grows with the length of the song (a full STFT of 4 minutes took about 1 GB).
+    static final int SPLIT_SEG = 512 * 2560, SPLIT_PAD = 512 * 8;
     static float[][][] splitDrums(float[][] drums, float[] guira44) {
+        int n = drums[0].length;
+        if (n <= SPLIT_SEG + 2 * SPLIT_PAD) return splitBlock(drums, guira44);
+        float[][] gu = new float[2][n], bo = new float[2][n];
+        for (int s = 0; s < n; s += SPLIT_SEG) {
+            int a = Math.max(0, s - SPLIT_PAD), b = Math.min(n, s + SPLIT_SEG + SPLIT_PAD), cnt = Math.min(SPLIT_SEG, n - s);
+            float[][] d = {java.util.Arrays.copyOfRange(drums[0], a, b), java.util.Arrays.copyOfRange(drums[1], a, b)};
+            float[][][] r = splitBlock(d, java.util.Arrays.copyOfRange(guira44, a, b));
+            for (int c = 0; c < 2; c++) { System.arraycopy(r[0][c], s - a, gu[c], s, cnt); System.arraycopy(r[1][c], s - a, bo[c], s, cnt); }
+        }
+        return new float[][][]{gu, bo};
+    }
+
+    static float[][][] splitBlock(float[][] drums, float[] guira44) {
         int nfft = 2048, hop = 512, n = drums[0].length;
         Spec g = stft(guira44, nfft, hop, false);
         float[] gm = new float[g.re.length];
@@ -269,8 +286,9 @@ public final class Separator {
             pr.on("split", 0, 0);
             float[][][] sp = splitDrums(d, g44); guiraSt = sp[0]; bongo = sp[1];
         }
-        float[][] o = dem.get("other"), p = dem.get("piano"), altro = new float[2][n];
-        for (int c = 0; c < 2; c++) for (int i = 0; i < n; i++) altro[c][i] = o[c][i] + p[c][i];
+        dem.remove("drums"); d = null; // no longer needed: frees memory before the last steps
+        float[][] altro = dem.get("other"), p = dem.get("piano"); // altro = other + piano, summed in place
+        for (int c = 0; c < 2; c++) for (int i = 0; i < n; i++) altro[c][i] += p[c][i];
         Map<String, float[][]> res = new LinkedHashMap<>();
         res.put("vocals", dem.get("vocals")); res.put("guitar", dem.get("guitar")); res.put("bass", dem.get("bass"));
         res.put("bongo", bongo); res.put("guira", guiraSt); res.put("altro", altro); res.put("piano", p); // kept as a track by the app only if it really plays

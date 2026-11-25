@@ -292,7 +292,7 @@ Il conteggio sparisce: si ascolta e si tocca.
 - **Güira**: AudioSep ResUNet30 (29,8 milioni di parametri).
   - La descrizione testuale della güira ("guiro scraping metal scraper") è calcolata una volta e salvata dentro il modello.
   - Lavora a 32 kHz a finestre di 5 s.
-  - Poi la traccia delle percussioni viene divisa con una maschera morbida: **güira** = la parte che somiglia alla güira, **bongo** = il resto.
+  - Poi la traccia delle percussioni viene divisa con una maschera morbida: **güira** = la parte che somiglia alla güira, **bongo** = il resto. La divisione si fa a blocchi di circa 30 s (con un po' di margine ai bordi): il risultato è identico a quello sul brano intero (verificato: differenza 0), ma la memoria non cresce più con la lunghezza. Prima, su 4 minuti, questo passaggio da solo prendeva circa 1 GB.
 - **Motore**: nell'app Android ONNX Runtime nativo su 4 core (plugin `SeparatorPlugin`, codice in `android/.../Separator.java`, verificato identico alla versione JavaScript); nel browser ONNX Runtime Web (WebAssembly) in un Web Worker.
   - Modelli a metà precisione: circa 60 MB l'uno, scaricati una volta e conservati nel browser.
   - In memoria i pesi sono a piena precisione. Il picco misurato durante la separazione è di circa 3,6 GB (consigliati telefoni da 6–8 GB).
@@ -328,12 +328,14 @@ Il conteggio sparisce: si ascolta e si tocca.
 
 - Provata su un solo telefono (Vivo X300, Dimensity 9500). La separazione usa la CPU (4 core), uguale su tutti i telefoni a 64 bit: MediaTek, Snapdragon, Tensor, Kirin, Xiaomi.
 - La separazione richiede lo schermo acceso e la pagina aperta.
-- Nessun limite di durata, ma la memoria cresce con la lunghezza: circa 250 MB nell'app per ogni minuto di brano. Consigliati 30–90 secondi.
+- Nessun limite di durata, ma la memoria cresce con la lunghezza: circa 200 MB per ogni minuto di brano nella separazione nativa (le tracce stesse), più le tracce aperte nel player. Consigliati 30–90 secondi.
 - I dati stanno nel browser: cancellando i dati del sito si perdono i progetti.
 
 ---
 
 ## Registro modifiche
+
+- **25/11/2026**: separazione con meno memoria per i brani lunghi: divisione bongo/güira a blocchi di 30 s (risultato identico) e "Altro" sommato sul posto. Picco su 4 minuti da circa 1,6 GB a circa 0,8 GB.
 
 - **25/11/2026**: tolto il limite dei 3 minuti; tasto "Tutto il brano".
 
