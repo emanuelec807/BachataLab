@@ -14,79 +14,67 @@ Bachata Lab è un'app per studiare la **musicalità in bachata**. Carichi una ca
 
 | Schermata | Indirizzo | Come ci si arriva |
 |---|---|---|
-| Progetti (home) | `/` | apertura dell'app, tasto Indietro, "Progetti" |
+| Progetti (home) | `/` | apertura dell'app, tasto Indietro, "Progetti" nella barra in basso |
+| Impostazioni | `#impostazioni` | "Impostazioni" nella barra in basso |
 | Nuovo progetto | `#nuovo` | "Nuovo progetto" → scelta del file |
-| Separazione | `#elabora` | "Crea progetto" |
-| Player (Lab) | `#player` | tocco su un progetto, oppure fine della separazione |
-| Mixer & ritmo (pannello) | `#mixer` | barra in basso del player: "Strumenti" o "Ritmo" |
+| Separazione | `#elabora` | "Separa gli strumenti" |
+| Player | `#player` | tocco su un progetto, oppure fine della separazione |
+| Mappa (Strumenti / Testo) | `#mappa` | "Mappa" nel player |
+| Popup del player | `#pop` | Velocità, Metronomo, Sezioni, volume di uno strumento, menu ⋮ |
 | Video a schermo intero | `#schermo` | tasto schermo intero sul video |
-| Allenamento | `#allenamento` | "Allenati" nel player o nella home |
+| Allenamento | `#allenamento` | "Allenati" nella barra in basso |
 
-- Il **tasto Indietro** del telefono chiude prima il pannello o l'overlay aperto, poi torna alla home.
+- Il **tasto Indietro** del telefono chiude, nell'ordine: il popup aperto, il video a schermo intero, l'allenamento, la mappa. Poi torna alla home.
 - Durante la separazione Indietro **non esce subito**: chiede "Annullare la separazione?". Anche chiudere o ricaricare la pagina chiede conferma.
-- La cronologia resta corta: home → una schermata → eventuale pannello.
+
+**Aspetto**
+- Stile pulito ispirato a Moises: sfondo quasi nero (o chiaro), un solo colore principale.
+- Ogni strumento ha il suo colore fisso, uguale in righe, mappa e popup.
+- Tema e colore si scelgono nelle Impostazioni (§2).
 
 ---
 
-## 2. Home (Progetti)
+## 2. Home (Progetti) e Impostazioni
 
-**Intestazione e spazio**
-- Riquadro "Elaborazione 100% sul telefono" con lo spazio occupato dai progetti (es. "37 MB usati"). Non c'è un limite dell'app: lo spazio disponibile dipende solo dalla memoria libera del telefono.
-- "Gestisci" apre le **Impostazioni**.
-
-**Nuovo progetto**
-- Il grande riquadro "Nuovo progetto" apre la scelta del file: MP3, M4A, WAV, OGG, FLAC, AAC, oppure video MP4, MOV, WEBM.
-
-**Elenco progetti**
-- **Ricerca** per nome: compare con 3 o più progetti.
-- **Filtri** Tutti / Video / Audio con il numero di progetti: compaiono solo se ci sono sia audio sia video.
-- **Ordine** Recenti oppure A–Z (si ricorda la scelta): compare con 2 o più progetti.
-- Ogni scheda mostra:
-  - miniatura: fotogramma del video, oppure un'icona per l'audio;
-  - tipo e durata;
-  - nome, BPM, numero di tracce (5 o 6) e data dell'ultima modifica ("Oggi, 18:30", "Ieri, …", "12 mag");
-  - il primo segnalibro (es. "Derecho · 0:09 +2");
-  - una riga di stato con il mix lasciato: "Solo Bongo + Güira", "Voce spenta", "Preset Trova l'1" oppure "6 strumenti · mix completo";
-  - il tasto "Apri Lab".
-- Tocco sulla scheda: apre il player. I tre puntini: **Rinomina** o **Elimina**. Elimina chiede conferma e cancella tracce e video.
-
-**Guida rapida**
-- Tre passi (scegli il brano, ritaglia 30–90 s, isola gli strumenti). Sparisce quando hai più di 2 progetti.
-
-**Barra in basso**
-- **Progetti**: la pagina attuale.
-- **Lab**: riapre l'ultimo progetto usato.
-- **Allenati**: riapre l'ultimo progetto e apre subito l'allenamento.
-- **Impostazioni**: vedi sotto.
-- Lab e Allenati sono disattivati finché non c'è un progetto.
+**Home**
+- In alto: logo e un tasto per passare al volo da tema scuro a chiaro.
+- "Progetti" con il numero di progetti e lo spazio usato (es. "1 progetto · 41 MB"). Non c'è un limite dell'app: lo spazio dipende solo dalla memoria del telefono.
+- Ogni progetto è una riga con:
+  - miniatura: fotogramma del video con la scritta VIDEO, oppure un'icona per l'audio;
+  - nome, durata, BPM e numero di tracce;
+  - data dell'ultima modifica ("Oggi, 17:33", "Ieri, …", "12 mag");
+  - lo stato del mix lasciato (es. "Mix completo", "Voce spenta", "Solo Bongo + Güira").
+- Tocco sulla riga: apre il player. I tre puntini: **Rinomina** o **Elimina** (chiede conferma e cancella tracce e video).
+- "Come funziona" (tre passi) compare finché hai al massimo 2 progetti.
+- Il grande tasto **Nuovo progetto** apre la scelta del file: MP3, M4A, WAV, OGG, FLAC, AAC, oppure video MP4, MOV, WEBM.
+- **Barra in basso**: Progetti, Allenati (sull'ultimo brano usato, disattivato senza progetti), Impostazioni.
 
 **Impostazioni**
-- Mostra: progetti salvati, spazio usato, quanti core del processore ha usato l'ultima separazione, se i modelli sono già scaricati, versione.
-- **Elimina i modelli scaricati** (circa 160 MB): si riscaricano al prossimo progetto.
-- **Mostra di nuovo i suggerimenti**.
+- **Tema**: Scuro (predefinito), Chiaro o Come il telefono.
+- **Colore** principale da una lista: Corallo (predefinito), Lime, Azzurro, Viola, Menta, Rosa. Nel tema chiaro si usa una tonalità più scura dello stesso colore, così si legge bene.
+- **Ritardo dell'audio**: mostra il ritardo misurato e il tasto **Calibra** (vedi §9).
+- **Memoria**: progetti e spazio usato, dove stanno i modelli ("dentro l'app" nell'APK), versione. Nel browser c'è anche "Elimina modelli" (circa 160 MB, si riscaricano al prossimo progetto).
 
 ---
 
 ## 3. Nuovo progetto
 
-1. **Nome progetto**: preso dal nome del file (trattini e underscore diventano spazi). Si può cambiare; la X lo cancella.
-2. **Anteprima video** (solo per i video): mostra durata e nome del file e ha "Cambia file". Segue la posizione delle maniglie.
-3. **Ritaglio sezione**
-   - All'inizio sono selezionati i primi 60 secondi (o tutto il brano se è più corto).
-   - Il riquadro "Durata selezionata" dice quanti secondi e se la parte è "una frase", "ideale per studiare" o "sezione lunga".
-   - **Forma d'onda** con le maniglie INIZIO (rosa) e FINE (ciano): si trascinano, e si muove la maniglia più vicina al dito.
+1. **Nome**: preso dal nome del file (trattini e underscore diventano spazi). Si può cambiare; la X lo cancella.
+2. **File scelto**: icona (nota o video), nome e durata, con **Cambia**.
+3. **Usa solo l'audio** (compare solo per i video, spento di default)
+   - Acceso: il video **non viene salvato**. Il progetto diventa un progetto audio e occupa meno spazio.
+   - L'MP3 si scarica poi dal player (§5.6).
+   - Spento: il video resta e il player mostra il video (§6).
+4. **Scegli la parte**
+   - All'inizio sono selezionati i primi 60 secondi (o tutto il brano se è più corto). La durata scelta è scritta in grande; consigliati 30–90 secondi.
+   - **Forma d'onda** con le maniglie di inizio e fine: si trascinano, e si muove la maniglia più vicina al dito.
    - **−1 s / +1 s** per l'inizio e per la fine.
-   - **Ascolta** suona solo la parte scelta. Mentre suona: **Inizio qui** sposta l'inizio dove sei, **Fine qui** sposta la fine e ferma.
-   - Limiti: **minimo 8 s, massimo 3 min**. Oltre i 2 minuti compare un avviso (più memoria e più tempo); oltre i 3 minuti "Crea progetto" si disattiva.
+   - **Ascolta la parte** suona solo la parte scelta. Mentre suona: **Inizio qui** sposta l'inizio dove sei, **Fine qui** sposta la fine e ferma.
+   - Limiti: **minimo 8 s, massimo 3 min**. Oltre i 2 minuti compare un avviso; oltre i 3 minuti il tasto si disattiva.
    - File oltre i 350 MB vengono rifiutati con un messaggio. Un file che il telefono non riesce a leggere dà un messaggio chiaro.
-4. **Separa la güira dal bongo** (attivo di default)
-   - Acceso: 6 tracce (Voce, Chitarra, Basso, Bongo, Güira, Altro).
-   - Spento: 5 tracce, e la güira resta dentro "Bongo + güira". È più veloce.
-   - "Tracce che ottieni" mostra l'elenco aggiornato.
-5. **Tempo stimato**
-   - La stima parte dalla velocità misurata su computer e assume che il telefono sia circa 2 volte più lento. Dopo il primo progetto si corregge con la velocità reale del telefono.
-   - Al primo utilizzo avvisa che scarica anche i modelli (circa 160 MB, una volta sola, meglio con il Wi‑Fi).
-6. **Crea progetto** avvia la separazione. **Annulla** torna alla home.
+5. **6 tracce separate**: Voce, Chitarra, Basso, Bongo, Güira, Altro. La **güira è sempre separata** dal bongo: non è più un'opzione.
+6. **Tempo stimato**: impara la velocità reale del telefono dopo ogni progetto (separatamente per app e browser). Nel browser, al primo utilizzo, avvisa che scarica anche i modelli (circa 160 MB, una volta sola).
+7. **Separa gli strumenti** avvia la separazione. La freccia indietro torna alla home.
 
 ---
 
@@ -95,10 +83,10 @@ Bachata Lab è un'app per studiare la **musicalità in bachata**. Carichi una ca
 **Passaggi mostrati**
 1. Scarico i modelli (la prima volta; poi li legge dalla memoria del browser).
 2. Separo voce, chitarra, basso, percussioni.
-3. Isolo la güira (solo se l'opzione è attiva).
+3. Isolo la güira.
 4. Trovo il ritmo e salvo.
 
-Il passaggio in corso ha una barra sua. Quelli finiti sono segnati FATTO, quelli in arrivo ATTESA.
+Il cerchio mostra la percentuale totale; sotto, i passaggi finiti, quello in corso e quelli in attesa.
 
 **Indicatori**
 - Cerchio con la percentuale totale e la fase attuale.
@@ -122,101 +110,85 @@ Il passaggio in corso ha una barra sua. Quelli finiti sono segnati FATTO, quelli
 - Alla fine il progetto si apre da solo nel player.
 
 **Cosa viene salvato**
-- Le 6 (o 5) tracce stereo, a 16 bit.
-- Il video originale, se c'è, e una miniatura.
-- Il livello di ogni strumento nel tempo (20 valori al secondo), usato da luci, timeline e griglia.
+- Le 6 tracce stereo, a 16 bit.
+- Il video originale e una miniatura, se c'è un video e non hai scelto "Usa solo l'audio".
+- Il livello di ogni strumento nel tempo (20 valori al secondo), usato da forme d'onda, mappa e pulsanti che si accendono.
 - BPM, posizione di ogni battito e posizione dell'1 (vedi §11).
 - L'app chiede al browser di non cancellare questi dati quando manca spazio.
 
 ---
 
-## 5. Player (Lab), versione audio
+## 5. Player, versione audio
 
-Tutto il player sta in **una sola schermata senza scorrere** (pensato per 390×760 e adattato agli schermi più bassi). Dall'alto in basso:
+Tutto il player sta in **una sola schermata senza scorrere** (pensato per 390×760). Dall'alto in basso:
 
 ### 5.1 Intestazione
-- "‹ Progetti", nome del brano, tipo e durata, **BPM** del brano, menu (Rinomina / Elimina).
+- Freccia indietro, nome del brano, durata, BPM e tipo.
+- **⋮** apre il popup "Ritmo del brano" (§5.7).
 
-### 5.2 Pannello del conteggio
-- **Frase n/N**: in quale frase da 8 sei, sul totale.
-- Al centro, il **nome della sezione** in cui sei (dai segnalibri, es. "Derecho"). Dal tempo 5 in poi, se la frase successiva cambia strumenti, diventa rosso lampeggiante: **"Cambio tra N"**.
-- "Tap 4 & 8", sempre visibile come promemoria.
-- **Numero grande** del tempo attuale:
-  - bianco con alone ciano: tempi 2, 3, 6, 7;
-  - rosa: **1 e 5** (inizio di ogni mezza frase);
-  - ambra: **4 e 8** (tap).
-  - Accanto: "Tempo" o "Tap" e "prima metà" / "seconda metà".
-- **Otto caselle 1–8**: si accende quella attuale (ciano, rosa per 1 e 5, ambra per 4 e 8). Le caselle 4 e 8 riportano "TAP".
-- **Scorrere** col dito sul pannello: a sinistra salta avanti, a destra salta indietro (di 4 o 8 tempi).
-- Se il ritmo non è stato trovato, il numero grande mostra il tempo in minuti e secondi. Sotto compare un avviso; un altro avviso compare se il ritmo è incerto.
+### 5.2 Conteggio
+- **Numero grande** del tempo attuale, con "Frase n di N" e il nome della sezione in cui sei. Dal tempo 5 in poi, se la frase successiva cambia strumenti, avvisa "Cambio tra N".
+- **Otto caselle 1–8**: si accende quella attuale; le caselle 4 e 8 riportano "TAP".
+- Se il ritmo non è stato trovato, al posto del numero c'è il tempo in minuti e secondi, con un avviso.
 
-### 5.3 Strumenti (pad)
-- Sei pad: Voce, Chitarra, Basso, Bongo, Güira, Altro. Ognuno ha un'icona e un **misuratore a 5 barre** che si accende quando lo strumento suona.
-- Il misuratore è tarato su ogni strumento, così anche una güira bassa si accende chiaramente.
-- **Tocco**: spegne lo strumento (nome barrato, icona muto). Un altro tocco lo riaccende.
-- **Tieni premuto** (circa mezzo secondo): **solo**. Bordo ambra, badge "S" e vibrazione. Si possono mettere più strumenti in solo.
-- Tocco su un pad in solo: toglie il solo.
-- Tocco su un pad spento mentre altri sono in solo: lo aggiunge al solo.
-- **Attiva tutti**: toglie tutti i muti e i solo e riporta a 100% gli strumenti a volume zero.
-- Pad e mixer sono sempre allineati.
+### 5.3 Strumenti
+- Una **riga per strumento** (Voce, Chitarra, Basso, Bongo, Güira, Altro), ognuna con:
+  - nome e **volume in %**: un tocco apre il **popup del volume** (cursore 0–200%, 100% = originale, Spegni, Solo, ripristino a 100%);
+  - la **forma d'onda** del brano nel colore dello strumento, più accesa fino a dove sei arrivato;
+  - **M** (spegni) e **S** (solo). Si possono mettere più strumenti in solo.
+- Uno strumento spento o escluso dal solo ha la riga sbiadita.
+- **Accendi tutti**: toglie muti e solo e riporta a 100% gli strumenti a volume 0.
+- Sotto: barra della posizione con tempo attuale e durata. Toccarla o trascinarla sposta la riproduzione.
 
-### 5.4 Timeline / Griglia 8 tempi
-Due viste, selezionabili con le linguette e ricordate per ogni progetto.
+### 5.4 Loop e sezioni
+- **Loop 4**: ripete la mezza frase in cui sei (1–4 oppure 5–8). **Loop 8**: ripete la frase in cui sei. Se la prima frase è tagliata dal ritaglio, usa quella intera successiva.
+- **A–B**: primo tocco segna A, secondo segna B e parte il loop. I punti si agganciano al tempo se vicini (0,2 s). Minimo mezzo secondo.
+- Ritoccare il tasto del loop attivo lo spegne.
+- La scritta del loop dice cosa è attivo, per esempio "Loop 8 · frase 3", oppure "Loop 4 · frase 3 dal 5" dopo uno spostamento di 4 tempi.
+- **Sezioni** apre il popup dei segnalibri:
+  - **Segna l'inizio della frase qui**: nomi pronti (Intro, Derecho, Majao, Mambo, Break, Finale) o libero. Massimo 12.
+  - Tocco su una sezione: va lì. Tieni premuto: **Loop sezione** (fino alla successiva), **Rinomina**, **Elimina**.
 
-- **Timeline**
-  - Una corsia per strumento con il suo livello nel tempo (le corsie degli strumenti spenti sono sbiadite).
-  - Il numero di ogni frase sull'1, le tacche dei tempi, i segnalibri come bandierine ambra.
-  - La zona del loop evidenziata e la linea di riproduzione.
-  - **Tocco**: va lì (si aggancia al tempo più vicino entro 0,25 s). **Trascinare**: scorre. **Tenere premuto**: nuovo segnalibro in quel punto.
-- **Griglia 8 tempi**
-  - Una riga per frase: F1, F2… con dei pallini che dicono quali strumenti suonano in quella frase.
-  - Le frasi con la stessa combinazione di strumenti hanno lo stesso colore, così si vedono le ripetizioni e i cambi.
-  - La casella del tempo attuale si accende e la griglia scorre da sola.
-  - La frase successiva lampeggia in ambra quando sta per cambiare.
-  - **Tocco su una casella**: va a quel tempo. **Tieni premuto**: aggiungi, modifica o elimina una **nota** (fino a 60 caratteri, es. "giro", "dip"). Un puntino ciano segna le caselle con una nota.
-- Sopra: posizione attuale / durata.
-- **Segnalibri** (chip sotto la timeline)
-  - Tocco: va lì.
-  - Tieni premuto: **Loop sezione** (dal segnalibro fino al successivo), **Rinomina**, **Elimina**.
-  - Il chip della sezione in cui sei è evidenziato.
-
-### 5.5 Loop, salti, segnalibri
-- **Loop 4**: ripete la mezza frase in cui sei (1–4 oppure 5–8).
-- **Loop 8**: ripete la frase in cui sei (1–8). Se la prima frase è tagliata dall'inizio del ritaglio, usa quella intera successiva.
-- **A–B**
-  - Primo tocco: segna A. Secondo tocco: segna B e parte il loop. Entrambi i punti si agganciano al tempo se sono vicini (0,2 s). Un loop deve durare almeno mezzo secondo.
-  - Un altro tocco sul tasto toglie il loop.
-- Ritoccare Loop 4 o Loop 8 quando è attivo lo spegne.
-- **Barra del loop**: dice quale loop è attivo (es. "Loop 8 tempi attivo: 1–8 (frase 3)", "Loop sezione Derecho: 0:09 – 0:17", "A segnato a 0:32…"). La **X** lo spegne. Nella versione video questa barra è nascosta per lasciare spazio al video.
-- **Salta 4 / 8**: sceglie di quanti tempi saltano i tasti ◀ e ▶ (si ricorda per progetto).
+### 5.5 Trasporto
+- **−8 · −4 · Play/Pausa · +4 · +8** (in tempi), uguali in tutte le schermate del player (anche nella mappa).
   - Senza loop: salta di 4 o 8 tempi, agganciandosi al tempo.
-  - Con Loop 4 o Loop 8 attivo: il loop si sposta al **loop precedente o successivo della stessa misura**.
-  - Con A–B: il loop si sposta di 4 o 8 tempi.
-- **Segna** (icona segnalibro): nuovo segnalibro all'**inizio della frase** in cui sei.
-  - Nomi pronti: Intro, Derecho, Majao, Mambo, Break, Finale; oppure un nome libero.
-  - Massimo 12 segnalibri.
-- Andare fuori dal loop (con un tocco sulla timeline o sulla griglia) spegne il loop.
+  - Con un loop attivo: **sposta il loop** di 4 o 8 tempi, e la riproduzione lo segue.
+- Tastiera (da computer): Spazio = play/pausa, frecce = salti di 8 tempi (con Maiusc di 4).
 
-### 5.6 Velocità, metronomo, allenamento
-- **Velocità** da 50% a 120%: − e + cambiano di 5% alla volta. Il **tono resta invariato**.
-  - Il valore è ambra quando non è 100%. Un tocco sul valore torna al 100%.
-- **Metronomo ON/OFF**: un click su ogni tempo, con l'accento scelto nel pannello Ritmo. Senza ritmo trovato non si accende.
-- **Allenati**: apre l'allenamento (§9).
+### 5.6 Tasti in basso
+- **Velocità**: popup con − / + (5% alla volta, da 50% a 120%) e scorciatoie 60–100%. Il **tono resta invariato**. Il tasto mostra la velocità attuale.
+- **Metronomo**: popup con acceso/spento, volume, **Click forte su** (sull'1, su 4 e 8, su 1 e 5) e **Conta d'ingresso** (il Play parte da 5-6-7-8 prima dell'1). Senza ritmo trovato non si accende.
+- **Mappa**: apre la mappa strumenti e testo (§5.8).
 
-### 5.7 Trasporto
-- **◀ 4/8 tempi**, **−5 s**, **Play/Pausa** (grande, rosa), **+5 s**, **4/8 tempi ▶**.
-- Dentro un loop, ±5 s resta nel loop (ricomincia dall'altro lato).
-- Tastiera (da computer): Spazio = play/pausa, frecce = salti.
+### 5.7 Ritmo del brano (menu ⋮)
+- BPM attuali e quelli rilevati.
+- **−1 BPM / +1 BPM**, **Metà**, **Doppio**: la griglia dei tempi viene ricostruita regolare, tenendo fermo l'inizio della frase in cui sei. Limiti 40–240. Ogni cambio spegne il loop.
+- **Tap tempo**: tocca almeno 4 volte sul tempo; dopo 1,6 s senza tocchi applica i BPM (se tra 60 e 220).
+- **L'1 è qui!**: con il brano in riproduzione tocca esattamente sull'1. Il conteggio si sposta sul tempo più vicino al tocco, tenendo conto del ritardo calibrato (o di 0,15 s senza calibrazione). Il loop attivo si riallinea.
+- **Ripristina**: torna a battiti, BPM e 1 trovati dall'app.
+- **Rinomina** ed **Elimina** il progetto.
+- **Scarica l'MP3 del mix attuale**: crea un MP3 (192 kbps, alla velocità originale) con gli strumenti come li senti, cioè con volumi, muti e solo attuali. Il nome dice cosa manca (es. "Frío - senza voce.mp3").
+  - Nel browser il file si scarica.
+  - Nell'app Android si apre la condivisione del telefono: salvalo in File o Drive, o mandalo su WhatsApp.
+  - Per un video caricato con "Usa solo l'audio" è il modo per avere l'MP3 della canzone.
 
-### 5.8 Barra in basso
-- **Lab** (il player), **Strumenti** (pannello mixer), **Ritmo** (pannello ritmo e velocità), **Progetti** (torna alla home).
+### 5.8 Mappa (Strumenti / Testo)
+Si apre a tutto schermo da "Mappa"; la freccia in giù o Indietro la chiude. In alto il conteggio resta sempre visibile.
+
+- **È una vista del player, non un player a parte**: velocità, metronomo, mix e loop restano quelli del player.
+- **Strumenti**:
+  - sei pulsanti degli strumenti che si **illuminano nel loro colore** mentre suonano ("suona", "forte", "pausa");
+  - sotto, le **forme d'onda** di ogni strumento su un asse orizzontale, 4 frasi alla volta con il numero di ogni frase; una linea segna dove sei; il loop attivo è disegnato come un riquadro; le note sono puntini;
+  - **tocco sulle onde**: va lì; **scorrere**: mostra le altre frasi; **tieni premuto**: aggiungi, modifica o elimina una **nota** su quel tempo (fino a 60 caratteri, es. "giro", "dip");
+  - −8 / −4 / +4 / +8 funzionano come nel player (spostano anche il loop).
+- **Toccare un pulsante strumento lo spegne solo dentro la mappa.** Uscendo dalla mappa tutti gli strumenti tornano come erano nel player.
+  - Uno strumento che nel player era spento o a volume 0 parte spento nella mappa; toccandolo si accende a 100%, sempre solo nella mappa.
+- **Testo**: per ora un segnaposto "Testo in arrivo" (vedi §12).
 
 ### 5.9 Comportamenti automatici
 - La musica si **ferma** se l'app va in secondo piano o se il telefono interrompe l'audio.
 - Lo schermo resta acceso mentre il progetto è aperto.
-- Posizione e impostazioni si salvano da sole: mix, preset, velocità, salto, segnalibri, note, metronomo, automazioni, specchio, vista, 1, BPM.
-- Riaprendo un progetto riparte da dove l'avevi lasciato.
-- Al primo progetto aperto compare il suggerimento "Tocca uno strumento per spegnerlo, tienilo premuto per sentirlo da solo".
+- Posizione e impostazioni si salvano da sole: mix, velocità, segnalibri, note, metronomo, specchio, 1, BPM. Riaprendo un progetto riparte da dove l'avevi lasciato.
 
 ---
 
@@ -224,67 +196,25 @@ Due viste, selezionabili con le linguette e ricordate per ogni progetto.
 
 Stesse funzioni dell'audio, con queste differenze:
 
-- In alto c'è il **video** al posto del pannello del conteggio. Sul video:
-  - il **numero del tempo** grande (stessi colori);
-  - sezione e frase (o "Cambio tra N");
-  - **Specchio**: ribalta il video come in sala. È acceso di default per i video e si ricorda.
-  - **Schermo intero**: gira il telefono in orizzontale e mostra una barra con indietro, play, avanti, velocità a scatti (100 → 85 → 70%) ed Esci.
-- Sotto il video, le **8 caselle** del conteggio.
-- Pad compatti in 3 colonne, con piccoli misuratori.
-- Tocco sul video: play/pausa. Scorrere sul video: salti.
-- **Il suono viene dalle tracce separate**. Il video è muto e segue l'orologio dell'audio: corregge da solo piccoli ritardi e salta se è troppo indietro. Questo vale anche a velocità ridotta.
+- In alto c'è il **video** al posto del conteggio grande. Sul video: il numero del tempo, "Frase n di N", **Specchio** (ribalta il video come in sala; acceso di default e ricordato) e **Schermo intero** (telefono in orizzontale, con indietro, play, avanti, velocità a scatti 100 → 85 → 70% ed Esci).
+- Sotto il video le **8 caselle** del conteggio.
+- Gli strumenti sono **pulsanti compatti** in 3 colonne al posto delle righe con le onde:
+  - tocco: spegne o riaccende;
+  - tieni premuto: solo.
+- Tocco sul video: play/pausa.
+- **Il suono viene dalle tracce separate**: il video è muto e segue l'orologio dell'audio (corregge piccoli ritardi e salta se è troppo indietro), anche a velocità ridotta.
 - Se il video salvato non si trova, resta solo l'audio (con un avviso).
-- La barra del loop è nascosta (il loop si vede dal tasto acceso e sulla timeline).
 
 ---
 
-## 7. Pannello "Mixer & ritmo": Strumenti
+## 7–8. Funzioni tolte con il nuovo design
 
-- Si apre dal basso. Si chiude con **Fatto**, con un tocco fuori, trascinando giù la maniglia o con Indietro.
-- **Preset didattici** (l'etichetta dice "Preset: …" oppure "Personalizzato"):
-
-  | Preset | Voce | Chitarra | Basso | Bongo | Güira | Altro |
-  |---|---|---|---|---|---|---|
-  | Completo | 100 | 100 | 100 | 100 | 100 | 100 |
-  | Trova l'1 | 0 | 0 | 100 | 0 | 150 | 0 |
-  | Solo ritmo | 0 | 0 | 100 | 100 | 100 | 0 |
-  | Senza voce | 0 | 100 | 100 | 100 | 100 | 100 |
-  | Solo voce | 100 | 0 | 0 | 0 | 0 | 0 |
-  | Chitarra | 0 | 150 | 60 | 40 | 60 | 0 |
-  | Bongo | 0 | 0 | 50 | 160 | 80 | 0 |
-
-- Un preset azzera muti e solo. Qualsiasi modifica a mano lo fa diventare "Personalizzato".
-- **Canale per strumento**:
-  - icona, nome e descrizione (es. "Raspa: scandisce ogni tempo");
-  - volume in %;
-  - **M** (muto) e **S** (solo);
-  - cursore da 0 a 200% a passi di 5, con una **tacca ambra al 100%**.
-- Un canale in solo ha il bordo ambra. Un canale spento perché un altro è in solo è sbiadito e dice "Spento: un altro è in solo".
-- Se la güira non è stata separata, il canale Güira dice "Non separata (dentro il bongo)".
-
-## 8. Pannello "Mixer & ritmo": Ritmo e velocità
-
-**Tempo del brano**
-- BPM attuali e il valore **rilevato** dall'app.
-- **−1,0 / −0,1 / +0,1 / +1,0**: cambiano i BPM. La griglia dei tempi viene ricostruita regolare, tenendo fermo l'inizio della frase in cui sei. Limiti 40–240.
-- **÷2 Metà** e **×2 Doppio**: per quando l'app ha contato il doppio o la metà dei tempi.
-- **Ripristina**: torna ai battiti, ai BPM e all'1 trovati dall'app.
-- **Tap tempo**: tocca almeno 4 volte sul tempo. Usa l'intervallo medio (mediana); dopo 1,6 s senza tocchi applica i BPM (se tra 60 e 220).
-- Ogni cambio di BPM spegne il loop attivo.
-
-**L'1 è qui!**
-- Con il brano in riproduzione, tocca esattamente sull'1. L'app sposta il conteggio sul tempo più vicino al tuo tocco, tenendo conto del ritardo calibrato (o di 0,15 s se non hai calibrato).
-- Il loop 4 o 8 attivo si riallinea. Vibra e conferma.
-
-**Velocità di studio**
-- Scorciatoie 60 / 70 / 80 / 90 / 100%. Tono invariato.
-
-**Metronomo**
-- Interruttore, volume (0–200%) e **accento**: solo sull'1, su 4 e 8 (tap), oppure su 1 e 5.
-
-**Automazioni esercizi**
-- **Accelera nel loop**: a ogni 2 giri completi del loop la velocità sale di 5%, fino al 100%. Contano solo i giri veri, non i salti fatti a mano. Spegnendo il loop si torna alla velocità scelta.
-- **Conta d'ingresso**: con Play, la musica parte 4 tempi prima dell'inizio della frase (o del loop), così senti 5‑6‑7‑8 prima dell'1.
+- Preset del mixer (Trova l'1, Solo ritmo, …): si fa lo stesso con M/S e "Accendi tutti".
+- Ritocchi di BPM da ±0,1.
+- "Accelera nel loop".
+- Pannello "Mixer & ritmo", vista Griglia e Timeline: sostituiti da righe con onde, popup e Mappa.
+- Opzione "Separa la güira": ora sempre attiva.
+- Riquadro "Elaborazione 100% sul telefono" nella home.
 
 ---
 
@@ -293,9 +223,8 @@ Stesse funzioni dell'audio, con queste differenze:
 Il conteggio sparisce: si ascolta e si tocca.
 
 ### 9.1 Scelta dell'esercizio
-- Brano attivo con i suoi BPM.
-- Serie di giorni consecutivi di allenamento (es. "5 giorni di fila!").
-- Tre esercizi, ognuno con descrizione, 8 caselle che mostrano quali tempi toccare, record (punteggio migliore e scarto migliore in ms) e "Inizia":
+- **Brano** su cui allenarsi, con BPM e **Cambia** per sceglierne un altro.
+- Tre esercizi, ognuno con descrizione, le 8 caselle con i tempi da toccare e il record:
 
   | Esercizio | Tempi da toccare | Consiglio a fine esercizio |
   |---|---|---|
@@ -303,35 +232,24 @@ Il conteggio sparisce: si ascolta e si tocca.
   | **A tempo** | tutti, da 1 a 8 | segui la güira |
   | **Il tap** | 4 e 8 | ascolta il bongo che chiude la mezza frase |
 
-- **Parametri sessione** (ricordati per tutti i brani):
-  - **Guida audio**: Basso + güira (default; senza güira separata usa basso e bongo), Tutti, oppure Mix attuale.
-  - **Durata**: 4 frasi (32 tempi) oppure 8 frasi (64 tempi). Se il brano è più corto si usano le frasi disponibili.
-- **Calibra il ritardo di cuffie e casse**: suonano 16 click e tu tocchi su ognuno (i primi 4 servono per prendere il ritmo). L'app misura il ritardo tipico tra suono e tocco (Bluetooth e reazione compresi) e lo toglie da ogni tocco negli esercizi e in "L'1 è qui!". Va rifatta quando cambi cuffie o casse. Senza calibrazione: 0 ms negli esercizi e 150 ms per "L'1 è qui!".
-  - Se a fine esercizio arrivi sempre in ritardo di oltre 60 ms e non hai calibrato, il risultato suggerisce di farlo.
-- Durante l'esercizio il **metronomo è spento**. La guida audio vale solo per l'esercizio: alla fine torna il mix del progetto.
-- "Torna al player" chiude.
+- **Durata**: 4 frasi (32 tempi) oppure 8 frasi (64 tempi). Se il brano è più corto si usano le frasi disponibili.
+- **Cosa si sente**: Basso + güira (predefinito), Tutti, oppure Il tuo mix.
+- **Ritardo dell'audio · Calibra**: suonano 16 click e tu tocchi su ognuno (i primi 4 servono a prendere il ritmo). L'app misura il ritardo tipico tra suono e tocco (Bluetooth, altoparlante e reazione compresi) e lo toglie da ogni tocco negli esercizi e in "L'1 è qui!". Va rifatta quando cambi cuffie o passi all'altoparlante. Senza calibrazione: 0 ms negli esercizi e 150 ms per "L'1 è qui!".
+- Durante l'esercizio il metronomo è spento; alla fine torna il mix del progetto.
 
 ### 9.2 Sessione
-- Parte dalla frase in cui eri (o dall'ultima utile). Ci sono 4 tempi di preparazione (5, 6, 7, 8) e poi la registrazione dei tocchi.
+- Parte dalla frase in cui eri. Ci sono 4 tempi di preparazione (5, 6, 7, 8) e poi la registrazione dei tocchi.
 - Un loop attivo viene sospeso e rimesso alla fine.
-- Sullo schermo:
-  - gioco e "Frase k di N", con una barra a segmenti;
-  - colpi presi sul totale e scarto medio in ms;
-  - **barra di precisione** da −150 a +150 ms, con il segno dell'ultimo tocco e la scritta "A tempo", "In anticipo di X ms" o "In ritardo di +X ms";
-  - il grande **pad da toccare**: diventa ciano se il tocco va a segno, rosso se è sbagliato ("Quello era il 6", "Già preso").
+- Sullo schermo: frase e barra a segmenti, colpi presi e scarto medio in ms, **barra di precisione** (prima · a tempo · dopo) con il segno dell'ultimo tocco, e il grande pad **Tocca** che si colora se il tocco va a segno e diventa rosso se è sbagliato ("Quello era il 6", "Già preso").
 - Un tocco vale se cade entro il 30% di un tempo dal tempo giusto. Entro ±30 ms è "Perfetto".
-- Se tocchi il tempo giusto ma troppo presto o troppo tardi, l'app lo dice ("Era il 1, ma troppo tardi") e mostra di quanti ms, invece di dire che non era quel tempo.
-- Al ritardo di ogni tocco viene tolto il **ritardo calibrato** (vedi sotto).
-- **Pausa/Riprendi**, **Ricomincia**, **Esci** (torna alla scelta dell'esercizio).
+- Se tocchi il tempo giusto ma troppo presto o troppo tardi, l'app lo dice ("Era l'1, ma troppo tardi").
+- **Pausa/Riprendi**, **Ricomincia**, **Esci**.
 
 ### 9.3 Risultato
 - **Punteggio** = (colpi presi − 0,5 × tocchi sbagliati) / colpi possibili. Se è il migliore: "Nuovo record personale!".
-- Giudizio: "Ritmo eccellente" (≥ 85%), "Bene, ci sei quasi" (≥ 60%), "Riproviamo".
-- Colpi a segno, precisione media (± ms) e distribuzione dei tocchi: anticipo, perfetto (±30 ms), ritardo.
-- **Tendenza**: se in media anticipi o ritardi di più di 25 ms, lo dice e suggerisce come correggere; altrimenti "Sei centrato".
-- Consiglio di ascolto dell'esercizio.
-- **Riprova esercizio**, **Altri esercizi**, **Torna al player**.
-- Record e giorni di allenamento restano nel browser.
+- Colpi a segno, precisione media (± ms) e distribuzione dei tocchi: anticipo, perfetto, ritardo.
+- **Tendenza**: se in media anticipi o ritardi di più di 25 ms, lo dice e suggerisce come correggere. Se ritardi molto e non hai calibrato, suggerisce "Calibra".
+- **Riprova**, **Altri esercizi**, **Torna al player**. Record e giorni di allenamento restano sul telefono.
 
 ---
 
@@ -371,37 +289,17 @@ Il conteggio sparisce: si ascolta e si tocca.
   Si può avviare anche a mano da Actions → "APK Android" → "Run workflow".
 - **Firma**: senza segreti configurati usa la chiave `android-signing/sideload.jks` del repository, così ogni nuova versione si installa sopra la precedente senza perdere i progetti. Per il Play Store servono una chiave privata e i segreti `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`: se ci sono, il workflow usa quelli. Cambiare chiave obbliga a disinstallare l'app una volta.
 
-## 12. Nuovo design (in lavorazione)
+## 12. In lavorazione
 
-Disegnato nella tela "Bachata Lab · nuovo design" su Claude. Stile pulito ispirato a Moises: sfondo quasi nero, un solo colore principale (da scegliere: corallo, lime, azzurro, viola, menta o rosa). Diventerà l'interfaccia dell'app quando sarà approvato. Decisioni prese finora:
-
-- **Player**:
-  - una riga per strumento, con forma d'onda, volume in % e tasti M/S;
-  - tasti in basso uguali in tutte le schermate: **−8 · −4 · Play · +4 · +8** (tempi);
-  - il bottone "Allenati" è tolto dal player: l'allenamento si apre dalla barra in basso della home;
-  - al suo posto c'è **Mappa**, che apre la mappa degli strumenti (con l'interruttore Strumenti / Testo).
-- **Mappa strumenti**:
-  - **Cos'è**:
-    - in alto, sei pulsanti degli strumenti che si illuminano nel loro colore mentre suonano;
-    - sotto, le forme d'onda di ogni strumento su un asse orizzontale, 4 frasi alla volta con il numero della frase, scorrevole;
-    - una linea bianca segna dove sei.
-  - **È una vista del player, non un player a parte**: prende tutte le impostazioni dalla schermata precedente (velocità, metronomo, mix).
-  - **Il loop resta attivo** ed è disegnato sulla mappa. I salti −8/−4/+4/+8 lo spostano come nel player.
-  - Toccare le onde porta in quel punto.
-  - **Toccare un pulsante strumento lo spegne solo dentro la mappa.** Tornando al player tutti gli strumenti tornano come erano nel player.
-  - Uno strumento che nel player era a volume 0 o spento parte spento nella mappa. Toccandolo si accende a 100%, sempre solo nella mappa.
-- **Testo sincronizzato**: schermata accanto alla mappa, con la riga cantata che si accende e il conteggio sempre visibile in alto. Prima si cerca il testo su LRCLIB (serve Internet); se il brano non c'è, si usa la trascrizione della voce separata con Whisper "base" sul telefono.
-- **Metronomo**: il bottone apre un popup con acceso/spento, volume e **click forte su** (sull'1, su 4 e 8, su 1 e 5).
-- **Güira sempre separata**: non è più un'opzione, ogni progetto ha sempre 6 tracce.
-- **Impostazioni**:
-  - tema Scuro (predefinito), Chiaro o Come il telefono;
-  - colore principale da una lista di 6, Corallo predefinito; nel tema chiaro si usa una tonalità più scura dello stesso colore, così si legge bene;
-  - calibrazione del ritardo dell'audio;
-  - spazio usato e versione.
-- **Decisioni del 25/11 sulle funzioni**:
-  - tolti: preset del mixer, ritocchi di BPM da ±0,1, "Accelera nel loop";
-  - restano: tap tempo, ±1 BPM, metà/doppio, "L'1 è qui", note sui tempi, esercizi completi (anche la guida audio).
-- **Ritardo nel conteggio degli esercizi**: l'utente l'ha notato con l'altoparlante del telefono, non con le cuffie. Sui telefoni Android anche l'altoparlante può avere 100–250 ms di ritardo che il browser non dichiara. Da verificare con la calibrazione fatta con l'altoparlante. Se invece è l'1 ad essere trovato nel posto sbagliato, va corretto con "L'1 è qui".
+- **Testo sincronizzato** (linguetta Testo della mappa): la riga cantata che si accende, con il conteggio sempre visibile in alto.
+  - Prima si cerca il testo su LRCLIB (serve Internet).
+  - Se il brano non c'è, si trascrive la voce separata con Whisper "base" sul telefono.
+  - Una riga sbagliata si potrà correggere a mano.
+- **Traduzione del testo**:
+  - l'app riconosce la lingua e traduce sul telefono (Opus-MT, scaricato la prima volta);
+  - in **italiano** di default, cambiabile nelle Impostazioni;
+  - la traduzione compare piccola sotto ogni riga e si può nascondere.
+- **Ritardo nel conteggio degli esercizi**: l'utente l'ha notato con l'altoparlante del telefono. Sui telefoni Android anche l'altoparlante può avere 100–250 ms di ritardo che il browser non dichiara: va calibrato con l'altoparlante. Se invece è l'1 a essere nel posto sbagliato, si corregge con "L'1 è qui".
 
 ## 13. Limiti noti
 
@@ -413,6 +311,14 @@ Disegnato nella tela "Bachata Lab · nuovo design" su Claude. Stile pulito ispir
 ---
 
 ## Registro modifiche
+
+- **25/11/2026**: nuovo design ispirato a Moises, disegnato con Claude.
+  - Tema scuro, chiaro o come il telefono; colore principale a scelta (Corallo predefinito).
+  - Home a righe con stato del mix; barra in basso Progetti / Allenati / Impostazioni.
+  - Player con una riga per strumento (onda, %, M/S), popup per volume, velocità, metronomo (con accento), sezioni e ritmo; tasti −8 −4 ▶ +4 +8 che spostano anche il loop.
+  - Nuova **Mappa** strumenti a tutto schermo, con muto valido solo nella mappa.
+  - **Usa solo l'audio** per i video e **MP3 del mix attuale** (download nel browser, condivisione nell'app Android).
+  - Güira sempre separata. Tolti preset del mixer, BPM ±0,1, "Accelera nel loop", griglia e pannello Mixer & ritmo.
 
 - **25/11/2026**: separazione nativa nell'app Android (ONNX Runtime su 4 core, circa 5 volte più veloce), finestre della güira più efficienti (−25% di lavoro), ripiego automatico sulla versione nel browser. Calibrazione del ritardo di cuffie e casse per esercizi e "L'1 è qui!"; messaggio chiaro quando il tempo è giusto ma il tocco è in anticipo o in ritardo. Tolto il "limite" di spazio dalla home: si vede solo lo spazio usato.
 

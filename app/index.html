@@ -3,907 +3,659 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0f131c">
+<meta name="theme-color" content="#0B0C10">
 <title>Bachata Lab</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
-/* "Stage Studio Pulse" (Stitch design, Nov 2026): a stage mixing desk for dancers.
-   Charcoal hardware panels with 1px edges, small radii, no soft shadows.
-   Light is the signal: rose = the 1 and the 5 and the main action, cyan = the pulse and loops,
-   amber = the tap (4 and 8), solo and warnings. Glow only on live elements.
-   Type: Space Grotesk (structure), Geist (text), JetBrains Mono (counts, readouts, labels). */
+/* Bachata Lab, clean design (Nov 2026): near-black ground, one accent colour (coral by default,
+   chosen in Settings), light and dark themes. Inter for text, Space Grotesk for titles and the count. */
 :root{color-scheme:dark;
---bg:#0f131c;--s0:#0a0e17;--s1:#151922;--s2:#1c2029;--s3:#262a33;--s4:#31353f;--s5:#3e4555;
---edge:#2a3245;--edge2:#3e4a66;
---ink:#dfe2ef;--ink2:#b9c0d0;--pk:#e5bcc1;--mut:#7a849a;
---pri:#ffb2bd;--acc:#ff4e7b;--on-acc:#3b0014;--cy:#00eefc;--on-cy:#00363a;--am:#ffba20;--on-am:#412d00;--warn:#ffba20;--bad:#ffb4ab;--badbg:#93000a;
---c-vocals:#00eefc;--c-guitar:#ffba20;--c-bass:#ff4e7b;--c-bongo:#ffdea8;--c-guira:#b693ff;--c-altro:#8fa3c8;
---r1:4px;--r2:8px;--r3:12px;
---mono:"JetBrains Mono",ui-monospace,monospace;--disp:"Space Grotesk",Geist,system-ui,sans-serif;--body:Geist,system-ui,sans-serif;
+--bg:#0B0C10;--s1:#15171D;--s2:#1E2129;--s3:#2A2F3A;--ink:#F2F3F5;--ink2:#C9CDD5;--ink3:#9BA1AD;--mute:#5C6270;--line:#1E2129;
+--acc:#FF6A4D;--on-acc:#0B0C10;--tap:#FFC24A;--bad:#FF8A80;
+--c-vocals:#7FD4FF;--c-guitar:#FFC24A;--c-bass:#FF8A73;--c-bongo:#F2E3C6;--c-guira:#B9A4FF;--c-altro:#8FA3C8;
+--disp:"Space Grotesk",Inter,system-ui,sans-serif;--body:Inter,system-ui,sans-serif;
 --sat:env(safe-area-inset-top);--sab:env(safe-area-inset-bottom)}
+:root.light{color-scheme:light;--bg:#F6F6F3;--s1:#ECECE7;--s2:#E0E0DA;--s3:#D3D3CC;--ink:#14151A;--ink2:#3E424B;--ink3:#5E626B;--mute:#A9ACB3;--line:#E0E0DA;
+--tap:#A86F00;--bad:#C0392B;--c-vocals:#1E88C8;--c-guitar:#C98A00;--c-bass:#E0533A;--c-bongo:#9A7B45;--c-guira:#7C5CE6;--c-altro:#5D7096}
 *{box-sizing:border-box;min-width:0;-webkit-tap-highlight-color:transparent}
 [hidden]{display:none!important}
 html{background:var(--bg)}
 html,body{height:100%}
-body{margin:0;background:var(--bg);color:var(--ink);font:400 15px/1.45 var(--body);overflow-x:clip;
-  padding:var(--sat) env(safe-area-inset-right) var(--sab) env(safe-area-inset-left)}
-.screen{display:none;max-width:560px;margin:0 auto;min-height:100%;padding:4px 16px 24px}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 15px/1.45 var(--body);overflow-x:clip;padding:var(--sat) env(safe-area-inset-right) var(--sab) env(safe-area-inset-left)}
+.screen{display:none;max-width:560px;margin:0 auto;min-height:100%}
 .screen.on{display:block}
-h1,h2,h3{font-family:var(--disp);margin:0;letter-spacing:-.01em;overflow-wrap:anywhere}
-h2{font-size:22px;line-height:1.2;font-weight:700}
-h3{font-size:17px;font-weight:700}
-p{margin:6px 0}.mute{color:var(--ink2)}.small{font-size:13px}.warn{color:var(--warn)}
-.k{font:600 11px/1.3 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--pk)}
-.mono{font-family:var(--mono)}
-.badge{font:700 11px/14px var(--mono);letter-spacing:.08em;text-transform:uppercase}
+h1,h2,h3{margin:0;font-family:var(--disp);letter-spacing:-.01em}
+p{margin:0}
+.mute{color:var(--ink3)}.small{font-size:13px}.warn{color:var(--tap)}
 svg.i{width:20px;height:20px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 svg.i.f{fill:currentColor;stroke:none}
-button{font:600 13px var(--mono);letter-spacing:.04em;min-height:44px;padding:0 12px;border-radius:var(--r1);border:1px solid var(--edge);
-  background:var(--s3);color:var(--ink);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;
-  touch-action:manipulation;user-select:none;-webkit-user-select:none;transition:transform .06s,background .12s;white-space:nowrap}
+button{font:600 14px var(--body);min-height:44px;padding:0 14px;border:0;border-radius:12px;background:var(--s2);color:var(--ink);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;touch-action:manipulation;user-select:none;-webkit-user-select:none;white-space:nowrap}
 button:active{transform:scale(.97)}
-:focus-visible{outline:2px solid var(--cy);outline-offset:2px}
-button.on,button.primary{background:var(--acc);border-color:var(--acc);color:var(--on-acc)}
 button:disabled{opacity:.4}
-.icon{width:44px;padding:0;background:transparent;border-color:transparent;color:var(--ink2)}
-.link{background:none;border:0;color:var(--cy);padding:0 4px;min-height:36px;font:700 11px var(--mono);letter-spacing:.08em;text-transform:uppercase}
-input[type=text]{font:500 16px var(--body);width:100%;min-height:44px;border:0;background:transparent;color:var(--ink);padding:0}
-input[type=text]:focus{outline:none}
-.field:focus-within,.search:focus-within{border-color:var(--cy)}
-/* sliders: recessed track, round thumb */
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.icon{width:44px;padding:0;border-radius:22px;background:transparent;color:var(--ink)}
+.link{background:none;color:var(--acc);min-height:36px;padding:0 6px;font-weight:600;font-size:13px}
+.pill{border-radius:999px}
+.primary{background:var(--acc);color:var(--on-acc);font-weight:700}
+.on.chipb,.chipb.on{background:var(--ink);color:var(--bg)}
+input[type=text]{font:500 16px var(--body);width:100%;min-height:44px;border:0;background:transparent;color:var(--ink);padding:0;outline:none}
 input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:40px;margin:0;background:transparent;--p:50%}
-input[type=range]::-webkit-slider-runnable-track{height:6px;border-radius:3px;background:linear-gradient(90deg,var(--tc,var(--cy)) var(--p),var(--s0) var(--p));box-shadow:inset 0 1px 2px rgba(0,0,0,.8)}
-input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:var(--tc,var(--cy));margin-top:-8px;border:3px solid var(--bg)}
-input[type=range]::-moz-range-track{height:6px;border-radius:3px;background:var(--s0)}
-input[type=range]::-moz-range-progress{height:6px;border-radius:3px;background:var(--tc,var(--cy))}
-input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:var(--tc,var(--cy));border:3px solid var(--bg)}
-input[type=range]:focus-visible{outline:none}
-input[type=range]:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 3px var(--ink)}
-/* switches */
-.sw{-webkit-appearance:none;appearance:none;width:48px;height:28px;border-radius:14px;background:var(--s4);border:1px solid var(--edge2);position:relative;flex:none;cursor:pointer;margin:0;transition:background .15s}
-.sw::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:var(--ink2);transition:transform .15s,background .15s}
-.sw:checked{background:var(--acc);border-color:var(--acc)}.sw:checked::after{transform:translateX(20px);background:var(--on-acc)}
-.panel{background:var(--s1);border:1px solid var(--edge);border-radius:var(--r2);padding:14px;margin-top:12px}
+input[type=range]::-webkit-slider-runnable-track{height:4px;border-radius:2px;background:linear-gradient(90deg,var(--tc,var(--acc)) var(--p),var(--s3) var(--p))}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:var(--ink);margin-top:-9px}
+input[type=range]::-moz-range-track{height:4px;border-radius:2px;background:var(--s3)}
+input[type=range]::-moz-range-progress{height:4px;border-radius:2px;background:var(--tc,var(--acc))}
+input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:var(--ink);border:0}
+.sw{-webkit-appearance:none;appearance:none;width:50px;height:30px;border-radius:15px;background:var(--s3);position:relative;flex:none;cursor:pointer;margin:0;transition:background .15s}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:var(--ink3);transition:transform .15s}
+.sw:checked{background:var(--acc)}.sw:checked::after{transform:translateX(20px);background:var(--on-acc)}
 .row{display:flex;gap:8px;align-items:center}
-.wrap{flex-wrap:wrap}
-.grow,.sp{flex:1}
-.chip{display:inline-flex;align-items:center;gap:6px;min-height:24px;padding:2px 8px;border-radius:var(--r1);background:var(--s3);border:1px solid var(--edge);
-  font:700 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink2);white-space:nowrap}
-.chip:empty{display:none}
-.chip.cy{color:var(--cy);border-color:rgba(0,238,252,.35);background:rgba(0,238,252,.08)}
-.chip.am{color:var(--am);border-color:rgba(255,186,32,.35);background:rgba(255,186,32,.08)}
-.chip.rose{color:var(--pri);border-color:rgba(255,78,123,.4);background:rgba(255,78,123,.1)}
-.chip.red{color:#fff;background:#b3002f;border-color:#b3002f}
-.chip i{width:6px;height:6px;border-radius:50%;background:currentColor;display:block}
-.chips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding:2px 0}.chips::-webkit-scrollbar{display:none}
+.grow{flex:1}
+.card{background:var(--s1);border-radius:18px;padding:14px 16px}
+.seg{display:flex;gap:4px;padding:4px;border-radius:14px;background:var(--s1)}
+.seg button{flex:1;min-height:38px;border-radius:10px;background:transparent;color:var(--ink2);font-size:13px;padding:0 6px}
+.seg button.on{background:var(--ink);color:var(--bg)}
+.lbl{font:600 13px var(--body);color:var(--ink3);margin:20px 4px 8px}
+.chips{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none}.chips::-webkit-scrollbar{display:none}
 .chips:empty{display:none}
-.chips button{flex:none;min-height:40px;padding:0 14px;font:700 12px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink2);background:var(--s2);border-radius:999px}
-.chips button.on{background:var(--acc);border-color:var(--acc);color:var(--on-acc)}
-.seg{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:4px}
-.seg button{background:var(--s2);font:600 12px var(--mono);color:var(--ink2);padding:0 6px}
-.seg button.on{background:rgba(255,186,32,.18);border-color:var(--am);color:var(--am)}
-.lbl{font:600 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--pk);margin:16px 0 8px}
-.tbar{display:flex;align-items:center;gap:6px;min-height:52px}
-.tbar h3{flex:1;font:700 18px var(--disp);letter-spacing:.04em;text-transform:uppercase}
-.bnav{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));background:var(--s0);border-top:1px solid var(--edge);padding:4px 8px calc(4px + var(--sab));gap:4px}
-.bnav button{flex-direction:column;gap:2px;background:transparent;border:0;min-height:52px;font:700 10px var(--mono);letter-spacing:.1em;color:var(--mut);border-radius:var(--r2)}
-.bnav button svg.i{width:22px;height:22px}
-.bnav button.on{color:var(--acc);background:var(--s3)}
-.bnav button:disabled{opacity:.35}
+.chips button{flex:none;min-height:36px;border-radius:18px;background:var(--s1);color:var(--ink2);font-size:14px}
+.chips button.on{background:var(--ink);color:var(--bg)}
+.tbar{display:flex;align-items:center;gap:6px;min-height:56px;padding:6px 12px 0}
+.tbar h1{flex:1;font-size:18px}
+.bnav{position:fixed;left:0;right:0;bottom:0;z-index:5;max-width:560px;margin:0 auto;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));background:var(--bg);border-top:1px solid var(--line);padding:4px 8px calc(10px + var(--sab))}
+.bnav button{flex-direction:column;gap:4px;background:none;color:var(--ink3);font-size:11px;min-height:56px}
+.bnav button.on{color:var(--ink)}
+.bnav svg.i{width:22px;height:22px}
 
 /* ---------- Home ---------- */
-#s-home{padding-bottom:calc(88px + var(--sab))}
-.hbar{display:flex;align-items:center;gap:12px;min-height:64px}
-.logo{width:42px;height:42px;border-radius:var(--r2);background:var(--s2);border:1px solid var(--edge);display:grid;place-items:center;color:var(--acc)}
-.hbar .ht{flex:1}
-.hbar b{font:700 21px/1.1 var(--disp);letter-spacing:.02em;display:block}
-.hbar small{font:600 11px var(--mono);letter-spacing:.12em;color:var(--cy);text-transform:uppercase}
-.privacy .row{align-items:flex-start}
-.privacy svg.i{color:var(--cy)}
-.ubar{height:6px;border-radius:3px;background:var(--s0);margin:10px 0 8px;overflow:hidden;display:flex}
-.ubar i{display:block;height:100%}
-.privacy p{font:500 12px var(--mono);color:var(--ink2);margin:0;flex:1}
-.newcard{width:100%;justify-content:flex-start;gap:14px;text-align:left;min-height:84px;margin-top:12px;padding:14px;background:var(--s2);border:1px solid var(--edge2);border-radius:var(--r2);font:inherit;letter-spacing:0}
-.newcard .plus{width:56px;height:56px;border-radius:var(--r2);background:var(--acc);color:var(--on-acc);display:grid;place-items:center;flex:none;box-shadow:0 0 20px rgba(255,78,123,.35)}
-.newcard .plus svg{width:28px;height:28px}
-.newcard b{display:block;font:700 19px var(--disp);letter-spacing:.02em}
-.newcard span span{display:block;color:var(--ink2);font-size:14px;line-height:1.3}
-.newcard>svg{color:var(--acc);margin-left:auto}
-.search{display:flex;align-items:center;gap:10px;background:var(--s0);border:1px solid var(--edge);border-radius:var(--r2);padding:0 12px;margin:12px 0 8px;color:var(--ink2)}
-.search input{font:500 15px var(--body);background:transparent;border:0;color:var(--ink);flex:1;min-height:48px;outline:none}
-.sect{display:flex;align-items:center;gap:8px;margin:16px 0 4px}
-.sect h2{font:700 19px var(--disp);letter-spacing:.02em;text-transform:uppercase}
-.sect .sp{flex:1}
-.proj{background:var(--s1);border:1px solid var(--edge);border-radius:var(--r2);padding:12px;margin-top:10px;cursor:pointer}
-.proj:active{border-color:var(--edge2);background:var(--s2)}
-.proj .top{display:flex;gap:12px}
-.thumb{position:relative;width:104px;height:78px;border-radius:var(--r1);overflow:hidden;flex:none;background:var(--s0);border:1px solid var(--edge);display:grid;place-items:center;color:var(--cy)}
-.thumb img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
-.thumb svg.i{width:28px;height:28px}
-.thumb .tag{position:absolute;top:4px;left:4px;padding:1px 5px;border-radius:3px;background:rgba(10,14,23,.85);color:var(--cy)}
-.thumb .dur{position:absolute;bottom:4px;right:4px;padding:1px 5px;border-radius:3px;background:rgba(10,14,23,.85);font:700 11px var(--mono);color:var(--ink)}
-.proj .pi{flex:1;display:flex;flex-direction:column;gap:4px}
-.proj .pt{display:flex;align-items:flex-start;gap:4px}
-.proj .pt b{flex:1;font:700 17px/1.25 var(--disp);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.proj .pt .icon{width:36px;min-height:36px;margin:-6px -8px 0 0}
-.proj .meta{font:600 12px var(--mono);color:var(--cy);display:flex;flex-wrap:wrap;gap:2px 8px}
-.proj .meta .b{color:var(--am)}.proj .meta .d{color:var(--ink2)}
-.proj .mk{align-self:flex-start;color:var(--cy);border-color:rgba(0,238,252,.35);background:rgba(0,238,252,.06);text-transform:none;letter-spacing:.02em}
-.proj .foot{display:flex;align-items:center;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid var(--edge)}
-.proj .status{flex:1;display:flex;align-items:center;gap:6px;font:600 11px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink2);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
-.proj .status i{width:7px;height:7px;border-radius:50%;background:var(--sc,var(--cy));flex:none}
-.proj .open{min-height:40px;background:var(--s3);color:var(--ink);font:700 12px var(--mono);letter-spacing:.08em}
-.proj .open svg{width:16px;height:16px;color:var(--acc)}
-.empty{display:grid;justify-items:center;text-align:center;gap:4px;padding:32px 20px;margin-top:12px;border:1px dashed var(--edge2);border-radius:var(--r2);color:var(--ink2)}
-.empty svg.i{width:32px;height:32px;color:var(--acc);margin-bottom:6px}
-.empty b{font:700 18px var(--disp);color:var(--ink)}
+#s-home,#s-set{padding-bottom:calc(84px + var(--sab))}
+.hhead{display:flex;align-items:center;justify-content:space-between;padding:20px 20px 8px}
+.logo{width:36px;height:36px;border-radius:10px;background:var(--acc);color:var(--on-acc);display:grid;place-items:center}
+.hhead h1{font-size:22px}
+#themeBtn{background:var(--s1)}
+.search{display:flex;align-items:center;gap:10px;height:48px;padding:0 14px;margin:8px 20px 0;border-radius:14px;background:var(--s1);color:var(--ink3)}
+.filters{padding:14px 20px 4px}
+.sect{display:flex;justify-content:space-between;align-items:baseline;padding:18px 20px 6px}
+.sect h2{font-size:17px;font-weight:600}
+#projects{padding:0 12px}
+.proj{display:flex;align-items:center;gap:14px;padding:12px 8px;border-radius:14px;cursor:pointer}
+.proj:active{background:var(--s1)}
+.proj .th{position:relative;width:56px;height:56px;border-radius:12px;background:var(--s2);flex:none;display:flex;align-items:flex-end;justify-content:center;gap:3px;padding-bottom:14px;overflow:hidden}
+.proj .th i{display:block;width:4px;border-radius:2px;background:var(--acc)}
+.proj .th img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.proj .th .vt{position:absolute;left:4px;bottom:4px;padding:1px 5px;border-radius:5px;background:var(--bg);font:600 10px var(--body);color:var(--ink2)}
+.proj .tx{flex:1;min-width:0}
+.proj b{display:block;font:600 16px var(--body);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.proj .m1{font:500 13px var(--body);color:var(--ink3);margin-top:3px}
+.proj .m2{font:500 12px var(--body);color:var(--ink2);margin-top:5px;display:flex;align-items:center;gap:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.proj .m2 i{width:6px;height:6px;border-radius:3px;background:var(--sc,var(--acc));flex:none}
+.proj .when{font:500 12px var(--body);color:var(--ink3);flex:none}
+.proj .icon{width:36px;min-height:36px;color:var(--ink3);margin-right:-6px}
+.empty{text-align:center;padding:36px 24px;color:var(--ink3)}
+.empty b{display:block;font:700 18px var(--disp);color:var(--ink);margin-bottom:6px}
 #projects:not(:empty)~.empty{display:none}
-.guide ol{list-style:none;padding:0;margin:12px 0 0;display:grid;gap:8px}
-.guide li{display:grid;grid-template-columns:44px minmax(0,1fr);gap:12px;background:var(--s2);border-radius:var(--r1);padding:12px}
-.guide li .n{width:44px;height:44px;border-radius:var(--r1);display:grid;place-items:center;font:700 22px var(--mono)}
-.guide li:nth-child(1) .n{background:rgba(255,78,123,.18);color:var(--acc)}
-.guide li:nth-child(2) .n{background:rgba(0,238,252,.14);color:var(--cy)}
-.guide li:nth-child(3) .n{background:rgba(255,186,32,.16);color:var(--am)}
-.guide li b{display:block;font:600 16px var(--body)}
-.guide li span{font-size:14px;color:var(--ink2);display:block;line-height:1.4}
-#homeNav{position:fixed;left:0;right:0;bottom:0;z-index:5;max-width:560px;margin:0 auto}
+.guide{margin:16px 16px 0}
+.guide ol{list-style:none;padding:0;margin:10px 0 0;display:grid;gap:10px}
+.guide li{display:flex;gap:12px;align-items:flex-start}
+.guide li .n{width:28px;height:28px;border-radius:14px;background:var(--s2);color:var(--acc);display:grid;place-items:center;font:700 14px var(--disp);flex:none}
+.guide li span{font-size:14px;color:var(--ink2)}
+.newbar{position:fixed;left:0;right:0;bottom:calc(76px + var(--sab));z-index:4;max-width:560px;margin:0 auto;padding:0 20px 10px;background:linear-gradient(0deg,var(--bg) 60%,transparent)}
+#newBtn{width:100%;height:56px;border-radius:28px;font-size:16px}
+#s-home{padding-bottom:calc(156px + var(--sab))}
+
+/* ---------- Settings ---------- */
+.set{padding:0 16px}
+.set h1{font-size:24px;padding:20px 4px 4px}
+.swatches{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;margin-top:10px}
+.swatches button{height:44px;border-radius:22px;padding:0;background:var(--c)}
+.swatches button.on{box-shadow:0 0 0 3px var(--s1),0 0 0 5px var(--ink)}
+.setrow{display:flex;align-items:center;gap:12px;padding:14px 16px;border-top:1px solid var(--s2)}
+.setrow:first-child{border-top:0}
+.setrow .tx{flex:1}.setrow .tx b{display:block;font:600 15px var(--body)}.setrow .tx span{font-size:12px;color:var(--ink3)}
+.preview{display:flex;align-items:center;gap:12px;margin-top:16px;padding:12px;border-radius:14px;background:var(--bg)}
+.preview .num{width:44px;height:44px;border-radius:22px;background:var(--acc);color:var(--on-acc);display:grid;place-items:center;font:700 26px var(--disp)}
+.preview .bar{flex:1;height:5px;border-radius:3px;background:var(--s2);position:relative}
+.preview .bar i{position:absolute;left:0;top:0;bottom:0;width:55%;border-radius:3px;background:var(--acc)}
 
 /* ---------- New project ---------- */
-.field{display:flex;align-items:center;gap:8px;background:var(--s0);border:1px solid var(--edge);border-radius:var(--r1);padding:0 4px 0 12px;margin-top:8px}
-.vcard{position:relative;border-radius:var(--r2);overflow:hidden;background:#000;border:1px solid var(--edge);display:none;margin-top:12px}
+#s-new{padding-bottom:24px}
+.field{display:block;margin:8px 16px 0;padding:10px 14px;border-radius:14px;background:var(--s1)}
+.field span{display:block;font:500 12px var(--body);color:var(--ink3)}
+.field .row{display:flex}.field .row input{min-height:30px;font-weight:600}
+.fileRow{display:flex;align-items:center;gap:12px;margin:10px 16px 0;padding:12px 14px;border-radius:14px;background:var(--s1)}
+.fileRow .ic{width:40px;height:40px;border-radius:10px;background:var(--s2);display:grid;place-items:center;color:var(--acc);flex:none}
+.vcard{position:relative;margin:10px 16px 0;border-radius:14px;overflow:hidden;background:#000;display:none}
 .vcard.on{display:block}
-.vcard video{display:block;width:100%;aspect-ratio:16/9;object-fit:contain;background:#000}
-.vcard .ov{position:absolute;left:8px;right:8px;display:flex;justify-content:space-between;align-items:center;pointer-events:none}
-.vcard .ov.top{top:8px}.vcard .ov.bot{bottom:8px}
-.vcard .ov span,.vcard .ov button{pointer-events:auto;background:rgba(10,14,23,.85);border-radius:var(--r1);padding:3px 8px;min-height:26px}
-.vcard .ov button{color:var(--ink);min-height:40px;padding:0 10px}
-.durbox{display:flex;align-items:flex-end;justify-content:space-between;gap:8px;background:var(--s0);border:1px solid var(--edge);border-radius:var(--r1);padding:10px 12px;margin-top:12px}
-.durbox b{display:block;font:700 46px/1 var(--mono);letter-spacing:-.03em;color:var(--acc);margin-top:6px}
-.durbox .r{text-align:right;font:600 11px var(--mono);letter-spacing:.06em;color:var(--ink2);text-transform:uppercase}
-.wave{position:relative;height:96px;touch-action:none;border-radius:var(--r1);overflow:hidden;background:var(--s0);border:1px solid var(--edge);margin-top:12px}
+.vcard video{display:block;width:100%;aspect-ratio:16/9;object-fit:contain}
+.part{margin:16px 16px 0}
+.part .hd{display:flex;justify-content:space-between;align-items:flex-end}
+.part h2{font-size:15px;font-weight:600}
+#rd{font:700 34px/1 var(--disp);color:var(--acc)}
+.wave{position:relative;height:88px;margin-top:14px;touch-action:none}
 .wave canvas{position:absolute;inset:0;width:100%;height:100%}
-.wave .ph{position:absolute;top:0;bottom:0;width:2px;background:#fff;display:none;pointer-events:none}
-.ticks{display:flex;justify-content:space-between;font:600 11px var(--mono);color:var(--mut);margin-top:6px}
-.steppers{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
-.steppers>div{background:var(--s2);border:1px solid var(--edge);border-radius:var(--r1);padding:10px}
-.steppers .h{display:flex;justify-content:space-between;align-items:center}
-.steppers b{font:700 18px var(--mono);color:var(--ink)}
-.steppers .row{margin-top:8px}.steppers .row button{flex:1;background:var(--s3);min-height:40px}
-.three{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px}
-.three button{font:700 11px var(--mono);letter-spacing:.05em;text-transform:uppercase;padding:0 6px}
-.three #preview{background:rgba(0,238,252,.12);border-color:var(--cy);color:var(--cy)}
-.limits{display:flex;justify-content:space-between;gap:8px;margin-top:12px;font:600 11px var(--mono);letter-spacing:.06em;color:var(--ink2);text-transform:uppercase}
-.alert{display:flex;gap:10px;align-items:flex-start;background:rgba(255,186,32,.1);border:1px solid rgba(255,186,32,.4);border-radius:var(--r1);padding:10px 12px;margin-top:10px;font-size:14px;color:var(--ink)}
-.alert svg.i{color:var(--am)}
+.wave .ph{position:absolute;top:0;bottom:0;width:2px;background:var(--ink);display:none;pointer-events:none}
+.ticks{display:flex;justify-content:space-between;margin-top:10px;font:500 11px var(--body);color:var(--ink3)}
+.steppers{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
+.steppers>div{padding:10px;border-radius:12px;background:var(--s2)}
+.steppers .h{display:flex;justify-content:space-between;font:500 12px var(--body);color:var(--ink3)}
+.steppers b{color:var(--ink);font:700 14px var(--body)}
+.steppers .row{margin-top:8px;gap:6px}.steppers .row button{flex:1;min-height:34px;border-radius:10px;background:var(--s3);font-size:13px}
+#preview{width:100%;margin-top:10px;background:var(--s3)}
+.here{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.here button{min-height:38px;background:var(--s2);font-size:13px}
+.alert{margin-top:10px;padding:10px 12px;border-radius:12px;background:rgba(255,194,74,.12);color:var(--ink);font-size:13px}
 .alert:empty{display:none}
-.opt{display:block;cursor:pointer}
-.opt .row{align-items:flex-start;gap:12px}
-.opt b{display:block;font:600 17px var(--body)}
-.stemtags{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-top:8px}
-.stemtags span{display:flex;align-items:center;gap:6px;background:var(--s2);border:1px solid var(--edge);border-radius:var(--r1);padding:6px 8px;font:500 13px var(--body);color:var(--ink);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
-.stemtags span svg{width:16px;height:16px;color:var(--c)}
-.est .row{justify-content:space-between}
-.est b.big{font:700 22px var(--mono);color:var(--am);background:var(--s0);border:1px solid var(--edge);border-radius:var(--r1);padding:4px 10px}
-.est .nt{display:flex;gap:10px;margin-top:10px;background:var(--s2);border-radius:var(--r1);padding:10px;font-size:13px;color:var(--ink2)}
-.est .nt svg{color:var(--cy);flex:none}
-.est .nt:empty{display:none}
-.cta{width:100%;min-height:58px;border-radius:var(--r2);font:700 19px var(--disp);letter-spacing:.06em;text-transform:uppercase;margin-top:16px;box-shadow:0 0 24px rgba(255,78,123,.3)}
-.ghost{background:var(--s2);color:var(--ink2);width:100%;margin-top:8px;font:600 15px var(--body);letter-spacing:0}
+.stemchips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.stemchips span{padding:5px 10px;border-radius:12px;background:var(--s2);font:600 12px var(--body);color:var(--c)}
+#est{text-align:center;margin:18px 16px 10px;font-size:13px;color:var(--ink3)}
+#createBtn{display:flex;width:calc(100% - 32px);margin:0 16px;height:56px;border-radius:28px;font-size:16px}
 
 /* ---------- Processing ---------- */
-.liveline{display:flex;justify-content:space-between;align-items:center;gap:8px;border-bottom:1px solid var(--edge);padding:0 0 8px}
-.liveline .k{color:var(--ink);display:flex;align-items:center;gap:8px}
-.liveline .k i{width:8px;height:8px;border-radius:50%;background:var(--acc);box-shadow:0 0 10px var(--acc)}
-.trk{display:flex;align-items:center;gap:12px}
-.trk .ic{width:60px;height:60px;border-radius:var(--r1);background:var(--s0);border:1px solid var(--edge);display:grid;place-items:center;color:var(--cy);overflow:hidden;flex:none}
-.trk .ic img{width:100%;height:100%;object-fit:cover}
-.trk b{display:block;font:700 17px var(--disp);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.gaugebox{text-align:center;background:radial-gradient(90% 70% at 50% 35%,rgba(255,78,123,.12),transparent 70%),var(--s1)}
-.gauge{position:relative;width:180px;height:180px;margin:4px auto 0}
-.gauge svg{width:100%;height:100%;transform:rotate(-90deg)}
-.gauge circle{fill:none;stroke-width:9}
-.gauge .bg{stroke:var(--s3)}
-.gauge .fg{stroke:var(--acc);stroke-linecap:round;stroke-dasharray:414.7;stroke-dashoffset:414.7;transition:stroke-dashoffset .6s;filter:drop-shadow(0 0 6px rgba(255,78,123,.6))}
-.gauge .pct{position:absolute;inset:0;display:grid;place-content:center}
-.gauge .pct b{font:700 54px/1 var(--mono);letter-spacing:-.04em}
-.gauge .pct b small{font-size:20px;color:var(--acc)}
-.gauge .pct span{color:var(--cy);margin-top:4px}
-.stagepill{display:inline-flex;align-items:center;gap:8px;margin:12px auto 0;background:var(--s2);border:1px solid var(--edge);border-radius:999px;padding:8px 14px;font:500 15px var(--body);max-width:100%}
-.stagepill i{width:8px;height:8px;border-radius:50%;background:var(--acc);flex:none}
-.stats3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));margin-top:14px;background:var(--s0);border:1px solid var(--edge);border-radius:var(--r1);padding:10px 4px}
-.stats3 div{display:grid;gap:2px}
-.stats3 span{font:600 10px var(--mono);letter-spacing:.08em;color:var(--ink2);text-transform:uppercase}
-.stats3 b{font:700 17px var(--mono)}
-.stats3 div:last-child b{color:var(--am)}
-.steps{list-style:none;padding:0;margin:8px 0 0;display:grid;gap:8px}
-.steps li{display:flex;align-items:center;gap:12px;padding:12px;border-radius:var(--r2);background:var(--s1);border:1px solid var(--edge);flex-wrap:wrap}
-.steps li .st{width:40px;height:40px;border-radius:var(--r1);display:grid;place-items:center;background:var(--s3);color:var(--ink2);flex:none}
-.steps li.done .st{background:rgba(0,238,252,.14);color:var(--cy)}
-.steps li.now{border-left:3px solid var(--acc)}
-.steps li.now .st{background:rgba(255,78,123,.16);color:var(--acc)}
-.steps li.now .st svg{animation:spin 1.2s linear infinite}
-.steps li.todo{opacity:.55}
-.steps li .t{flex:1;font:600 15px var(--body)}
-.steps li .tag{font:700 10px var(--mono);letter-spacing:.08em;padding:2px 6px;border-radius:3px;background:var(--s3);color:var(--ink2)}
-.steps li.done .tag{color:var(--cy)}.steps li.now .tag{background:#b3002f;color:#fff}
-.steps li .sbar{flex-basis:100%;height:4px;border-radius:2px;background:var(--s0);overflow:hidden}
-.steps li .sbar b{display:block;height:100%;width:0;background:var(--acc);transition:width .4s}
-@keyframes spin{to{transform:rotate(360deg)}}
-.secure .k{color:var(--am);display:flex;gap:8px;align-items:center}
-.secure p{font-size:14px;color:var(--ink)}
-#cancelBtn{width:100%;margin-top:14px;min-height:52px;color:var(--am);font:700 14px var(--mono);letter-spacing:.08em}
-
-/* ---------- Player ---------- */
-#s-player{padding:0 14px;--bigh:clamp(56px,9vh,88px)}
-#s-player.on{display:flex;flex-direction:column;gap:8px;height:calc(100dvh - var(--sat) - var(--sab));overflow:hidden}
-#s-player>*{flex:none}
-.ptop{display:flex;align-items:center;gap:6px;min-height:48px;margin-top:2px}
-.ptop .back{width:auto;padding:0 8px 0 4px;background:var(--s2);font:700 11px var(--mono);letter-spacing:.06em}
-.ptop .tt{flex:1;min-width:0}
-.ptop .tt b{display:block;font:700 17px/1.2 var(--disp);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ptop .tt span{display:block;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font:600 10px var(--mono);letter-spacing:.06em}
-.ptop .chip{min-height:36px;font-size:12px}
-.ptop .chip b{color:var(--am);font-size:14px}
-.count{position:relative;background:radial-gradient(60% 75% at 50% 45%,var(--glow,rgba(0,238,252,.14)),transparent 72%),var(--s1);border:1px solid var(--edge);border-radius:var(--r2);padding:8px;touch-action:pan-y}
-.count.c1{--glow:rgba(255,78,123,.2)}.count.c4{--glow:rgba(255,186,32,.16)}
-.ctop{display:flex;justify-content:space-between;align-items:center;gap:6px}
-.ctop .chip{background:var(--s3)}
-#secLbl{overflow:hidden;text-overflow:ellipsis}
-#secLbl.warn{background:#b3002f;border-color:#b3002f;color:#fff;animation:blink .5s ease-in-out infinite alternate}
-@keyframes blink{to{opacity:.6}}
-.bigrow{display:flex;justify-content:center;align-items:flex-end;gap:10px;height:var(--bigh);margin:2px 0 6px}
-.big{font:800 calc(var(--bigh) * 1.05)/var(--bigh) var(--mono);letter-spacing:-.05em;color:var(--ink);text-shadow:0 0 24px rgba(0,238,252,.5);font-variant-numeric:tabular-nums}
-.big.one{color:var(--acc);text-shadow:0 0 24px rgba(255,78,123,.55)}
-.big.tap{color:var(--am);text-shadow:0 0 24px rgba(255,186,32,.45)}
-.cap{font:700 13px/1.2 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ink);padding-bottom:6px;min-width:64px}
-.cap small{display:block;font-size:10px;color:var(--ink2);letter-spacing:.06em}
-.cap.tap{color:var(--am)}
-.dots{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:4px}
-.dot{height:38px;border-radius:var(--r1);display:flex;flex-direction:column;align-items:center;justify-content:center;font:700 15px/1 var(--mono);background:var(--s3);color:var(--ink2);border:1px solid var(--edge);position:relative}
-.dot small{font-size:8px;letter-spacing:.06em;margin-top:2px;color:var(--am)}
-.dot.tap{color:var(--am)}
-.dot.now{background:var(--cy);border-color:var(--cy);color:var(--on-cy);box-shadow:0 0 16px rgba(0,238,252,.5)}
-.dot.now.one{background:var(--acc);border-color:var(--acc);color:var(--on-acc);box-shadow:0 0 16px rgba(255,78,123,.55)}
-.dot.now.tap{background:var(--am);border-color:var(--am);color:var(--on-am);box-shadow:0 0 16px rgba(255,186,32,.5)}
-.dot.now small{color:inherit}
-.note{font-size:13px;color:var(--warn);margin-top:-2px}
-.note:empty{display:none}
-.phd{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:-4px}
-.phd .k{font-size:10px;color:var(--pk)}
-.phd .link{min-height:28px;font-size:10px}
-/* pads: the meter is the signal. --lv drives opacity only (compositor friendly) */
-.pads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
-.pad{--lv:0;--mc:var(--cy);display:flex;flex-direction:column;justify-content:space-between;align-items:stretch;gap:6px;min-height:58px;padding:8px;background:var(--s1);border:1px solid var(--edge);border-radius:var(--r1);text-align:left;font:600 13px var(--body);letter-spacing:0;color:var(--ink)}
-.pad .hd{display:flex;align-items:center;gap:6px}
-.pad .hd svg.ic{width:16px;height:16px;color:var(--c)}
-.pad .pn{flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
-.pad .sb{display:none;font:800 10px/1 var(--mono);padding:3px 4px;border-radius:3px;background:var(--am);color:var(--on-am)}
-.pad.solo{border-color:var(--am);box-shadow:0 0 14px rgba(255,186,32,.3);--mc:var(--am)}
-.pad.solo .sb{display:block}
-.pad .mt{display:none;width:15px;height:15px;color:var(--bad)}
-.meter{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:3px;align-items:end;height:14px}
-.meter i{display:block;background:var(--mc);border-radius:1px;opacity:.14;will-change:opacity}
-.meter i:nth-child(1){height:45%;opacity:clamp(.14,calc(var(--lv) * 5 - 0),1)}
-.meter i:nth-child(2){height:60%;opacity:clamp(.14,calc(var(--lv) * 5 - 1),1)}
-.meter i:nth-child(3){height:75%;opacity:clamp(.14,calc(var(--lv) * 5 - 2),1)}
-.meter i:nth-child(4){height:88%;opacity:clamp(.14,calc(var(--lv) * 5 - 3),1)}
-.meter i:nth-child(5){height:100%;opacity:clamp(.14,calc(var(--lv) * 5 - 4),1)}
-.pad.off{background:var(--s0);opacity:.6}
-.pad.off .pn{color:var(--mut);text-decoration:line-through}.pad.off .mt{display:block}.pad.off .hd svg.ic{color:var(--mut)}
-.pad.off .meter i{opacity:.1!important;background:var(--mut)}
-.minipads{display:none;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
-.minipads .pad{min-height:44px;flex-direction:row;align-items:center;padding:0 8px}
-.minipads .pad .hd{flex:1}
-.minipads .meter{width:22px;height:16px;gap:1px}
-.tlbox{flex:1 1 0!important;min-height:54px;display:flex;flex-direction:column;gap:6px}
-.tlhead{display:flex;justify-content:space-between;align-items:center;gap:8px}
-.tlhead .mono{font:600 11px var(--mono);color:var(--ink2)}
-.vtab{display:flex;border:1px solid var(--edge);border-radius:var(--r1);overflow:hidden}
-.vtab button{min-height:32px;border:0;border-radius:0;background:var(--s2);font:700 10px var(--mono);letter-spacing:.08em;color:var(--pk);padding:0 10px}
-.vtab button.on{background:var(--cy);color:var(--on-cy)}
-.tl{position:relative;flex:1;min-height:34px;touch-action:none;background:var(--s0);border:1px solid var(--edge);border-radius:var(--r1);overflow:hidden}
-.tl canvas{position:absolute;inset:0;width:100%;height:100%}
-.grid8{flex:1;min-height:34px;overflow-y:auto;scrollbar-width:none;border-radius:var(--r1);background:var(--s0);border:1px solid var(--edge);padding:4px;display:none;position:relative}
-.grid8::-webkit-scrollbar{display:none}
-.tlbox.gridmode .grid8{display:block}.tlbox.gridmode .tl{display:none}
-.marks button{min-height:34px;padding:0 10px;font:600 11px var(--body);letter-spacing:0;text-transform:none;border-radius:var(--r1);background:var(--s2);color:var(--ink)}
-.marks button::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--pri)}
-.marks button.on{background:rgba(0,238,252,.14);border-color:var(--cy);color:var(--cy);box-shadow:none}
-.marks button.on::before{background:var(--cy)}
-.loops{display:flex;gap:6px;align-items:center}
-.loops>button{min-height:40px;padding:0 9px;font:600 12px var(--mono);background:var(--s2)}
-.loops>button.on{background:var(--cy);border-color:var(--cy);color:var(--on-cy);box-shadow:0 0 12px rgba(0,238,252,.35)}
-.loops #markBtn{color:var(--am);border-color:rgba(255,186,32,.4);background:rgba(255,186,32,.08)}
-.loops #markBtn{width:44px;padding:0}.loops #markBtn svg{width:18px;height:18px}
-.salta{display:flex;align-items:center;gap:2px;background:var(--s2);border:1px solid var(--edge);border-radius:var(--r1);padding:0 2px 0 8px;height:40px}
-.salta>span{font:700 10px var(--mono);letter-spacing:.06em;color:var(--pk);margin-right:4px}
-.salta button{min-height:34px;min-width:30px;padding:0 6px;border:0;background:transparent;font:800 13px var(--mono);color:var(--ink2)}
-.salta button.on{background:var(--cy);color:var(--on-cy)}
-.loopinfo{display:flex;align-items:center;gap:10px;min-height:38px;padding:0 0 0 12px;background:var(--s2);border:1px solid var(--edge2);border-radius:var(--r1);font:500 13px var(--body);color:var(--ink)}
-.loopinfo svg{color:var(--cy);width:18px;height:18px}
-.loopinfo span{flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
-.loopinfo button{min-height:36px;width:40px;padding:0;border:0;background:transparent;color:var(--ink2)}
-.ctrls{display:grid;grid-template-columns:auto 1fr auto;gap:6px}
-.spd{display:flex;align-items:center;gap:2px;background:var(--s2);border:1px solid var(--edge);border-radius:var(--r1);padding:0 2px 0 8px}
-.spd svg.i{width:16px;height:16px;color:var(--am)}
-.spd #tempoV{min-height:40px;min-width:50px;padding:0 4px;border:0;background:transparent;font:800 14px var(--mono);color:var(--ink)}
-.spd #tempoV.slow{color:var(--am)}
-.spd button.pm{min-height:40px;width:34px;padding:0;border:0;background:transparent;font:700 18px var(--mono);color:var(--ink2)}
-.ctrls .met{font:700 10px/1.1 var(--mono);letter-spacing:.06em;background:var(--s2);color:var(--ink2);padding:0 8px;gap:8px}
-.ctrls .met span{display:flex;flex-direction:column;align-items:flex-start}.ctrls .met b{font-size:12px}
-.ctrls .met b{color:var(--mut)}
-.ctrls .met.on{background:var(--cy);border-color:var(--cy);color:var(--on-cy);box-shadow:0 0 14px rgba(0,238,252,.35)}
-.ctrls .met.on b{color:var(--on-cy)}
-.ctrls .met svg{width:16px;height:16px}
-.trainbtn{background:#c58f00;border-color:#c58f00;color:var(--on-am);font:700 12px var(--mono);letter-spacing:.06em;padding:0 10px}
-.trainbtn svg{width:16px;height:16px}
-.transport{display:grid;grid-template-columns:1fr 1fr 84px 1fr 1fr;gap:8px;align-items:center;justify-items:center}
-.transport button{width:54px;height:54px;min-height:0;border-radius:var(--r2);padding:0;flex-direction:column;gap:0;background:var(--s2);font:800 15px/1 var(--mono)}
-.transport button span{font:700 9px var(--mono);letter-spacing:.06em;color:var(--ink2);margin-top:3px}
-.transport #jb,.transport #jf{width:62px;height:58px;border-color:var(--edge2);background:var(--s3)}
-.transport #jb b,.transport #jf b{display:flex;align-items:center;gap:1px;font:800 17px var(--mono);color:var(--cy)}
-.transport #jb b svg,.transport #jf b svg{width:14px;height:14px}
-.transport .play{width:80px;height:68px;border-radius:var(--r3);background:var(--acc);border-color:var(--acc);color:var(--on-acc);box-shadow:0 0 26px rgba(255,78,123,.45)}
-.transport .play svg.i{width:34px;height:34px}
-#s-player .bnav{margin:0 -14px;padding-bottom:calc(2px + var(--sab))}
-#s-player .bnav button{min-height:50px}
-
-/* video layout */
-.stage{position:relative;background:#000;border-radius:var(--r2);border:1px solid var(--edge);overflow:hidden;display:none;touch-action:pan-y}
-.stage video{display:block;width:100%;aspect-ratio:16/9;max-height:max(130px,calc(100dvh - var(--sat) - var(--sab) - 605px));object-fit:contain;background:#000}
-.stage.mirror video{transform:scaleX(-1)}
-.stage .shade{position:absolute;inset:0;background:linear-gradient(0deg,rgba(10,14,23,.75),transparent 40%,transparent 70%,rgba(10,14,23,.45));pointer-events:none}
-.ov{position:absolute;pointer-events:none}
-.ov-num{left:12px;bottom:6px;font:800 64px/1 var(--mono);letter-spacing:-.05em;color:var(--cy);text-shadow:0 2px 12px rgba(0,0,0,.8)}
-.ov-num.one{color:var(--acc)}.ov-num.tap{color:var(--am)}
-.ov-phrase{right:8px;bottom:8px;background:rgba(10,14,23,.85);color:var(--ink);border-color:var(--edge2)}
-.ov-phrase.warn{background:#b3002f;border-color:#b3002f;color:#fff}
-.ov-dots{display:none}
-.stagebtns{position:absolute;left:8px;right:8px;top:8px;display:flex;justify-content:space-between;pointer-events:none}
-.stagebtns button{pointer-events:auto;min-height:36px;height:36px;padding:0 10px;background:rgba(10,14,23,.82);border-color:var(--edge2);color:var(--ink);font:700 11px var(--mono);letter-spacing:.06em}
-.stagebtns #fsBtn{width:40px;padding:0}
-.stagebtns #mirrorBtn.on{color:var(--cy);border-color:var(--cy)}
-.fsbar{display:none}
-.stage.fs{position:fixed;inset:0;z-index:30;border-radius:0;border:0;display:flex;align-items:center;justify-content:center;margin:0}
-.stage.fs video{max-height:100vh;height:100%;aspect-ratio:auto}
-.stage.fs .fsbar{display:flex;position:absolute;left:50%;transform:translateX(-50%);bottom:24px;gap:8px}
-.stage.fs .fsbar button{background:rgba(10,14,23,.8);color:#fff;min-width:56px;min-height:52px}
-.stage.fs .ov-num{font-size:120px}
-#s-player.video .stage{display:block}
-#s-player.video .ctop,#s-player.video .bigrow,#s-player.video .pads,#s-player.video .phd,#s-player.video .loopinfo{display:none!important}
-#s-player.video .dot{height:34px}
-#s-player:not(.video):has(#marks button){--bigh:clamp(48px,7.5vh,72px)}
-#s-player:has(#marks button) .dot{height:34px}
-#s-player:has(#marks button) .pad{min-height:52px;gap:4px}
-#s-player:has(#marks button) .tl{min-height:28px}
-#s-player.video .count{background:var(--s1);padding:6px}
-#s-player.video .minipads{display:grid}
-#s-player.video .phd .k::after{content:""}
-@media(max-height:720px){#s-player:has(#marks button) .phd{display:none}.marks button{min-height:30px}#s-player{--bigh:clamp(48px,8vh,64px)}.pad{min-height:52px;padding:6px 8px}.dot{height:34px}.transport button{height:50px}.transport .play{height:62px}#s-player.on{gap:6px}}
-
-/* grid of 8s (phrase rows) */
-.prow{display:grid;grid-template-columns:34px repeat(8,minmax(0,1fr));gap:3px;align-items:center;margin-bottom:3px;border-radius:3px;padding:1px 2px 1px 0;box-shadow:inset 3px 0 0 var(--pc)}
-.prow .ph{font:700 10px var(--mono);color:var(--pc);text-align:center;display:flex;flex-direction:column;align-items:center;line-height:1.1}
-.prow .ph i{display:flex;gap:1px;margin-top:2px}.prow .ph i b{width:4px;height:4px;border-radius:50%;background:var(--c)}
-.cell{min-height:26px;padding:0;border-radius:3px;border:0;background:color-mix(in srgb,var(--pc) 14%,var(--s2));font:700 10px var(--mono);color:var(--ink2);position:relative}
-.cell.tap{color:var(--am)}
-.cell.note::after{content:"";position:absolute;top:3px;right:3px;width:5px;height:5px;border-radius:50%;background:var(--cy)}
-.cell.now{background:var(--cy);color:var(--on-cy)}
-.prow.next{animation:nextp .5s ease-in-out infinite alternate}
-@keyframes nextp{to{box-shadow:inset 3px 0 0 var(--pc),0 0 0 2px var(--am)}}
-
-/* ---------- Sheet (mixer & rhythm) ---------- */
-.scrim{position:fixed;inset:0;background:rgba(5,7,12,.7);opacity:0;pointer-events:none;transition:opacity .2s;z-index:20}
-.scrim.on{opacity:1;pointer-events:auto}
-.sheet{position:fixed;left:0;right:0;bottom:0;top:calc(var(--sat) + 24px);overflow:auto;background:var(--bg);border-top:1px solid var(--edge2);border-radius:var(--r3) var(--r3) 0 0;
-  transform:translateY(105%);transition:transform .25s,visibility 0s .25s;visibility:hidden;z-index:21;padding:0 14px calc(20px + var(--sab));max-width:560px;margin:0 auto}
-.sheet.on{transform:none;visibility:visible;transition:transform .25s,visibility 0s}
-.grab{width:40px;height:4px;border-radius:2px;background:var(--s5);margin:8px auto 2px}
-.shead{display:flex;align-items:center;gap:10px;background:var(--s1);border:1px solid var(--edge);border-radius:var(--r2);padding:8px 8px 8px 12px;margin:6px 0 10px}
-.shead i{width:10px;height:10px;border-radius:50%;background:var(--acc);box-shadow:0 0 10px var(--acc);flex:none}
-.shead h3{flex:1;font:700 17px var(--disp);letter-spacing:.04em;text-transform:uppercase}
-.shead h3 small{display:block;font:600 10px var(--mono);color:var(--pk);letter-spacing:.1em}
-.tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px;background:var(--s0);border:1px solid var(--edge);border-radius:var(--r2);padding:4px}
-.tabs button{border:0;background:transparent;min-height:46px;color:var(--ink);font:700 12px var(--mono);letter-spacing:.06em;text-transform:uppercase}
-.tabs button.on{background:var(--acc);color:var(--on-acc)}
-.presetbox .row{justify-content:space-between}
-.presetbox .chips{margin-top:8px}
-.presetbox .chips button{border-radius:var(--r1);background:var(--s2);text-transform:none;font:600 13px var(--body);letter-spacing:0;color:var(--ink)}
-.presetbox .chips button.on{background:var(--acc);color:var(--on-acc)}
-.ch{--tc:var(--cy);background:var(--s1);border:1px solid var(--edge);border-radius:var(--r2);padding:10px 10px 2px;margin-top:8px}
-.ch .hd{display:flex;align-items:center;gap:8px}
-.ch .hd .ic{width:32px;height:32px;border-radius:var(--r1);display:grid;place-items:center;color:var(--c);flex:none}
-.ch .hd .nm{flex:1;min-width:0}
-.ch .hd b{display:block;font:700 15px var(--disp);text-transform:uppercase;letter-spacing:.02em}
-.ch .hd .tg{display:block;font:600 10px var(--mono);letter-spacing:.06em;color:var(--ink2);text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ch .hd .tg.why{color:var(--mut)}
-.ch .hd button{width:40px;min-height:40px;padding:0;background:var(--s3);color:var(--ink2);font:700 13px var(--mono)}
-.ch .hd button.on.m{background:var(--badbg);border-color:var(--badbg);color:#ffdad6}
-.ch .hd button.on.s{background:var(--am);border-color:var(--am);color:var(--on-am)}
-.ch .hd .v{width:48px;text-align:right;font:700 13px var(--mono);color:var(--ink);flex:none}
-.ch.solo{border-color:var(--am);box-shadow:0 0 14px rgba(255,186,32,.2);--tc:var(--am)}
-.ch.solo .hd b{color:var(--am)}
-.ch.byother,.ch.muted{opacity:.6}
-.ch .fd{position:relative}
-.ch .fd::after{content:"";position:absolute;left:50%;top:10px;bottom:10px;width:2px;background:var(--am);opacity:.5;pointer-events:none}
-.ch input[type=range]{height:36px}
-.bpmbox .hd{display:flex;justify-content:space-between;align-items:center}
-.bpmval{font:700 60px/1 var(--mono);letter-spacing:-.04em;color:var(--ink);margin:12px 0 14px;text-align:center}
-.bpmval small{font:700 20px var(--mono);color:var(--acc);letter-spacing:0}
-.grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
-.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-top:6px}
-.grid4 button,.grid3 button{background:var(--s2);font:600 13px var(--mono)}
-.grid3 button{font-size:12px}
-.grid3 [data-bpm=reset]{color:var(--cy)}
-#tempoChips button.on{background:var(--cy);border-color:var(--cy);color:var(--on-cy)}
-#tapBtn{width:100%;margin-top:8px;min-height:64px;background:var(--s2);color:var(--ink);flex-direction:column;gap:2px;font:700 15px var(--mono)}
-#tapBtn span{font:500 11px var(--mono);color:var(--ink2);letter-spacing:0}
-#tapBtn svg{color:var(--cy)}
-.oneBox{margin-top:12px}
-#oneBtn{width:100%;min-height:64px;background:var(--acc);border-color:var(--acc);color:var(--on-acc);font:700 22px var(--disp);letter-spacing:.02em;box-shadow:0 0 22px rgba(255,78,123,.35)}
-#oneBtn svg{width:26px;height:26px}
-.oneBox p{text-align:center;font:500 12px var(--mono);color:var(--ink2);margin:8px 4px 0}
-.metbox .row:first-child{justify-content:space-between}
-.metbox .tx b{display:block;font:700 16px var(--disp);text-transform:uppercase}
-.metbox .tx span{font:600 10px var(--mono);color:var(--ink2);letter-spacing:.06em;text-transform:uppercase}
-.metbox .ic{width:36px;height:36px;display:grid;place-items:center;color:var(--am);flex:none}
-.tgl{display:flex;align-items:center;gap:12px;padding:12px 0;cursor:pointer;border-top:1px solid var(--edge)}
-.tgl:first-of-type{border-top:0}
-.tgl .tx{flex:1}.tgl .tx b{display:block;font:600 15px var(--body)}.tgl .tx span{font:500 11px var(--mono);color:var(--ink2)}
-
-/* ---------- Training ---------- */
-.train{position:fixed;inset:0;z-index:35;background:var(--bg);display:none;flex-direction:column;padding:var(--sat) 16px calc(16px + var(--sab));max-width:560px;margin:0 auto;overflow-y:auto}
-.train.on{display:flex}
-.train .tbar{border-bottom:1px solid var(--edge);margin:0 -16px 4px;padding:0 10px}
-.train .tbar h3{font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.tracktop{display:flex;align-items:center;gap:12px}
-.tracktop .ic{width:44px;height:44px;border-radius:var(--r1);background:var(--s3);display:grid;place-items:center;color:var(--acc);flex:none}
-.tracktop b{display:block;font:700 18px var(--disp);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.tracktop .chip{min-height:32px}
-.streak{display:flex;gap:12px;align-items:center;background:rgba(255,186,32,.08);border-color:rgba(255,186,32,.3)}
-.streak .ic{width:48px;height:48px;border-radius:var(--r1);background:rgba(255,186,32,.25);color:var(--am);display:grid;place-items:center;flex:none}
-.streak b{display:block;font:700 19px var(--disp);color:var(--am)}
-.streak span{color:var(--ink2);font-size:14px}
-.sectt{display:flex;align-items:center;gap:10px;margin:20px 0 4px}
-.sectt::before{content:"";width:4px;height:20px;border-radius:2px;background:var(--acc)}
-.sectt h3{flex:1;font:700 18px var(--disp);text-transform:uppercase}
-.game .gh{display:flex;gap:12px;align-items:flex-start}
-.game .gi{width:44px;height:44px;border-radius:var(--r1);display:grid;place-items:center;flex:none;font:800 20px var(--mono)}
-.game .gn{flex:1}
-.game .gn b{display:block;font:700 20px var(--disp)}
-.game .gn span{font:600 11px var(--mono);color:var(--ink2);letter-spacing:.04em}
-.game p{font-size:15px;color:var(--ink);margin:10px 0}
-.game .steps8{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:4px;background:var(--s0);border-radius:var(--r1);padding:5px}
-.game .steps8 i{height:30px;border-radius:3px;display:grid;place-items:center;font:700 13px var(--mono);font-style:normal;background:var(--s3);color:var(--mut)}
-.game .gf{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:12px}
-.game .gf .rec{font:600 12px var(--mono);color:var(--ink2);display:flex;gap:6px;align-items:center}
-.game .gf .rec svg{color:var(--am);width:16px;height:16px}
-.game .gf .rec b{color:var(--gc)}
-.game .go{min-width:120px;font:700 14px var(--mono);letter-spacing:.1em;background:var(--gc);border-color:var(--gc);color:#111}
-.game[data-g=one]{--gc:var(--acc)}.game[data-g=beat]{--gc:var(--cy)}.game[data-g=tap]{--gc:var(--am)}
-.game[data-g=one] .gi{background:rgba(255,78,123,.16);color:var(--acc)}
-.game[data-g=beat] .gi{background:rgba(0,238,252,.14);color:var(--cy)}
-.game[data-g=tap] .gi{background:rgba(255,186,32,.16);color:var(--am)}
-.game .steps8 i.on{background:var(--gc);color:#111}
-.game[data-g=beat] .steps8 i.on.one{background:var(--acc)}
-.params .seg button{text-transform:none;font:600 12px var(--mono)}
-.params .seg button.on{background:rgba(0,238,252,.12);border-color:var(--cy);color:var(--cy)}
-#trainPlay{flex:1;display:flex;flex-direction:column}
-.blind{display:flex;gap:8px;justify-content:space-between;margin-top:8px}
-.blind .chip{min-height:30px}
-.tstate .row{justify-content:space-between;align-items:flex-start}
-.tstate .gname{font:700 11px var(--mono);color:var(--cy);letter-spacing:.08em;text-transform:uppercase}
-.tstate h2{font:700 28px var(--disp);text-transform:uppercase}
-.tstate .hits{text-align:right}
-.tstate .hits b{font:700 26px var(--mono)}
-.tstate .hits span{display:block;font:600 11px var(--mono);color:var(--am);letter-spacing:.06em;text-transform:uppercase}
-.segs4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:12px}
-.segs4 i{height:7px;border-radius:4px;background:var(--s3)}
-.segs4 i.done{background:var(--cy)}.segs4 i.now{background:var(--pri)}
-.segs4.n8{grid-template-columns:repeat(8,minmax(0,1fr))}
-.tprep{display:flex;gap:10px;align-items:center;margin-top:8px;background:var(--s1);border:1px solid var(--edge);border-radius:var(--r1);padding:10px 12px;font:600 12px var(--mono);color:var(--ink2)}
-.tprep svg{color:var(--am)}
-.tbarbox{margin-top:10px}
-.tbarbox .row{justify-content:space-between}
-.tbarbox .late{font:700 13px var(--mono);letter-spacing:.04em;color:var(--am);display:flex;gap:8px;align-items:center}
-.tbarbox .late i{width:12px;height:12px;border-radius:50%;background:currentColor}
-.tbarbox .late.ok{color:var(--cy)}
-.tline{position:relative;height:40px;background:var(--s0);border:1px solid var(--edge);border-radius:var(--r1);margin-top:8px;font:600 11px var(--mono);color:var(--mut)}
-.tline .zone{position:absolute;left:40%;width:20%;top:0;bottom:0;background:rgba(0,238,252,.12)}
-.tline .zero{position:absolute;left:50%;top:0;bottom:0;width:2px;background:var(--cy)}
-.tline .mk{position:absolute;top:6px;bottom:6px;width:12px;margin-left:-6px;border-radius:3px;background:var(--am);box-shadow:0 0 10px rgba(255,186,32,.6);left:50%;display:none}
-.tline span{position:absolute;top:12px}
-.tpad{flex:1;margin:12px auto 0;width:min(100%,340px);border-radius:var(--r3);background:linear-gradient(180deg,var(--acc),#5a001f);padding:10px;display:grid;touch-action:manipulation;user-select:none;min-height:150px;box-shadow:0 0 40px rgba(255,78,123,.3)}
-.tpad>div{background:var(--s0);border-radius:var(--r2);display:grid;place-content:center;justify-items:center;text-align:center;gap:4px;font:700 24px var(--disp);color:var(--ink);text-transform:uppercase}
-.tpad>div svg{width:44px;height:44px;color:var(--acc)}
-.tpad small{display:block;font:700 18px var(--mono);color:var(--pri)}
-.tpad.hit{background:linear-gradient(180deg,var(--cy),#00686f);box-shadow:0 0 40px rgba(0,238,252,.4)}
-.tpad.miss{background:linear-gradient(180deg,#ffb4ab,#93000a)}
-.thelp{text-align:center;margin-top:12px}
-.thelp b{display:block;font:600 17px var(--body)}
-.thelp span{font:600 11px var(--mono);letter-spacing:.06em;color:var(--pk);text-transform:uppercase}
-.tctl{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:12px}
-.tctl button{flex-direction:column;min-height:56px;gap:4px;font:700 12px var(--mono);letter-spacing:.06em}
-.tctl svg{color:var(--am)}.tctl #tRestart svg{color:var(--cy)}.tctl #tExit{background:var(--s0)}.tctl #tExit svg{color:var(--pri)}
-.rechip{display:flex;justify-content:space-between;align-items:center;margin-top:8px}
-.ringbox{text-align:center;background:radial-gradient(80% 60% at 70% 80%,rgba(0,238,252,.1),transparent),var(--s1)}
-.ring{position:relative;width:200px;height:200px;margin:4px auto 0}
+#s-proc{text-align:center;padding-bottom:24px}
+#s-proc .kick{font:600 12px var(--body);letter-spacing:.06em;color:var(--ink3);padding-top:24px}
+#procTitle{font-size:20px;margin-top:4px}
+.ring{position:relative;width:220px;height:220px;margin:30px auto 0}
 .ring svg{width:100%;height:100%;transform:rotate(-90deg)}
 .ring circle{fill:none;stroke-width:12}
-.ring .bg{stroke:var(--s3)}
-.ring .fg{stroke:url(#rg);stroke-linecap:round;stroke-dasharray:452.4;stroke-dashoffset:452.4;transition:stroke-dashoffset .8s}
-.ring .pct{position:absolute;inset:0;display:grid;place-content:center}
-.ring .pct b{font:700 64px/1 var(--disp);letter-spacing:-.03em}
-.ring .pct b small{font-size:22px;color:var(--cy);vertical-align:top}
-.ring .pct span{color:var(--cy)}
-.verdict{margin:14px auto 4px;background:var(--s2);border:1px solid var(--edge);border-radius:var(--r2);padding:10px 14px;font:700 13px var(--mono);letter-spacing:.06em;text-transform:uppercase}
-.an h3{display:flex;gap:8px;align-items:center;font:700 19px var(--disp);text-transform:uppercase}
-.an h3 svg{color:var(--cy)}
-.an2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
-.an2>div{background:var(--s2);border-radius:var(--r1);padding:12px}
-.an2 .k{display:block}
-.an2 b{display:block;font:700 26px var(--mono);margin:8px 0}
-.an2 b small{font-size:13px;color:var(--cy)}
-.an2 .bar{height:6px;border-radius:3px;background:var(--s0);overflow:hidden}
-.an2 .bar i{display:block;height:100%;background:var(--cy)}
-.an2>div:last-child .bar i{background:var(--acc)}
-.dist{background:var(--s2);border-radius:var(--r1);padding:12px;margin-top:8px}
-.dist .row{justify-content:space-between;font:700 13px var(--mono);margin-top:8px}
-.dist .row span{display:flex;gap:6px;align-items:center}
-.dist .row span i{width:7px;height:7px;border-radius:50%;background:var(--dc)}
-.dist .bar{height:12px;border-radius:2px;background:var(--s4);margin-top:4px;overflow:hidden}
-.dist .bar i{display:block;height:100%;background:var(--dc)}
-.trend{display:flex;gap:12px;background:var(--s2);border:1px solid var(--edge);border-radius:var(--r1);padding:12px;margin-top:8px}
-.trend svg{color:var(--am);flex:none}
-.trend .k{color:var(--am)}
-.trend p{margin:4px 0 0;font-size:15px}
-.trend:empty{display:none}
-.tip h3{font:700 19px var(--disp);display:flex;gap:8px}
-.tip h3 svg{color:var(--am)}
-.tip p{font-size:15px;line-height:1.55;margin-top:8px}
-#tAgain{width:100%;min-height:56px;margin-top:16px;font:700 17px var(--mono);letter-spacing:.06em}
-#tBack{width:100%;min-height:52px;margin-top:8px;color:var(--cy);font:700 16px var(--disp);letter-spacing:.04em;text-transform:uppercase}
-#tToPlayer{width:100%;margin-top:8px;background:none;border:0;color:var(--ink2);font:700 12px var(--mono);letter-spacing:.1em}
+.ring .bg{stroke:var(--s2)}
+.ring .fg{stroke:var(--acc);stroke-linecap:round;stroke-dasharray:603.2;stroke-dashoffset:603.2;transition:stroke-dashoffset .6s}
+.ring .pct{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+#procPct{font:700 56px/1 var(--disp)}
+#procLeft{font-size:13px;color:var(--ink3);margin-top:6px}
+.steps{list-style:none;margin:30px 16px 0;padding:6px 16px;border-radius:18px;background:var(--s1);text-align:left}
+.steps li{display:flex;align-items:center;gap:12px;min-height:52px;border-top:1px solid var(--s2);flex-wrap:wrap}
+.steps li:first-child{border-top:0}
+.steps .st{width:26px;height:26px;border-radius:13px;background:var(--s2);color:var(--ink3);display:grid;place-items:center;font:700 12px var(--body);flex:none}
+.steps li.done .st{background:var(--s3);color:var(--ink)}
+.steps li.now .st{background:var(--acc);color:var(--on-acc)}
+.steps .t{flex:1;font-size:14px;color:var(--ink3)}
+.steps li.now .t,.steps li.done .t{color:var(--ink)}.steps li.now .t{font-weight:600}
+.steps .tag{font-size:12px;color:var(--ink3)}
+.steps .sbar{flex-basis:100%;height:3px;border-radius:2px;background:var(--s2);margin:-6px 0 8px 38px;overflow:hidden}
+.steps .sbar b{display:block;height:100%;width:0;background:var(--acc);transition:width .4s}
+.awake{display:flex;gap:12px;align-items:flex-start;margin:12px 16px 0;padding:14px 16px;border-radius:18px;background:var(--s1);text-align:left;font-size:13px;color:var(--ink2)}
+.awake svg{color:var(--acc)}
+#cancelBtn{width:calc(100% - 32px);margin:20px 16px 0;height:52px;border-radius:26px;background:var(--s1)}
 
-/* ---------- Dialog, toast, busy ---------- */
-.dlg{position:fixed;inset:0;display:none;place-items:center;z-index:40;background:rgba(5,7,12,.78);padding:20px}
+/* ---------- Player ---------- */
+#s-player.on{display:flex;flex-direction:column;height:calc(100dvh - var(--sat) - var(--sab));overflow:hidden}
+#s-player>*{flex:none}
+.ptop{display:flex;align-items:center;gap:6px;padding:8px 12px 0}
+.ptop .tt{flex:1;min-width:0}
+.ptop b{display:block;font:700 18px var(--disp);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ptop span{display:block;font:500 12px var(--body);color:var(--ink3)}
+.count{display:flex;gap:16px;align-items:center;margin:6px 16px 0;padding:12px 14px;border-radius:18px;background:var(--s1);touch-action:pan-y}
+.bignum{width:84px;height:84px;border-radius:42px;background:var(--s2);color:var(--ink);display:grid;place-items:center;font:700 54px/1 var(--disp);flex:none;transition:background .08s}
+.bignum.one{background:var(--acc);color:var(--on-acc)}
+.bignum.tap{background:var(--tap);color:#0B0C10}
+.count .rt{flex:1;display:flex;flex-direction:column;gap:10px}
+.count .rt .row{justify-content:space-between}
+#phraseLbl{font:600 15px var(--body)}
+#secLbl{padding:3px 9px;border-radius:10px;background:var(--s2);font:600 12px var(--body);color:var(--ink2);max-width:50%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#secLbl:empty{display:none}
+#secLbl.warn{background:#C62F2F;color:#fff}
+.dots{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:4px}
+.dot{height:30px;border-radius:7px;background:var(--s2);color:var(--ink2);display:flex;flex-direction:column;align-items:center;justify-content:center;font:700 12px/1 var(--body)}
+.dot small{font-size:7px;letter-spacing:.06em;margin-top:2px}
+.dot.tap{color:var(--tap)}
+.dot.now{background:var(--ink);color:var(--bg)}
+.dot.now.one{background:var(--acc);color:var(--on-acc)}
+.dot.now.tap{background:var(--tap);color:#0B0C10}
+.note{margin:6px 20px 0;font-size:12px;color:var(--tap)}
+.note:empty{display:none}
+.shd{display:flex;justify-content:space-between;align-items:center;padding:10px 20px 0}
+.shd h2{font-size:15px;font-weight:600}
+#stems{padding:0 16px;flex:1 1 0!important;min-height:0;display:flex;flex-direction:column;justify-content:space-evenly}
+.stem{--lv:0;display:flex;align-items:center;gap:10px;height:50px;max-height:54px;flex:1}
+.stem .bar{width:6px;height:30px;border-radius:3px;background:var(--c);flex:none;opacity:calc(.35 + var(--lv) * .65)}
+.stem .nm{width:70px;flex:none;background:none;min-height:44px;padding:0;flex-direction:column;align-items:flex-start;justify-content:center;gap:0;border-radius:8px}
+.stem .nm b{font:600 14px var(--body)}
+.stem .nm span{font:500 11px var(--body);color:var(--ink3)}
+.stem canvas{flex:1;min-width:0;height:34px}
+.stem .ms{width:36px;min-height:36px;height:36px;padding:0;border-radius:10px;background:var(--s2);color:var(--ink2);font:700 13px var(--body)}
+.stem .ms.m.on{background:var(--ink);color:var(--bg)}
+.stem .ms.s.on{background:var(--tap);color:#0B0C10}
+.stem.off{opacity:.5}
+.minipads{display:none;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;padding:10px 16px 0}
+.mpad{--lv:0;min-height:44px;justify-content:flex-start;gap:8px;padding:0 10px;background:var(--s1);font-size:13px}
+.mpad i{width:8px;height:8px;border-radius:4px;background:var(--c);flex:none;opacity:calc(.4 + var(--lv) * .6)}
+.mpad.off{background:transparent;color:var(--ink3);text-decoration:line-through}.mpad.off i{background:var(--mute)}
+.mpad.solo{box-shadow:inset 0 0 0 2px var(--tap)}
+.scrub{padding:12px 20px 0}
+.track{position:relative;height:6px;border-radius:3px;background:var(--s2);touch-action:none;margin:10px 0}
+.track::before{content:"";position:absolute;left:0;right:0;top:-14px;bottom:-14px}
+#scFill{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--ink);pointer-events:none}
+#scLoop{position:absolute;top:-4px;bottom:-4px;border:2px solid var(--acc);border-radius:5px;pointer-events:none;display:none}
+#scHandle{position:absolute;top:-5px;width:16px;height:16px;margin-left:-8px;border-radius:8px;background:var(--ink);pointer-events:none}
+#scMarks i{position:absolute;top:-6px;width:2px;height:18px;margin-left:-1px;background:var(--tap);border-radius:1px}
+.times{display:flex;justify-content:space-between;font:500 12px var(--body);color:var(--ink3)}
+#loopTxt{color:var(--ink2)}
+.loops{display:flex;gap:8px;padding:10px 16px 0}
+.loops button{flex:1;min-height:40px;font-size:13px}
+.loops button.on{background:var(--acc);color:var(--on-acc);font-weight:700}
+.transport{display:flex;align-items:center;justify-content:space-between;padding:14px 20px 0}
+.transport button{width:54px;height:54px;min-height:0;border-radius:27px;padding:0;background:var(--s1);font:700 16px var(--body)}
+.transport .play{width:76px;height:76px;border-radius:38px;background:var(--ink);color:var(--bg)}
+.transport .play svg.i{width:30px;height:30px}
+.tools{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:14px 16px calc(14px + var(--sab))}
+.tools button{min-height:48px;border-radius:14px;background:var(--s1);flex-direction:column;gap:1px}
+.tools b{font:700 15px var(--body)}
+.tools span{font:500 10px var(--body);color:var(--ink3)}
+.tools #mapBtn b{color:var(--acc)}
+.tools .on b{color:var(--acc)}
+/* video */
+.stage{position:relative;background:#000;display:none;touch-action:pan-y;margin-top:6px}
+.stage video{display:block;width:100%;aspect-ratio:16/9;max-height:max(140px,calc(100dvh - var(--sat) - var(--sab) - 600px));object-fit:contain}
+.stage.mirror video{transform:scaleX(-1)}
+.ov{position:absolute;pointer-events:none}
+.ov-num{left:12px;bottom:12px;width:56px;height:56px;border-radius:28px;background:var(--s2);color:var(--ink);display:grid;place-items:center;font:700 34px/1 var(--disp)}
+.ov-num:empty{display:none}
+.ov-num.one{background:var(--acc);color:var(--on-acc)}.ov-num.tap{background:var(--tap);color:#0B0C10}
+.ov-phrase{right:12px;bottom:14px;padding:5px 10px;border-radius:12px;background:rgba(11,12,16,.8);color:#F2F3F5;font:600 12px var(--body)}
+.ov-phrase:empty{display:none}.ov-phrase.warn{background:#C62F2F}
+.ov-dots{display:none}
+.stagebtns{position:absolute;left:12px;right:12px;top:12px;display:flex;justify-content:space-between;pointer-events:none}
+.stagebtns button{pointer-events:auto;min-height:36px;height:36px;border-radius:18px;background:rgba(11,12,16,.8);color:#F2F3F5;font-size:12px;padding:0 12px}
+.stagebtns #fsBtn{width:36px;padding:0}
+.stagebtns #mirrorBtn.on{box-shadow:inset 0 0 0 2px var(--acc)}
+.fsbar{display:none}
+.stage.fs{position:fixed;inset:0;z-index:30;display:flex;align-items:center;justify-content:center;margin:0}
+.stage.fs video{max-height:100vh;height:100%;aspect-ratio:auto}
+.stage.fs .fsbar{display:flex;position:absolute;left:50%;transform:translateX(-50%);bottom:24px;gap:8px}
+.stage.fs .fsbar button{background:rgba(11,12,16,.8);color:#fff;min-width:56px;min-height:52px}
+#s-player.video .stage{display:block}
+#s-player.video .count .bignum,#s-player.video .count .rt>.row,#s-player.video #stems,#s-player.video .shd{display:none}
+#s-player.video .count{padding:8px;margin-top:8px}
+#s-player.video .minipads{display:grid}
+#s-player.video .scrub{flex:1 1 0!important}
+@media(max-height:720px){.bignum{width:64px;height:64px;font-size:40px}.stem{height:42px}.transport button{width:50px;height:50px}.transport .play{width:66px;height:66px}.tools{padding-top:10px}}
+
+/* ---------- Bottom popups ---------- */
+.scrim{position:fixed;inset:0;background:rgba(5,6,9,.55);opacity:0;pointer-events:none;transition:opacity .2s;z-index:20}
+.scrim.on{opacity:1;pointer-events:auto}
+.pop{position:fixed;left:0;right:0;bottom:0;max-height:88vh;overflow:auto;z-index:21;max-width:560px;margin:0 auto;padding:10px 20px calc(24px + var(--sab));border-radius:24px 24px 0 0;background:var(--s1);transform:translateY(105%);transition:transform .22s,visibility 0s .22s;visibility:hidden;display:flex;flex-direction:column;gap:16px}
+.pop.on{transform:none;visibility:visible;transition:transform .22s,visibility 0s}
+.pop .grab{width:40px;height:4px;border-radius:2px;background:var(--s3);margin:0 auto}
+.pop h2{font-size:20px}
+.pop .sub{font-size:13px;color:var(--ink3);margin-top:2px}
+.pop .done{height:52px;border-radius:26px;background:var(--ink);color:var(--bg);font-weight:700}
+.pop .grid5{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
+.pop .grid5 button,.pop .grid4 button,.pop .grid3 button{min-height:42px;background:var(--s2)}
+.pop .grid5 button.on{background:var(--acc);color:var(--on-acc)}
+.pop .grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.pop .grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.big2{font:700 44px/1 var(--disp);text-align:center}
+.big2 small{font:600 16px var(--body);color:var(--ink3)}
+.accDots{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:4px;margin-top:10px}
+.accDots i{height:30px;border-radius:7px;background:var(--s2);color:var(--ink3);display:grid;place-items:center;font:700 12px var(--body);font-style:normal}
+.accDots i.on{background:var(--acc);color:var(--on-acc)}
+#tapBtn{min-height:60px;flex-direction:column;gap:2px;background:var(--s2)}
+#tapBtn span{font:500 11px var(--body);color:var(--ink3)}
+#oneBtn{min-height:56px;font:700 19px var(--disp)}
+.marklist{display:flex;flex-direction:column;gap:6px}
+.marklist button{justify-content:space-between;background:var(--s2);min-height:48px}
+.marklist button.on{box-shadow:inset 0 0 0 2px var(--acc)}
+.marklist:empty::before{content:"Nessuna sezione: segnane una con il tasto qui sotto.";color:var(--ink3);font-size:13px}
+.volrow{display:flex;align-items:center;gap:12px}
+
+/* ---------- Map ---------- */
+.full{position:fixed;inset:0;z-index:15;background:var(--bg);display:none;flex-direction:column;padding:var(--sat) 0 var(--sab);max-width:560px;margin:0 auto;overflow:hidden}
+.full.on{display:flex}
+.full>*{flex:none}
+.mhead{display:flex;align-items:center;gap:6px;padding:10px 12px 0}
+.mhead .tt{flex:1;text-align:center}
+.mhead b{display:block;font:700 16px var(--disp)}
+.mhead span{font:500 12px var(--body);color:var(--ink3)}
+.mnum{width:44px;height:44px;border-radius:22px;background:var(--s2);display:grid;place-items:center;font:700 22px var(--disp);flex:none}
+.mnum.one{background:var(--acc);color:var(--on-acc)}.mnum.tap{background:var(--tap);color:#0B0C10}
+.mswitch{margin:8px 16px 0}
+.mheads{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:16px 16px 0}
+.mhd{--lv:0;min-height:56px;border-radius:14px;background:var(--s1);color:var(--ink3);flex-direction:column;gap:2px;transition:background .1s,box-shadow .1s}
+.mhd b{font:700 14px var(--body)}.mhd span{font:600 10px var(--body);opacity:.85}
+.mhd.lit{background:var(--c);color:#0B0C10;box-shadow:0 0 18px color-mix(in srgb,var(--c) 45%,transparent)}
+.mhd.off b{text-decoration:line-through}
+.mbox{position:relative;margin:16px 16px 0;border-radius:14px;background:var(--s1);overflow:hidden;touch-action:none;flex:1 1 0!important;min-height:200px}
+.mbox canvas{position:absolute;inset:0;width:100%;height:100%}
+.minfo{display:flex;align-items:center;gap:8px;padding:10px 16px 0;font-size:12px;color:var(--ink3);min-height:40px}
+#mapLoop{height:30px;padding:0 12px;border-radius:15px;box-shadow:inset 0 0 0 2px var(--acc);display:flex;align-items:center;font:600 12px var(--body);color:var(--ink);white-space:nowrap}
+#mapLoop:empty{display:none}
+.movw{position:relative;height:6px;margin:8px 16px 0;border-radius:3px;background:var(--s2)}
+#mapOvWin{position:absolute;top:0;bottom:0;border-radius:3px;background:var(--mute)}
+#mapOvPos{position:absolute;top:-3px;width:2px;height:12px;background:var(--acc)}
+.mhint{text-align:center;font-size:12px;color:var(--ink3);padding:10px 16px 0}
+.mtext{flex:1 1 0!important;min-height:0;overflow:auto;padding:24px;display:flex;flex-direction:column;gap:16px}
+.mtext p{font:700 24px/1.3 var(--body);color:var(--mute)}
+.mtext p.now{color:var(--ink);font-size:28px}
+.mtext p.past{color:var(--s3)}
+.mtext .tr{display:block;font:500 15px var(--body);color:var(--ink3);margin-top:4px}
+.mtext .empty{margin:auto}
+
+/* ---------- Training ---------- */
+.train{position:fixed;inset:0;z-index:35;background:var(--bg);display:none;flex-direction:column;padding:var(--sat) 0 var(--sab);max-width:560px;margin:0 auto;overflow-y:auto}
+.train.on{display:flex}
+.train .tbar h1{text-align:center}
+#trainMenu,#trainPlay,#trainDone{padding:0 16px 20px}
+.tsong{display:flex;align-items:center;gap:12px;margin-top:10px}
+.streak{margin-top:10px;color:var(--tap);font-weight:600;font-size:14px}
+.game{display:block;width:100%;text-align:left;margin-top:10px;padding:14px;border-radius:18px;background:var(--s1);min-height:0;white-space:normal}
+.game .gh{display:flex;justify-content:space-between;align-items:baseline}
+.game b{font:700 17px var(--disp)}
+.game .rec{font:500 12px var(--body);color:var(--ink3)}
+.game p{font:500 13px var(--body);color:var(--ink3);margin-top:3px}
+.game .c8{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:4px;margin-top:10px}
+.game .c8 i{height:26px;border-radius:6px;background:var(--s2);color:var(--ink3);display:grid;place-items:center;font:700 12px var(--body);font-style:normal}
+.game .c8 i.on{background:var(--acc);color:var(--on-acc)}
+#trainPlay{flex:1;display:flex;flex-direction:column}
+.tprog{display:flex;justify-content:space-between;align-items:baseline;margin-top:12px}
+#tLeft{font:700 22px var(--disp)}
+.tsegs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:12px}
+.tsegs.n8{grid-template-columns:repeat(8,minmax(0,1fr))}
+.tsegs i{height:6px;border-radius:3px;background:var(--s2)}
+.tsegs i.done{background:var(--ink)}.tsegs i.now{background:var(--acc)}
+#tPrep{font-size:12px;color:var(--ink3);margin-top:10px}
+.tpadwrap{flex:1;display:flex;align-items:center;justify-content:center;min-height:240px}
+.tpad{width:250px;height:250px;border-radius:50%;border:10px solid var(--acc);background:var(--s1);color:var(--ink);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;touch-action:manipulation;user-select:none;cursor:pointer}
+.tpad b{font:700 24px var(--disp);text-align:center;padding:0 20px}
+.tpad small{font:600 15px var(--body);color:var(--acc)}
+.tpad.hit{border-color:var(--ink)}.tpad.miss{border-color:var(--bad)}
+.tline{position:relative;height:28px;margin-top:10px;border-radius:8px;background:var(--bg)}
+.tline .zone{position:absolute;left:40%;width:20%;top:0;bottom:0;background:var(--s2)}
+.tline .zero{position:absolute;left:50%;top:4px;bottom:4px;width:2px;margin-left:-1px;background:var(--ink3)}
+.tline .mk{position:absolute;top:5px;bottom:5px;width:10px;margin-left:-5px;border-radius:3px;background:var(--tap);display:none}
+#tLate{display:flex;justify-content:space-between;font:600 13px var(--body)}
+.tctl{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:14px}
+.tctl button{min-height:52px;border-radius:26px;background:var(--s1)}
+#tHelp{text-align:center;font-weight:600;margin-top:8px}#tHelp2{text-align:center;font-size:12px;color:var(--ink3)}
+.res{text-align:center;padding-top:10px}
+.res .rring{position:relative;width:200px;height:200px;margin:0 auto}
+.res .rring svg{width:100%;height:100%;transform:rotate(-90deg)}
+.res .rring circle{fill:none;stroke-width:12}
+.res .rring .bg{stroke:var(--s2)}.res .rring .fg{stroke:var(--acc);stroke-linecap:round;stroke-dasharray:452.4;stroke-dashoffset:452.4;transition:stroke-dashoffset .8s}
+.res .rring .pct{position:absolute;inset:0;display:grid;place-content:center;font:700 56px/1 var(--disp)}
+#tResTitle{font:600 15px var(--body);margin-top:10px}
+#tRecord{color:var(--acc);font-weight:700;margin-top:6px}
+.an2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:16px;text-align:left}
+.an2 b{display:block;font:700 24px var(--disp);margin-top:6px}
+.an2 b small{font-size:13px;color:var(--ink3)}
+.an2 .bar{height:5px;border-radius:3px;background:var(--s2);margin-top:8px;overflow:hidden}.an2 .bar i{display:block;height:100%;background:var(--acc)}
+#tDist,#tTrend{text-align:left;margin-top:8px}
+#tDist .row{justify-content:space-between;font-size:13px;margin-top:8px}
+#tDist .db{height:8px;border-radius:2px;background:var(--s2);margin-top:4px;overflow:hidden}#tDist .db i{display:block;height:100%;background:var(--dc)}
+#tTrend:empty{display:none}
+.tip{text-align:left;margin-top:8px}.tip b{display:block;font:700 16px var(--disp)}.tip p{font-size:14px;margin-top:6px;color:var(--ink2)}
+.dlg{position:fixed;inset:0;display:none;place-items:center;z-index:40;background:rgba(5,6,9,.7);padding:20px}
 .dlg.on{display:grid}
-.dlg .panel{width:100%;max-width:420px;max-height:86vh;overflow:auto;background:var(--s2);border-color:var(--edge2);margin:0}
-.dlg h3{font:700 19px var(--disp)}
-.dlg .row.act{justify-content:flex-end;margin-top:16px;flex-wrap:wrap}
-.dlg .row.act button{background:var(--s3)}.dlg .row.act button.primary{background:var(--acc);color:var(--on-acc)}
-.dlg .field{background:var(--s0)}
-.dlg .chips button{min-height:36px}
-.dlg .setrow{display:flex;justify-content:space-between;gap:8px;padding:10px 0;border-bottom:1px solid var(--edge);font-size:14px}
-.dlg .setrow b{font:700 13px var(--mono)}
-.calpad{margin-top:12px;height:180px;border-radius:var(--r3);background:var(--s0);border:2px solid var(--acc);display:grid;place-items:center;font:700 22px var(--disp);text-transform:uppercase;touch-action:manipulation;user-select:none}
-.calpad.flash{background:rgba(255,78,123,.25)}
-.dlg .setbtn{width:100%;margin-top:8px;justify-content:flex-start;font:600 14px var(--body);letter-spacing:0}
-.toast{position:fixed;left:50%;bottom:calc(84px + var(--sab));transform:translateX(-50%);background:var(--s4);border:1px solid var(--edge2);color:var(--ink);
-  padding:10px 16px;border-radius:var(--r2);z-index:50;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw;text-align:center;font-weight:600;font-size:14px}
+.dlg .card{width:100%;max-width:420px;max-height:86vh;overflow:auto;background:var(--s1)}
+.dlg h3{font-size:19px}
+.dlg .act{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:8px;margin-top:16px}
+.dlg .act button.primary{background:var(--acc);color:var(--on-acc)}
+.dlg input[type=text]{background:var(--s2);border-radius:12px;padding:0 12px;margin-top:8px}
+.dlg .chips{margin-top:10px;flex-wrap:wrap}
+.calpad{margin-top:12px;height:180px;border-radius:18px;background:var(--bg);box-shadow:inset 0 0 0 3px var(--acc);display:grid;place-items:center;font:700 20px var(--disp);touch-action:manipulation;user-select:none}
+.calpad.flash{background:var(--s2)}
+.toast{position:fixed;left:50%;top:calc(var(--sat) + 60px);transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:14px;z-index:50;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw;text-align:center;font-weight:600;font-size:14px}
 .toast.on{opacity:1}
-body:has(#s-player.on) .toast{bottom:auto;top:calc(var(--sat) + 56px)}
-.busy{position:fixed;inset:0;z-index:45;background:rgba(5,7,12,.75);display:none;place-items:center;color:#fff;font:700 16px var(--mono)}
+.busy{position:fixed;inset:0;z-index:45;background:rgba(5,6,9,.75);display:none;place-items:center;color:#fff;font-weight:600}
 .busy.on{display:grid}
-@media(max-width:370px){.transport{grid-template-columns:1fr 1fr 72px 1fr 1fr}.transport .play{width:70px}.transport button{width:48px}.transport #jb,.transport #jf{width:54px}
-  .loops>button{padding:0 7px;font-size:11px}.salta>span{display:none}.ctrls .met{font-size:10px}}
-@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
-  <defs><linearGradient id="rg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff4e7b"/><stop offset="1" stop-color="#00eefc"/></linearGradient></defs>
   <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="M5 9l7 7 7-7"/></symbol>
   <symbol id="i-more" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.7" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.7" fill="currentColor" stroke="none"/><circle cx="12" cy="19" r="1.7" fill="currentColor" stroke="none"/></symbol>
-  <symbol id="i-tune" viewBox="0 0 24 24"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></symbol>
   <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13l10.5-6.5z" fill="currentColor" stroke="none"/></symbol>
-  <symbol id="i-pause" viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1" fill="currentColor" stroke="none"/><rect x="14" y="5" width="4" height="14" rx="1" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1.2" fill="currentColor" stroke="none"/><rect x="14" y="5" width="4" height="14" rx="1.2" fill="currentColor" stroke="none"/></symbol>
   <symbol id="i-prev" viewBox="0 0 24 24"><path d="M17 5.5v13L6.5 12z" fill="currentColor" stroke="none"/></symbol>
   <symbol id="i-next" viewBox="0 0 24 24"><path d="M7 5.5v13L17.5 12z" fill="currentColor" stroke="none"/></symbol>
-  <symbol id="i-replay" viewBox="0 0 24 24"><path d="M5 13a7 7 0 1 0 2.5-5.4"/><path d="M7 3.5v4.5h4.5"/></symbol>
-  <symbol id="i-fwd" viewBox="0 0 24 24"><path d="M19 13a7 7 0 1 1-2.5-5.4"/><path d="M17 3.5v4.5h-4.5"/></symbol>
-  <symbol id="i-bookmark" viewBox="0 0 24 24"><path d="M7 4h10v16l-5-4-5 4z"/><path d="M12 8v5M9.5 10.5h5"/></symbol>
   <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
   <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
   <symbol id="i-full" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></symbol>
   <symbol id="i-flip" viewBox="0 0 24 24"><path d="M12 3v18" stroke-dasharray="2 3"/><path d="M9 7L3.5 17H9z"/><path d="M15 7l5.5 10H15z" fill="currentColor" stroke="none"/></symbol>
-  <symbol id="i-mute" viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z"/><path d="M16 9.5l5 5M21 9.5l-5 5"/></symbol>
   <symbol id="i-note" viewBox="0 0 24 24"><path d="M9 18V5.5l10-2V16"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/></symbol>
   <symbol id="i-video" viewBox="0 0 24 24"><rect x="2.5" y="6" width="13" height="12" rx="2"/><path d="M15.5 10.5l6-3.5v10l-6-3.5"/></symbol>
-  <symbol id="i-alarm" viewBox="0 0 24 24"><circle cx="12" cy="13" r="7"/><path d="M12 9.5V13l2.5 2M5 4L2.5 6.5M19 4l2.5 2.5"/></symbol>
   <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
   <symbol id="i-eq" viewBox="0 0 24 24"><path d="M5 10v4M9 6v12M13 8v8M17 4v16M21 10v4"/></symbol>
-  <symbol id="i-bars" viewBox="0 0 24 24"><path d="M6 20v-6M12 20V6M18 20v-10"/></symbol>
-  <symbol id="i-trend" viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></symbol>
-  <symbol id="i-timer" viewBox="0 0 24 24"><circle cx="12" cy="13.5" r="7.5"/><path d="M12 13.5V9.5M9.5 2.5h5"/></symbol>
-  <symbol id="i-gauge" viewBox="0 0 24 24"><path d="M4.5 17a8 8 0 1 1 15 0"/><path d="M12 13l4-4"/></symbol>
-  <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3" fill="currentColor" stroke="none"/></symbol>
-  <symbol id="i-restart" viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M5 3v4h4"/></symbol>
-  <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13.5 2.5L5 13.5h6l-1 8 8.5-11h-6z"/></symbol>
-  <symbol id="i-sync" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14-4.5L4 9M4 13a8 8 0 0 0 14 4.5l2-2.5"/><path d="M4 4v5h5M20 20v-5h-5"/></symbol>
-  <symbol id="i-loop" viewBox="0 0 24 24"><path d="M17 2.5l3 3-3 3"/><path d="M4 11.5v-1a5 5 0 0 1 5-5h11"/><path d="M7 21.5l-3-3 3-3"/><path d="M20 12.5v1a5 5 0 0 1-5 5H4"/></symbol>
-  <symbol id="i-start" viewBox="0 0 24 24"><path d="M5 5v14M19 6l-7 6 7 6"/></symbol>
-  <symbol id="i-end" viewBox="0 0 24 24"><path d="M19 5v14M5 6l7 6-7 6"/></symbol>
-  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></symbol>
-  <symbol id="i-hourglass" viewBox="0 0 24 24"><path d="M6 3h12M6 21h12M7 3c0 5 5 6 5 9s-5 4-5 9M17 3c0 5-5 6-5 9s5 4 5 9"/></symbol>
   <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></symbol>
-  <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3.5" y="4" width="17" height="16" rx="2"/><path d="M3.5 9.5h17M3.5 14.5h17M9 4v16M15 4v16"/></symbol>
+  <symbol id="i-bookmark" viewBox="0 0 24 24"><path d="M7 4h10v16l-5-4-5 4z"/></symbol>
+  <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-restart" viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M5 3v4h4"/></symbol>
   <symbol id="i-hand" viewBox="0 0 24 24"><path d="M8 11V5.5a1.5 1.5 0 0 1 3 0V11M11 10V4a1.5 1.5 0 0 1 3 0v6M14 10V5.5a1.5 1.5 0 0 1 3 0V13c0 4-2.5 7-6 7-2.8 0-4.2-1.4-5.7-4L4 12.6a1.5 1.5 0 0 1 2.4-1.8L8 13"/></symbol>
-  <symbol id="i-trophy" viewBox="0 0 24 24"><path d="M7 4h10v5a5 5 0 0 1-10 0zM7 6H4v1.5A3.5 3.5 0 0 0 7.5 11M17 6h3v1.5a3.5 3.5 0 0 1-3.5 3.5M12 14v3M8 20h8M9.5 17h5"/></symbol>
-  <symbol id="i-school" viewBox="0 0 24 24"><path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11v5c3 2 9 2 12 0v-5M22 9v6"/></symbol>
   <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H9l2 2.5h8.5A1.5 1.5 0 0 1 21 9v9.5a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z"/></symbol>
-  <symbol id="i-flag" viewBox="0 0 24 24"><path d="M5 21V4M5 4h12l-2 4 2 4H5"/></symbol>
-  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></symbol>
-  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></symbol>
-  <symbol id="i-warn" viewBox="0 0 24 24"><path d="M12 3.5L2.5 20h19z"/><path d="M12 10v4.5M12 17.5v.5"/></symbol>
-  <symbol id="i-bulb" viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2V16h5v-.1c0-.8.4-1.5 1-2A6 6 0 0 0 12 3z"/></symbol>
-  <symbol id="i-exit" viewBox="0 0 24 24"><path d="M14 4h5v16h-5M10 8l-4 4 4 4M6 12h10"/></symbol>
-  <symbol id="i-dl" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v8M8.5 12.5l3.5 3.5 3.5-3.5"/></symbol>
-  <symbol id="i-micoff" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 11.6 4M12 17.5V21M4 4l16 16"/></symbol>
-  <symbol id="s-vocals" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></symbol>
-  <symbol id="s-guitar" viewBox="0 0 24 24"><path d="M9 18V5.5l10-2V16"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/></symbol>
-  <symbol id="s-bass" viewBox="0 0 24 24"><path d="M3 12h2M7 8v8M11 4v16M15 7v10M19 10v4M21 12h0"/></symbol>
-  <symbol id="s-bongo" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3.5" fill="currentColor" stroke="none"/></symbol>
-  <symbol id="s-guira" viewBox="0 0 24 24"><path d="M4 6h16M4 10h16M4 14h16M4 18h16"/></symbol>
-  <symbol id="s-altro" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 4v10M12 4v10M16 4v10M6.5 14h3M10.5 14h3M14.5 14h3"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7"/><circle cx="12" cy="12" r="6.3"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M10.5 18.5h3"/></symbol>
+  <symbol id="i-lines" viewBox="0 0 24 24"><path d="M4 5h4M4 10h10M4 15h6M4 20h12"/></symbol>
 </svg>
 
 <!-- HOME -->
 <section class="screen" id="s-home">
-  <header class="hbar"><div class="logo"><svg class="i"><use href="#i-eq"/></svg></div><div class="ht"><b>BACHATA LAB</b><small>Studio di musicalità</small></div></header>
-  <div class="panel privacy">
-    <div class="row"><svg class="i"><use href="#i-shield"/></svg><span class="k grow" style="color:var(--ink)">Elaborazione 100% sul telefono</span><span class="mono small" id="storageUse"></span></div>
-    <div class="ubar" id="useBar" hidden></div>
-    <div class="row" style="align-items:center"><p id="storage">I brani e i modelli non lasciano mai questo telefono.</p><button class="link" id="manageBtn">Gestisci</button></div>
-  </div>
-  <button class="newcard" id="newBtn"><span class="plus"><svg class="i"><use href="#i-plus"/></svg></span><span><b>NUOVO PROGETTO</b><span>Carica una canzone o un video dal telefono</span></span><svg class="i"><use href="#i-folder"/></svg></button>
-  <div class="search" id="searchBox" hidden><svg class="i"><use href="#i-search"/></svg><input id="q" type="text" placeholder="Cerca un brano" autocomplete="off"></div>
-  <div class="row"><div class="chips filters grow" id="filters"></div><button class="link" id="sortBtn" style="flex:none">RECENTI</button></div>
-  <div class="sect" id="projHead" hidden><h2>I miei progetti</h2><span class="chip cy" id="projCount"></span><span class="sp"></span></div>
+  <div class="hhead"><div class="row" style="gap:10px"><div class="logo"><svg class="i" style="stroke-width:2.4"><use href="#i-eq"/></svg></div><h1>Bachata Lab</h1></div><button class="icon" id="themeBtn" aria-label="Cambia tema"></button></div>
+  <label class="search" id="searchBox" hidden><svg class="i" style="width:18px;height:18px"><use href="#i-search"/></svg><input id="q" type="text" placeholder="Cerca un brano" autocomplete="off" aria-label="Cerca un brano"></label>
+  <div class="row filters"><div class="chips grow" id="filters"></div><button class="link" id="sortBtn">Recenti</button></div>
+  <div class="sect" id="projHead" hidden><h2>Progetti</h2><span class="small mute" id="homeMeta"></span></div>
   <div id="projects"></div>
-  <div class="empty"><svg class="i"><use href="#i-eq"/></svg><b>Ancora nessun progetto</b><span>Tocca «Nuovo progetto» e scegli una canzone o un video.</span></div>
-  <div class="panel guide" id="guide">
-    <div class="row"><span class="logo" style="width:36px;height:36px;color:var(--pri)"><svg class="i"><use href="#i-bulb"/></svg></span><h3 class="grow" style="text-transform:uppercase">Guida rapida</h3><span class="k" style="color:var(--cy)">3 passi</span></div>
-    <ol>
-      <li><span class="n">1</span><div><b>Scegli brano o video</b><span>Dalla memoria del telefono: MP3, M4A, WAV oppure un video MP4.</span></div></li>
-      <li><span class="n">2</span><div><b>Ritaglia 30–90 secondi</b><span>La frase, la combinazione o la sezione che vuoi studiare.</span></div></li>
-      <li><span class="n">3</span><div><b>Isola gli strumenti e conta 1–8</b><span>Spegni la voce, alza la chitarra o il bongo e balla a tempo.</span></div></li>
-    </ol>
-  </div>
+  <div class="empty"><b>Ancora nessun progetto</b>Tocca «Nuovo progetto» e scegli una canzone o un video.</div>
+  <div class="card guide" id="guide"><b style="font:700 16px var(--disp)">Come funziona</b>
+    <ol><li><span class="n">1</span><span>Scegli una canzone o un video dal telefono.</span></li><li><span class="n">2</span><span>Ritaglia 30–90 secondi: la parte che vuoi studiare.</span></li><li><span class="n">3</span><span>Spegni la voce, isola bongo e güira, conta da 1 a 8.</span></li></ol></div>
+  <div class="newbar"><button class="primary" id="newBtn"><svg class="i" style="stroke-width:2.6"><use href="#i-plus"/></svg>Nuovo progetto</button></div>
   <input type="file" id="file" accept="audio/*,video/*,.mp3,.m4a,.wav,.ogg,.flac,.aac,.mp4,.mov,.webm" hidden>
-  <nav class="bnav" id="homeNav">
-    <button class="on" id="navProj"><svg class="i"><use href="#i-folder"/></svg>PROGETTI</button>
-    <button id="navLast"><svg class="i"><use href="#i-tune"/></svg>LAB</button>
-    <button id="navTrain"><svg class="i"><use href="#i-flag"/></svg>ALLENATI</button>
-    <button id="navSet"><svg class="i"><use href="#i-gear"/></svg>IMPOSTAZIONI</button>
-  </nav>
+  <nav class="bnav"><button class="on" data-nav="home"><svg class="i"><use href="#i-folder"/></svg>Progetti</button><button data-nav="train"><svg class="i"><use href="#i-target"/></svg>Allenati</button><button data-nav="set"><svg class="i"><use href="#i-gear"/></svg>Impostazioni</button></nav>
+</section>
+
+<!-- SETTINGS -->
+<section class="screen" id="s-set">
+  <div class="set">
+    <h1>Impostazioni</h1>
+    <p class="lbl">Aspetto</p>
+    <div class="card">
+      <b style="font-weight:600">Tema</b>
+      <div class="seg" id="themeSeg" style="margin-top:10px;background:var(--s2)"><button data-theme="dark">Scuro</button><button data-theme="light">Chiaro</button><button data-theme="auto">Come il telefono</button></div>
+      <b style="display:block;font-weight:600;margin-top:18px">Colore</b>
+      <div class="swatches" id="accentList"></div>
+      <div class="row" style="justify-content:space-between;margin-top:8px"><span class="small mute" id="accentName"></span><span class="small mute" id="accentHint"></span></div>
+      <div class="preview" aria-hidden="true"><span class="num">1</span><span class="bar"><i></i></span><span class="pill" style="padding:7px 12px;background:var(--acc);color:var(--on-acc);font:700 12px var(--body)">Loop 8</span></div>
+    </div>
+    <p class="lbl">Audio</p>
+    <div class="card" style="padding:0">
+      <div class="setrow"><div class="tx"><b>Ritardo dell'audio</b><span id="calTxt2"></span></div><button id="calBtn2" class="pill" style="color:var(--acc)">Calibra</button></div>
+    </div>
+    <p class="lbl">Memoria</p>
+    <div class="card" style="padding:0" id="setInfo"></div>
+  </div>
+  <nav class="bnav"><button data-nav="home"><svg class="i"><use href="#i-folder"/></svg>Progetti</button><button data-nav="train"><svg class="i"><use href="#i-target"/></svg>Allenati</button><button class="on" data-nav="set"><svg class="i"><use href="#i-gear"/></svg>Impostazioni</button></nav>
 </section>
 
 <!-- NEW PROJECT -->
 <section class="screen" id="s-new">
-  <div class="tbar"><button class="icon" data-go="home" aria-label="Indietro"><svg class="i"><use href="#i-back"/></svg></button><h3 id="newTitle">Nuovo progetto</h3></div>
-  <div class="panel" style="margin-top:4px">
-    <label class="k" for="pname">Nome progetto</label>
-    <div class="field"><input type="text" id="pname" maxlength="60"><button class="icon" id="clearName" aria-label="Cancella nome"><svg class="i"><use href="#i-close"/></svg></button></div>
-  </div>
-  <div class="vcard" id="vcard">
-    <video id="vprev" muted playsinline preload="auto"></video>
-    <div class="ov top"><span class="badge" id="vdur" style="color:var(--cy)"></span><button class="badge" id="changeFile"><svg class="i" style="width:14px;height:14px"><use href="#i-sync"/></svg>Cambia file</button></div>
-    <div class="ov bot"><span class="badge" id="vname" style="max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink2)"></span></div>
-  </div>
-  <div class="panel">
-    <div class="row"><span class="chip" style="border:0;background:none;padding:0"><i style="background:var(--acc)"></i></span><h3 class="grow" style="text-transform:uppercase">Ritaglio sezione</h3><span class="chip am">Consigliati 30–90 s</span></div>
-    <div class="durbox"><div><span class="k">Durata selezionata</span><b id="rd">1:00</b></div><div class="r" id="rdS"></div></div>
+  <div class="tbar"><button class="icon" data-go="home" aria-label="Annulla"><svg class="i"><use href="#i-close"/></svg></button><h1 id="newTitle">Nuovo progetto</h1></div>
+  <label class="field"><span>Nome</span><span class="row"><input type="text" id="pname" maxlength="60"><button class="icon" id="clearName" aria-label="Cancella nome" style="width:32px;min-height:32px"><svg class="i" style="width:16px;height:16px"><use href="#i-close"/></svg></button></span></label>
+  <div class="fileRow" id="fileRow"><span class="ic" id="fileIc"><svg class="i"><use href="#i-note"/></svg></span><div class="grow"><b id="vname" style="display:block;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></b><span class="small mute" id="vdur"></span></div><button class="pill" id="changeFile">Cambia</button></div>
+  <div class="vcard" id="vcard"><video id="vprev" muted playsinline preload="auto"></video></div>
+  <label class="card row" id="audioOnlyRow" hidden style="margin:10px 16px 0;cursor:pointer"><span class="grow"><b style="display:block;font-weight:600">Usa solo l'audio</b><span class="small mute">Il video non viene salvato: occupa meno spazio. L'MP3 lo scarichi dal player.</span></span><input type="checkbox" class="sw" id="audioOnly"></label>
+  <div class="card part">
+    <div class="hd"><div><h2>Scegli la parte</h2><span class="small mute" id="rdS">Meglio 30–90 secondi</span></div><div id="rd">1:00</div></div>
     <div class="wave" id="rwave"><canvas></canvas><i class="ph" id="rph"></i></div>
     <div class="ticks" id="ticks"></div>
     <div class="steppers">
-      <div><div class="h"><span class="k">Inizio</span><b id="rs">0:00</b></div><div class="row"><button data-nudge="s,-1">−1 s</button><button data-nudge="s,1">+1 s</button></div></div>
-      <div><div class="h"><span class="k">Fine</span><b id="re">1:00</b></div><div class="row"><button data-nudge="e,-1">−1 s</button><button data-nudge="e,1">+1 s</button></div></div>
+      <div><div class="h">Inizio<b id="rs">0:00</b></div><div class="row"><button data-nudge="s,-1">−1 s</button><button data-nudge="s,1">+1 s</button></div></div>
+      <div><div class="h">Fine<b id="re">1:00</b></div><div class="row"><button data-nudge="e,-1">−1 s</button><button data-nudge="e,1">+1 s</button></div></div>
     </div>
-    <div class="three"><button id="preview"><svg class="i"><use href="#i-play"/></svg>Ascolta</button><button id="startHere" disabled><svg class="i" style="color:var(--acc)"><use href="#i-start"/></svg>Inizio qui</button><button id="endHere" disabled>Fine qui<svg class="i" style="color:var(--cy)"><use href="#i-end"/></svg></button></div>
-    <div class="limits"><span>Limiti consentiti</span><span>Min 8 s · Max 3 min</span></div>
+    <button id="preview"><svg class="i"><use href="#i-play"/></svg>Ascolta la parte</button>
+    <div class="here"><button id="startHere" disabled>Inizio qui</button><button id="endHere" disabled>Fine qui</button></div>
     <div id="regionWarn"></div>
   </div>
-  <label class="panel opt">
-    <span class="row"><input type="checkbox" class="sw" id="optGuira" checked><span class="grow"><b>Separa la güira dal bongo</b><span class="mute small">Per studiare il martillo del bongo e la raspa della güira ciascuno per conto suo. Rende la separazione più lenta.</span></span></span>
-    <span class="k" style="display:block;margin-top:14px">Tracce che ottieni</span>
-    <span class="stemtags" id="stemtags"></span>
-  </label>
-  <div class="panel est">
-    <div class="row"><span class="row"><svg class="i" style="color:var(--am)"><use href="#i-hourglass"/></svg><b style="font:600 17px var(--body)">Tempo stimato</b></span><b class="big" id="estMin">~1 min</b></div>
-    <div id="est"></div>
-  </div>
-  <button class="primary cta" id="createBtn"><svg class="i" style="width:22px;height:22px"><use href="#i-bolt"/></svg>Crea progetto</button>
-  <button class="ghost" data-go="home">Annulla</button>
+  <div class="card" style="margin:12px 16px 0"><b style="font-weight:600">6 tracce separate</b>
+    <div class="stemchips"><span style="--c:var(--c-vocals)">Voce</span><span style="--c:var(--c-guitar)">Chitarra</span><span style="--c:var(--c-bass)">Basso</span><span style="--c:var(--c-bongo)">Bongo</span><span style="--c:var(--c-guira)">Güira</span><span style="--c:var(--c-altro)">Altro</span></div></div>
+  <p id="est"></p>
+  <button class="primary" id="createBtn">Separa gli strumenti</button>
 </section>
 
 <!-- PROCESSING -->
 <section class="screen" id="s-proc">
-  <div class="tbar"><h3>Separazione</h3></div>
-  <div class="liveline"><span class="k"><i></i>Elaborazione sul telefono</span><span class="chip cy" id="wakeChip" hidden>Schermo acceso</span></div>
-  <div class="panel trk"><span class="ic" id="procThumb"><svg class="i"><use href="#i-note"/></svg></span><div class="grow"><span class="chip" id="procKind" style="margin-bottom:4px"></span><b id="procTitle">Separazione</b><span class="mono small mute" id="procSub"></span></div></div>
-  <div class="panel gaugebox">
-    <div class="gauge"><svg viewBox="0 0 160 160"><circle class="bg" cx="80" cy="80" r="66"/><circle class="fg" id="procRing" cx="80" cy="80" r="66"/></svg>
-      <div class="pct"><b id="procPct">0<small>%</small></b><span class="badge" id="procWhat">Preparazione</span></div></div>
-    <div class="stagepill"><i></i><span id="procStage">Preparazione…</span></div>
-    <div class="stats3"><div><span>Trascorso</span><b id="procEl">0:00</b></div><div><span>Rimanente</span><b id="procLeft">–</b></div><div><span>Parte</span><b id="procPart">–</b></div></div>
-  </div>
-  <div class="row" style="justify-content:space-between;margin:18px 0 0"><span class="k">Passaggi sul telefono</span><span class="k" style="color:var(--am)">Offline</span></div>
+  <div class="kick">SEPARAZIONE</div>
+  <h1 id="procTitle">Separazione</h1>
+  <p class="small mute" id="procSub"></p>
+  <div class="ring"><svg viewBox="0 0 220 220"><circle class="bg" cx="110" cy="110" r="96"/><circle class="fg" id="procRing" cx="110" cy="110" r="96"/></svg>
+    <div class="pct"><b id="procPct">0%</b><span id="procLeft">preparazione…</span></div></div>
   <ul class="steps" id="procSteps"></ul>
-  <div class="panel secure"><span class="k"><svg class="i" style="width:18px;height:18px"><use href="#i-shield"/></svg>Zero cloud · privacy totale</span><p>Tieni lo schermo acceso e non uscire dall'app: se il telefono va in standby il lavoro si ferma. Il brano non viene caricato da nessuna parte: tutto avviene su questo telefono.</p></div>
-  <button id="cancelBtn"><svg class="i"><use href="#i-close"/></svg>Annulla elaborazione</button>
+  <div class="awake"><svg class="i"><use href="#i-shield"/></svg><span>Lo schermo resta acceso da solo. Il brano non lascia il telefono.</span></div>
+  <button id="cancelBtn">Annulla</button>
+  <div hidden><span id="procThumb"></span><span id="procKind"></span><span id="procStage"></span><span id="procEl"></span><span id="procPart"></span><span id="procWhat"></span><span id="wakeChip"></span></div>
 </section>
 
-<!-- PLAYER (audio layout, or video layout with .video) -->
+<!-- PLAYER -->
 <section class="screen" id="s-player">
   <div class="ptop">
-    <button class="back" data-go="home" aria-label="Progetti"><svg class="i"><use href="#i-back"/></svg>PROGETTI</button>
+    <button class="icon" data-go="home" aria-label="Progetti"><svg class="i"><use href="#i-back"/></svg></button>
     <div class="tt"><b id="pTitle"></b><span id="pSub"></span></div>
-    <span class="chip" id="bpmChip">BPM <b id="bpmLbl">–</b></span>
-    <button class="icon" id="menuBtn" aria-label="Opzioni progetto" style="width:36px"><svg class="i"><use href="#i-more"/></svg></button>
+    <button class="icon" id="menuBtn" aria-label="Ritmo e progetto"><svg class="i"><use href="#i-more"/></svg></button>
   </div>
-
   <div class="stage" id="stage">
     <video id="vid" muted playsinline preload="auto"></video>
-    <div class="shade"></div>
     <div class="ov ov-num" id="ovNum"></div>
-    <div class="ov ov-phrase chip" id="ovPhrase"></div>
+    <div class="ov ov-phrase" id="ovPhrase"></div>
     <div class="ov ov-dots" id="ovDots"></div>
-    <div class="stagebtns"><button id="mirrorBtn" aria-pressed="false"><svg class="i" style="width:15px;height:15px"><use href="#i-flip"/></svg>SPECCHIO</button><button id="fsBtn" aria-label="Schermo intero"><svg class="i" style="width:16px;height:16px"><use href="#i-full"/></svg></button></div>
-    <div class="fsbar"><button data-act="jb" aria-label="Indietro"><svg class="i"><use href="#i-prev"/></svg></button><button data-act="play" id="fsPlay" aria-label="Play"><svg class="i"><use href="#i-play"/></svg></button><button data-act="jf" aria-label="Avanti"><svg class="i"><use href="#i-next"/></svg></button><button data-act="slow" id="fsSlow" class="mono">100%</button><button data-act="exitfs">Esci</button></div>
+    <div class="stagebtns"><button id="mirrorBtn" aria-pressed="false"><svg class="i" style="width:15px;height:15px"><use href="#i-flip"/></svg>Specchio</button><button id="fsBtn" aria-label="Schermo intero"><svg class="i" style="width:16px;height:16px"><use href="#i-full"/></svg></button></div>
+    <div class="fsbar"><button data-act="jb" aria-label="Indietro"><svg class="i"><use href="#i-prev"/></svg></button><button data-act="play" id="fsPlay" aria-label="Play"><svg class="i"><use href="#i-play"/></svg></button><button data-act="jf" aria-label="Avanti"><svg class="i"><use href="#i-next"/></svg></button><button data-act="slow" id="fsSlow">100%</button><button data-act="exitfs">Esci</button></div>
   </div>
-
   <div class="count" id="count">
-    <div class="ctop"><span class="chip" id="phrasePill"><span id="phraseLbl">Frase –</span></span><span class="chip" id="secLbl"></span><span class="chip am">Tap 4 &amp; 8</span></div>
-    <div class="bigrow"><div class="big" id="bigNum">–</div><div class="cap" id="countCap"></div></div>
-    <div class="dots" id="dots"></div>
+    <div class="bignum" id="bigNum">–</div>
+    <div class="rt"><div class="row"><span id="phraseLbl">Frase –</span><span id="secLbl"></span></div><div class="dots" id="dots"></div></div>
   </div>
   <div class="note" id="beatWarn"></div>
-
-  <div class="phd"><span class="k">Tocca: spegni · tieni premuto: solo</span><button class="link" id="allOn">Attiva tutti</button></div>
-  <div class="pads" id="pads"></div>
+  <div class="shd"><h2>Strumenti</h2><button class="link" id="allOn">Accendi tutti</button></div>
+  <div id="stems"></div>
   <div class="minipads" id="minipads"></div>
-
-  <div class="tlbox" id="tlbox">
-    <div class="tlhead"><div class="vtab"><button id="viewTl" class="on">Timeline</button><button id="viewGrid">Griglia 8 tempi</button></div><span class="mono"><span id="tPos">0:00</span> / <span id="tDur">0:00</span></span></div>
-    <div class="tl" id="tl"><canvas></canvas></div>
-    <div class="grid8" id="grid8"></div>
-    <div class="chips marks" id="marks"></div>
+  <div class="scrub" id="scrub">
+    <div class="track" id="tl"><i id="scFill"></i><i id="scLoop"></i><span id="scMarks"></span><i id="scHandle"></i></div>
+    <div class="times"><span id="tPos">0:00</span><span id="loopTxt"></span><span id="tDur">0:00</span></div>
   </div>
-
-  <div class="loops">
-    <button id="loop4">Loop 4</button><button id="loop8">Loop 8</button><button id="loopAB">A–B</button><span class="sp"></span>
-    <div class="salta" id="stepSeg" role="group" aria-label="Salta di"><span>SALTA</span><button data-step="4">4</button><button data-step="8">8</button></div>
-    <button id="markBtn" aria-label="Segna l'inizio di una sezione"><svg class="i"><use href="#i-bookmark"/></svg></button>
-  </div>
-  <div class="loopinfo" id="loopInfo" hidden><svg class="i"><use href="#i-loop"/></svg><span id="loopTxt"></span><button id="loopX" aria-label="Togli il loop"><svg class="i"><use href="#i-close"/></svg></button></div>
-
-  <div class="ctrls">
-    <div class="spd"><svg class="i"><use href="#i-gauge"/></svg><button id="tempoV" title="Tocca per tornare al 100%">100%</button><button class="pm" id="spdDown" aria-label="Più lento">−</button><button class="pm" id="spdUp" aria-label="Più veloce">+</button></div>
-    <button class="met" id="metBtn" aria-pressed="false"><svg class="i"><use href="#i-timer"/></svg><span>METRONOMO<b>OFF</b></span></button>
-    <button class="trainbtn" id="trainBtn"><svg class="i"><use href="#i-school"/></svg>ALLENATI</button>
-  </div>
+  <div class="loops"><button id="loop4">Loop 4</button><button id="loop8">Loop 8</button><button id="loopAB">A–B</button><button id="secBtn"><svg class="i" style="width:15px;height:15px"><use href="#i-bookmark"/></svg>Sezioni</button></div>
   <div class="transport">
-    <button id="jb" aria-label="Indietro di tempi"></button>
-    <button id="back5" aria-label="Indietro 5 secondi"><svg class="i" style="width:20px;height:20px"><use href="#i-replay"/></svg><span>5 S</span></button>
+    <button data-jump="-8" aria-label="Indietro di 8 tempi">−8</button><button data-jump="-4" aria-label="Indietro di 4 tempi">−4</button>
     <button class="play" id="playBtn" aria-label="Play"><svg class="i"><use href="#i-play"/></svg></button>
-    <button id="fwd5" aria-label="Avanti 5 secondi"><svg class="i" style="width:20px;height:20px"><use href="#i-fwd"/></svg><span>5 S</span></button>
-    <button id="jf" aria-label="Avanti di tempi"></button>
+    <button data-jump="4" aria-label="Avanti di 4 tempi">+4</button><button data-jump="8" aria-label="Avanti di 8 tempi">+8</button>
   </div>
-  <nav class="bnav">
-    <button class="on" id="navLab"><svg class="i"><use href="#i-target"/></svg>LAB</button>
-    <button id="mixBtn"><svg class="i"><use href="#i-bars"/></svg>STRUMENTI</button>
-    <button id="navBpm"><svg class="i"><use href="#i-gauge"/></svg>RITMO</button>
-    <button data-go="home"><svg class="i"><use href="#i-folder"/></svg>PROGETTI</button>
-  </nav>
+  <div class="tools">
+    <button id="speedBtn"><b id="tempoV">100%</b><span>Velocità</span></button>
+    <button id="metBtn"><b id="metState">Spento</b><span>Metronomo</span></button>
+    <button id="mapBtn"><b>Mappa</b><span>strumenti · testo</span></button>
+  </div>
 </section>
 
 <div class="scrim" id="scrim"></div>
-<div class="sheet" id="sheet" role="dialog" aria-label="Mixer e ritmo">
-  <div class="grab"></div>
-  <div class="shead"><i></i><h3>Mixer &amp; ritmo<small id="sheetSub"></small></h3><button id="sheetClose"><svg class="i" style="width:16px;height:16px"><use href="#i-close"/></svg>FATTO</button></div>
-  <div class="tabs"><button id="tabMix" class="on"><svg class="i" style="width:16px;height:16px"><use href="#i-bars"/></svg>Strumenti</button><button id="tabBeat"><svg class="i" style="width:16px;height:16px"><use href="#i-gauge"/></svg>Ritmo e velocità</button></div>
-  <div id="paneMixWrap">
-    <div class="panel presetbox" style="margin-top:0"><div class="row"><span class="k">Preset didattici</span><span class="chip am" id="presetBadge"></span></div><div class="chips" id="presets"></div></div>
-    <p class="mute small" style="margin:10px 2px 0">Sul player: tocca uno strumento per spegnerlo, tienilo premuto per sentirlo da solo. La tacca gialla è il volume originale (100%).</p>
-    <div id="paneMix"></div>
+<div class="pop" id="popSpeed" role="dialog" aria-label="Velocità">
+  <i class="grab"></i>
+  <div><h2>Velocità</h2><p class="sub">Il brano rallenta senza cambiare tono.</p></div>
+  <div class="row" style="justify-content:center;gap:24px"><button class="icon" id="spdDown" style="background:var(--s2);font-size:22px" aria-label="Più lento">−</button><div class="big2" id="spdVal">100%</div><button class="icon" id="spdUp" style="background:var(--s2);font-size:22px" aria-label="Più veloce">+</button></div>
+  <div class="grid5" id="tempoChips"><button data-tempo="60">60%</button><button data-tempo="70">70%</button><button data-tempo="80">80%</button><button data-tempo="90">90%</button><button data-tempo="100">100%</button></div>
+  <button class="done" data-close>Fatto</button>
+</div>
+<div class="pop" id="popMet" role="dialog" aria-label="Metronomo">
+  <i class="grab"></i>
+  <label class="row" style="cursor:pointer"><span class="grow"><h2>Metronomo</h2><span class="sub" style="display:block">Un click su ogni tempo, a tempo con la musica</span></span><input type="checkbox" class="sw" id="metOn"></label>
+  <div><div class="row" style="justify-content:space-between;font-weight:600"><span>Volume</span><span class="mute" id="metVolV"></span></div><input type="range" id="metVol" min="0" max="200" value="60" aria-label="Volume del metronomo"></div>
+  <div><b style="font-weight:600">Click forte su</b><div class="seg" id="accSeg" style="margin-top:10px;background:var(--bg)"><button data-acc="1">Sull'1</button><button data-acc="48">Su 4 e 8</button><button data-acc="15">Su 1 e 5</button></div><div class="accDots" id="accDots"></div></div>
+  <label class="row" style="cursor:pointer"><span class="grow"><b style="font-weight:600;display:block">Conta d'ingresso</b><span class="small mute">Il Play parte da 5-6-7-8 prima dell'1</span></span><input type="checkbox" class="sw" id="countIn"></label>
+  <button class="done" data-close>Fatto</button>
+</div>
+<div class="pop" id="popRhythm" role="dialog" aria-label="Ritmo del brano">
+  <i class="grab"></i>
+  <div class="row"><div class="grow"><h2>Ritmo del brano</h2><p class="sub" id="bpmOrig"></p></div></div>
+  <div class="big2" id="bpmVal">–</div>
+  <div class="grid4"><button data-bpm="-1">−1 BPM</button><button data-bpm="1">+1 BPM</button><button data-bpm="half">Metà</button><button data-bpm="double">Doppio</button></div>
+  <button id="tapBtn"><span id="tapLbl" style="font:700 15px var(--body);color:var(--ink);display:flex;gap:8px;align-items:center"><svg class="i"><use href="#i-hand"/></svg>Tap tempo</span><span>tocca almeno 4 volte sul tempo</span></button>
+  <button class="primary" id="oneBtn"><svg class="i"><use href="#i-target"/></svg>L'1 è qui!</button>
+  <p class="small mute" style="text-align:center;margin-top:-8px">Conteggio sfasato? Con il brano in riproduzione, tocca esattamente sull'1.</p>
+  <div class="grid3"><button data-bpm="reset">Ripristina</button><button id="renameBtn">Rinomina</button><button id="deleteBtn" style="color:var(--bad)">Elimina</button></div>
+  <button id="mp3Btn" style="background:var(--s2)">Scarica l'MP3 del mix attuale</button>
+  <button class="done" data-close>Fatto</button>
+</div>
+<div class="pop" id="popSec" role="dialog" aria-label="Sezioni">
+  <i class="grab"></i>
+  <div><h2>Sezioni</h2><p class="sub">Tocca per andare lì · tieni premuto per loop, rinomina o elimina.</p></div>
+  <div class="marklist" id="marks"></div>
+  <button id="markBtn" style="background:var(--s2)"><svg class="i"><use href="#i-bookmark"/></svg>Segna l'inizio della frase qui</button>
+  <button class="done" data-close>Fatto</button>
+</div>
+<div class="pop" id="popVol" role="dialog" aria-label="Volume strumento">
+  <i class="grab"></i>
+  <div class="row"><i id="volDot" style="width:12px;height:12px;border-radius:6px;background:var(--c)"></i><h2 id="volName" class="grow">Strumento</h2><b id="volVal"></b></div>
+  <input type="range" id="volRange" min="0" max="200" step="5" value="100" aria-label="Volume">
+  <p class="small mute" style="margin-top:-8px">100% è il volume originale.</p>
+  <div class="grid3"><button id="volM">Spegni</button><button id="volS">Solo</button><button id="volReset">100%</button></div>
+  <button class="done" data-close>Fatto</button>
+</div>
+
+<!-- MAP -->
+<div class="full" id="map">
+  <div class="mhead"><button class="icon" id="mapClose" aria-label="Chiudi"><svg class="i"><use href="#i-down"/></svg></button><div class="tt"><b id="mapTitle"></b><span id="mapSub"></span></div><div class="mnum" id="mapNum">–</div></div>
+  <div class="seg mswitch"><button id="mapTabS" class="on">Strumenti</button><button id="mapTabT">Testo</button></div>
+  <div id="mapPaneS" style="display:flex;flex-direction:column;flex:1 1 0;min-height:0">
+    <div class="mheads" id="mapHeads"></div>
+    <div class="mbox" id="mapBox"><canvas id="mapCv"></canvas></div>
+    <div class="minfo"><span id="mapLoop"></span><span id="mapInfo"></span></div>
+    <div class="movw"><i id="mapOvWin"></i><i id="mapOvPos"></i></div>
+    <p class="mhint">Tocca le onde per andare lì · scorri per le altre frasi · tieni premuto per una nota</p>
   </div>
-  <div id="paneBeat" hidden>
-    <div class="panel bpmbox" style="margin-top:0">
-      <div class="hd"><span class="k" style="display:flex;gap:6px;align-items:center;color:var(--ink)"><svg class="i" style="width:16px;height:16px;color:var(--cy)"><use href="#i-clock"/></svg>Tempo del brano</span><span class="chip cy" id="bpmOrig"></span></div>
-      <div class="bpmval" id="bpmVal">–</div>
-      <div class="grid4"><button data-bpm="-1">−1,0</button><button data-bpm="-0.1">−0,1</button><button data-bpm="0.1">+0,1</button><button data-bpm="1">+1,0</button></div>
-      <div class="grid3"><button data-bpm="half">÷2 Metà</button><button data-bpm="double">×2 Doppio</button><button data-bpm="reset"><svg class="i" style="width:15px;height:15px"><use href="#i-restart"/></svg>Ripristina</button></div>
-      <button id="tapBtn"><span style="display:flex;gap:8px;align-items:center;font:700 15px var(--mono);color:var(--ink)" id="tapLbl"><svg class="i"><use href="#i-hand"/></svg>TAP TEMPO</span><span>tocca almeno 4 volte sul tempo per impostare i BPM</span></button>
-    </div>
-    <div class="oneBox">
-      <button id="oneBtn"><svg class="i"><use href="#i-target"/></svg>L'1 è qui!</button>
-      <p>Conteggio sfasato? Fai partire il brano e tocca esattamente sull'1 per riallineare il conteggio.</p>
-    </div>
-    <div class="panel">
-      <div class="row" style="justify-content:space-between"><span class="k">Velocità di studio</span><span class="k" style="color:var(--ink)">Tono invariato</span></div>
-      <div class="grid4" id="tempoChips" style="grid-template-columns:repeat(5,minmax(0,1fr));margin-top:10px"><button data-tempo="60">60%</button><button data-tempo="70">70%</button><button data-tempo="80">80%</button><button data-tempo="90">90%</button><button data-tempo="100">100%</button></div>
-    </div>
-    <div class="panel metbox">
-      <label class="row" style="cursor:pointer"><span class="ic"><svg class="i"><use href="#i-alarm"/></svg></span><span class="tx grow"><b>Metronomo</b><span>Un click su ogni tempo</span></span><input type="checkbox" class="sw" id="metOn"></label>
-      <div class="row" style="margin-top:8px;justify-content:space-between"><span class="small">Volume metronomo</span><span class="mono small" style="color:var(--am)" id="metVolV"></span></div>
-      <input type="range" id="metVol" min="0" max="200" value="60" aria-label="Volume metronomo" style="--tc:var(--am)">
-      <span class="k" style="display:block;margin:6px 0 8px">Accento metronomo</span>
-      <div class="seg" id="accSeg"><button data-acc="1">Solo sull'1</button><button data-acc="48">Su 4 e 8 (tap)</button><button data-acc="15">Su 1 e 5</button></div>
-    </div>
-    <div class="panel">
-      <span class="k">Automazioni esercizi</span>
-      <label class="tgl"><span class="tx"><b>Accelera nel loop</b><span>+5% di velocità ogni 2 giri, fino al 100%</span></span><input type="checkbox" class="sw" id="rampOn"></label>
-      <label class="tgl"><span class="tx"><b>Conta d'ingresso</b><span>Il Play parte da 5-6-7-8 prima dell'1</span></span><input type="checkbox" class="sw" id="countIn"></label>
-    </div>
+  <div class="mtext" id="mapPaneT" hidden><div class="empty" id="lyrEmpty"><b>Testo in arrivo</b>Qui comparirà il testo sincronizzato del brano.</div><div id="lyr"></div></div>
+  <div class="transport" style="padding-bottom:calc(18px + var(--sab))">
+    <button data-jump="-8" aria-label="Indietro di 8 tempi">−8</button><button data-jump="-4" aria-label="Indietro di 4 tempi">−4</button>
+    <button class="play" id="mPlay" aria-label="Play"><svg class="i"><use href="#i-play"/></svg></button>
+    <button data-jump="4" aria-label="Avanti di 4 tempi">+4</button><button data-jump="8" aria-label="Avanti di 8 tempi">+8</button>
   </div>
 </div>
 
+<!-- TRAINING -->
 <div class="train" id="train">
-  <div class="tbar"><button class="icon" id="trainClose" aria-label="Chiudi allenamento"><svg class="i"><use href="#i-close"/></svg></button><h3 id="trainTitle">Allenamento</h3></div>
+  <div class="tbar"><button class="icon" id="trainClose" aria-label="Chiudi"><svg class="i"><use href="#i-close"/></svg></button><h1 id="trainTitle">Allenati</h1><span style="width:44px"></span></div>
   <div id="trainMenu">
-    <div class="panel tracktop"><span class="ic"><svg class="i"><use href="#i-eq"/></svg></span><div class="grow"><span class="k" style="color:var(--cy)">Brano attivo</span><b id="trainTrack"></b></div><span class="chip" id="trainBpm"></span></div>
-    <div class="panel streak" id="streakBox" hidden><span class="ic"><svg class="i"><use href="#i-trophy"/></svg></span><div><b id="trainStreak"></b><span>Continua così per consolidare il tempo.</span></div></div>
-    <div class="sectt"><h3>Scegli l'esercizio</h3><span class="k">Il conteggio sparisce</span></div>
+    <p class="mute small">Il conteggio sparisce: ascolti e tocchi.</p>
+    <div class="card tsong"><div class="grow"><span class="small mute">Brano</span><b id="trainTrack" style="display:block"></b></div><span class="small mute" id="trainBpm"></span><button class="pill" id="trainChange">Cambia</button></div>
+    <div class="streak" id="streakBox" hidden><span id="trainStreak"></span></div>
     <div id="games"></div>
-    <div class="panel params">
-      <div class="row"><svg class="i" style="color:var(--cy)"><use href="#i-tune"/></svg><h3 class="grow" style="text-transform:uppercase;font-size:16px">Parametri sessione</h3></div>
-      <span class="k" style="display:block;margin:14px 0 8px">Guida audio</span>
-      <div class="seg" id="guideSeg"><button data-guide="bg">Basso + güira</button><button data-guide="all">Tutti</button><button data-guide="mix">Mix attuale</button></div>
-      <span class="k" style="display:block;margin:14px 0 8px">Durata esercizio</span>
-      <div class="seg" id="lenSeg"><button data-len="4">4 frasi (32 tempi)</button><button data-len="8">8 frasi (64 tempi)</button></div>
-      <span class="k" style="display:block;margin:14px 0 8px">Ritardo di cuffie e casse</span>
-      <div class="row"><span class="grow small mute" id="calTxt"></span><button id="calBtn" style="flex:none"><svg class="i" style="width:16px;height:16px"><use href="#i-timer"/></svg>Calibra</button></div>
-      <p class="mute small" style="margin-top:10px">Durante l'esercizio il metronomo è spento: si ascolta solo la musica.</p>
-    </div>
-    <button id="trainBack" style="width:100%;min-height:52px;margin-top:14px;font:700 13px var(--mono);letter-spacing:.1em"><svg class="i"><use href="#i-back"/></svg>TORNA AL PLAYER</button>
+    <div class="card row" style="margin-top:10px"><div class="grow"><b style="font-weight:600;display:block">Ritardo dell'audio</b><span class="small mute" id="calTxt"></span></div><button class="pill" id="calBtn" style="color:var(--acc)">Calibra</button></div>
+    <p class="lbl">Durata</p><div class="seg" id="lenSeg"><button data-len="4">4 frasi</button><button data-len="8">8 frasi</button></div>
+    <p class="lbl">Cosa si sente</p><div class="seg" id="guideSeg"><button data-guide="bg">Basso + güira</button><button data-guide="all">Tutti</button><button data-guide="mix">Il tuo mix</button></div>
+    <button id="trainBack" style="width:100%;margin-top:18px;min-height:50px;border-radius:25px;background:var(--s1)">Torna al player</button>
   </div>
   <div id="trainPlay" hidden>
-    <div class="blind"><span class="chip">Ascolto cieco · conteggio nascosto</span><span class="chip cy"><i></i>Live</span></div>
-    <div class="panel tstate">
-      <div class="row"><div><span class="gname" id="tGame"></span><h2 id="tLeft">Pronti</h2></div><div class="hits"><b id="tHits">0/0</b><span>Scarto <b id="tErr" style="font-size:inherit;color:inherit">–</b> ms</span></div></div>
-      <div class="segs4" id="tSegs"></div>
-    </div>
-    <div class="tprep"><svg class="i"><use href="#i-check"/></svg><span id="tPrep">4 tempi di preparazione: 5, 6, 7, 8…</span></div>
-    <div class="panel tbarbox">
-      <div class="row"><span class="late" id="tLate"><i></i>Aspetta il primo tocco</span><span class="k" id="tLast"></span></div>
-      <div class="tline"><div class="zone"></div><div class="zero"></div><span style="left:8px">−150 ms</span><span style="right:8px">+150 ms</span><div class="mk" id="tMark"></div></div>
-    </div>
-    <div class="tpad" id="tpad"><div><svg class="i"><use href="#i-target"/></svg><span id="tWhat">Tocca</span><small id="tMsg">Ascolta…</small></div></div>
-    <div class="thelp"><b id="tHelp">Tocca esattamente sul tempo</b><span id="tHelp2">Nessun numero sullo schermo · segui la musica</span></div>
-    <div class="tctl"><button id="tPause"><svg class="i"><use href="#i-pause"/></svg><span>PAUSA</span></button><button id="tRestart"><svg class="i"><use href="#i-restart"/></svg>RICOMINCIA</button><button id="tExit"><svg class="i"><use href="#i-exit"/></svg>ESCI</button></div>
+    <div class="tprog"><span id="tLeft">Pronti</span><span><b id="tHits">0/0</b> <span class="mute small">presi · <span id="tErr">–</span> ms</span></span></div>
+    <span class="small mute" id="tGame"></span>
+    <div class="tsegs" id="tSegs"></div>
+    <p id="tPrep"></p>
+    <div class="tpadwrap"><button class="tpad" id="tpad"><b id="tWhat">Tocca</b><small id="tMsg">Ascolta…</small></button></div>
+    <p id="tHelp"></p><p id="tHelp2"></p>
+    <div class="card" style="margin-top:12px"><div id="tLate"><span id="tLateTxt">Aspetta il primo tocco</span><span class="mute small" id="tLast"></span></div>
+      <div class="tline"><i class="zone"></i><i class="zero"></i><i class="mk" id="tMark"></i></div>
+      <div class="row small mute" style="justify-content:space-between;margin-top:6px"><span>prima</span><span>a tempo</span><span>dopo</span></div></div>
+    <div class="tctl"><button id="tPause">Pausa</button><button id="tRestart">Ricomincia</button><button id="tExit">Esci</button></div>
   </div>
   <div id="trainDone" hidden>
-    <div class="rechip"><span class="chip rose" id="tRecord" hidden><i></i>Nuovo record personale!</span><span></span></div>
-    <div class="panel ringbox">
-      <div class="ring"><svg viewBox="0 0 160 160"><circle class="bg" cx="80" cy="80" r="72"/><circle class="fg" id="tRing" cx="80" cy="80" r="72"/></svg>
-        <div class="pct"><b id="tScore">0<small>%</small></b><span class="badge">Punteggio</span></div></div>
-      <div class="verdict" id="tResTitle"></div>
+    <div class="res">
+      <div class="rring"><svg viewBox="0 0 160 160"><circle class="bg" cx="80" cy="80" r="72"/><circle class="fg" id="tRing" cx="80" cy="80" r="72"/></svg><div class="pct" id="tScore">0%</div></div>
+      <p id="tResTitle"></p><p id="tRecord" hidden>Nuovo record personale!</p>
+      <div class="an2"><div class="card"><span class="small mute">Colpi a segno</span><b id="tHitsR"></b><div class="bar"><i id="tHitsBar"></i></div></div><div class="card"><span class="small mute">Precisione media</span><b id="tPrec"></b><div class="bar"><i id="tPrecBar"></i></div></div></div>
+      <div class="card" id="tDist"></div>
+      <div class="card" id="tTrend"></div>
+      <div class="card tip"><b id="tTipT"></b><p id="tResTip"></p></div>
+      <button class="primary" id="tAgain" style="width:100%;margin-top:16px;min-height:54px;border-radius:27px">Riprova</button>
+      <button id="tBack" style="width:100%;margin-top:8px;min-height:50px;border-radius:25px;background:var(--s1)">Altri esercizi</button>
+      <button id="tToPlayer" class="link" style="width:100%;margin-top:8px">Torna al player</button>
     </div>
-    <div class="panel an">
-      <h3><svg class="i"><use href="#i-bars"/></svg>Analisi ritmica</h3>
-      <div class="an2">
-        <div><span class="k">Colpi a segno</span><b id="tHitsR">0/0</b><div class="bar"><i id="tHitsBar"></i></div></div>
-        <div><span class="k">Precisione media</span><b id="tPrec">–</b><div class="bar"><i id="tPrecBar"></i></div></div>
-      </div>
-      <div class="dist" id="tDist"></div>
-      <div class="trend" id="tTrend"></div>
-    </div>
-    <div class="panel tip"><h3><svg class="i"><use href="#i-bulb"/></svg><span id="tTipT">Il consiglio</span></h3><p id="tResTip"></p></div>
-    <button class="primary" id="tAgain"><svg class="i"><use href="#i-restart"/></svg>RIPROVA ESERCIZIO</button>
-    <button id="tBack"><svg class="i"><use href="#i-flag"/></svg>Altri esercizi</button>
-    <button id="tToPlayer"><svg class="i"><use href="#i-eq"/></svg>TORNA AL PLAYER</button>
   </div>
 </div>
 
-<div class="dlg" id="dlg"><div class="panel"><h3 id="dlgT"></h3><div id="dlgB" style="margin-top:10px"></div><div class="row act" id="dlgA"></div></div></div>
+<div class="dlg" id="dlg"><div class="card"><h3 id="dlgT"></h3><div id="dlgB" style="margin-top:10px"></div><div class="act" id="dlgA"></div></div></div>
 <div class="toast" id="toast" role="status"></div>
 <div class="busy" id="busy"><span id="busyT">Leggo il file…</span></div>
 
 <script src="player.js"></script>
 <script src="beats.js"></script>
 <script src="separate.js"></script>
-<script src="app.js?v=50"></script>
+<script src="app.js?v=60"></script>
 </body>
 </html>

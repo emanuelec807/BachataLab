@@ -60,5 +60,7 @@ I modelli si scaricano una volta e restano nella cache del browser. Il picco di 
 - [AudioSep](https://github.com/Audio-AGI/AudioSep) (MIT): separatore ResUNet30. La query di testo è calcolata con CLAP.
 - [ONNX Runtime Web](https://github.com/microsoft/onnxruntime) (MIT).
 - [SoundTouchJS](https://github.com/cutterbl/SoundTouchJS) (LGPL-2.1), inclusa in `player.js` per cambiare velocità mantenendo il tono.
+- [lamejs](https://github.com/zhuker/lamejs) (LGPL-3.0), in `app/lame.min.js`, per creare l'MP3 del mix.
+- Plugin Capacitor `@capacitor/filesystem` e `@capacitor/share` (MIT), per salvare e condividere l'MP3 nell'app Android.
 
 Prima di distribuire l'app pubblicamente conviene verificare le licenze dei pesi dei modelli.
