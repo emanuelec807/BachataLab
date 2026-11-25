@@ -391,13 +391,17 @@ Disegnato nella tela "Bachata Lab · nuovo design" su Claude. Stile pulito ispir
   - **Toccare un pulsante strumento lo spegne solo dentro la mappa.** Tornando al player tutti gli strumenti tornano come erano nel player.
   - Uno strumento che nel player era a volume 0 o spento parte spento nella mappa. Toccandolo si accende a 100%, sempre solo nella mappa.
 - **Testo sincronizzato**: schermata accanto alla mappa, con la riga cantata che si accende e il conteggio sempre visibile in alto. Prima si cerca il testo su LRCLIB (serve Internet); se il brano non c'è, si usa la trascrizione della voce separata con Whisper "base" sul telefono.
-- **Tagli proposti, in attesa di conferma**:
-  - preset del mixer;
-  - ritocchi di BPM da ±0,1;
-  - scelta dell'accento del metronomo;
-  - "Accelera nel loop";
-  - note sui singoli tempi;
-  - scelta della guida audio negli esercizi.
+- **Metronomo**: il bottone apre un popup con acceso/spento, volume e **click forte su** (sull'1, su 4 e 8, su 1 e 5).
+- **Güira sempre separata**: non è più un'opzione, ogni progetto ha sempre 6 tracce.
+- **Impostazioni**:
+  - tema Scuro (predefinito), Chiaro o Come il telefono;
+  - colore principale da una lista di 6, Corallo predefinito; nel tema chiaro si usa una tonalità più scura dello stesso colore, così si legge bene;
+  - calibrazione del ritardo dell'audio;
+  - spazio usato e versione.
+- **Decisioni del 25/11 sulle funzioni**:
+  - tolti: preset del mixer, ritocchi di BPM da ±0,1, "Accelera nel loop";
+  - restano: tap tempo, ±1 BPM, metà/doppio, "L'1 è qui", note sui tempi, esercizi completi (anche la guida audio).
+- **Ritardo nel conteggio degli esercizi**: l'utente l'ha notato con l'altoparlante del telefono, non con le cuffie. Sui telefoni Android anche l'altoparlante può avere 100–250 ms di ritardo che il browser non dichiara. Da verificare con la calibrazione fatta con l'altoparlante. Se invece è l'1 ad essere trovato nel posto sbagliato, va corretto con "L'1 è qui".
 
 ## 13. Limiti noti
 
