@@ -371,6 +371,34 @@ Il conteggio sparisce: si ascolta e si tocca.
   Si può avviare anche a mano da Actions → "APK Android" → "Run workflow".
 - **Firma**: senza segreti configurati usa la chiave `android-signing/sideload.jks` del repository, così ogni nuova versione si installa sopra la precedente senza perdere i progetti. Per il Play Store servono una chiave privata e i segreti `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`: se ci sono, il workflow usa quelli. Cambiare chiave obbliga a disinstallare l'app una volta.
 
+## 13. Nuovo design (in lavorazione)
+
+Disegnato nella tela "Bachata Lab · nuovo design" su Claude. Stile pulito ispirato a Moises: sfondo quasi nero, un solo colore principale (da scegliere: corallo, lime, azzurro, viola, menta o rosa). Diventerà l'interfaccia dell'app quando sarà approvato. Decisioni prese finora:
+
+- **Player**:
+  - una riga per strumento, con forma d'onda, volume in % e tasti M/S;
+  - tasti in basso uguali in tutte le schermate: **−8 · −4 · Play · +4 · +8** (tempi);
+  - il bottone "Allenati" è tolto dal player: l'allenamento si apre dalla barra in basso della home;
+  - al suo posto c'è **Mappa**, che apre la mappa degli strumenti (con l'interruttore Strumenti / Testo).
+- **Mappa strumenti**:
+  - **Cos'è**:
+    - in alto, sei pulsanti degli strumenti che si illuminano nel loro colore mentre suonano;
+    - sotto, le forme d'onda di ogni strumento su un asse orizzontale, 4 frasi alla volta con il numero della frase, scorrevole;
+    - una linea bianca segna dove sei.
+  - **È una vista del player, non un player a parte**: prende tutte le impostazioni dalla schermata precedente (velocità, metronomo, mix).
+  - **Il loop resta attivo** ed è disegnato sulla mappa. I salti −8/−4/+4/+8 lo spostano come nel player.
+  - Toccare le onde porta in quel punto.
+  - **Toccare un pulsante strumento lo spegne solo dentro la mappa.** Tornando al player tutti gli strumenti tornano come erano nel player.
+  - Uno strumento che nel player era a volume 0 o spento parte spento nella mappa. Toccandolo si accende a 100%, sempre solo nella mappa.
+- **Testo sincronizzato**: schermata accanto alla mappa, con la riga cantata che si accende e il conteggio sempre visibile in alto. Prima si cerca il testo su LRCLIB (serve Internet); se il brano non c'è, si usa la trascrizione della voce separata con Whisper "base" sul telefono.
+- **Tagli proposti, in attesa di conferma**:
+  - preset del mixer;
+  - ritocchi di BPM da ±0,1;
+  - scelta dell'accento del metronomo;
+  - "Accelera nel loop";
+  - note sui singoli tempi;
+  - scelta della guida audio negli esercizi.
+
 ## 12. Limiti noti
 
 - Non ancora provata su un telefono Android vero: tempi e memoria vengono da prove su computer.
