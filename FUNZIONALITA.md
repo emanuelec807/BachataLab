@@ -24,7 +24,7 @@ Bachata Lab è un'app per studiare la **musicalità in bachata**. Carichi una ca
 | Video a schermo intero | `#schermo` | tasto schermo intero sul video |
 | Allenamento | `#allenamento` | "Allenati" nella barra in basso |
 
-- Il **tasto Indietro** del telefono chiude, nell'ordine: il popup aperto, il video a schermo intero, l'allenamento, la mappa. Poi torna alla home.
+- Il **tasto Indietro** e lo **swipe dal bordo** di Android chiudono, nell'ordine: la finestra di dialogo aperta, il popup aperto, il video a schermo intero, l'allenamento, la mappa. Poi torna alla home. Dalla home manda l'app in secondo piano (non la chiude). Nell'app Android lo gestisce il plugin App di Capacitor: senza, Android chiudeva subito l'app.
 - Durante la separazione Indietro **non esce subito**: chiede "Annullare la separazione?". Anche chiudere o ricaricare la pagina chiede conferma.
 
 **Aspetto**
@@ -195,8 +195,10 @@ Si apre a tutto schermo da "Mappa"; la freccia in giù o Indietro la chiude. In 
 - **Trovare il testo** (la prima volta, nella linguetta Testo della mappa):
   - **Cerca** su LRCLIB con titolo e artista (il campo parte dal nome del progetto). I risultati mostrano titolo, artista, durata e se hanno i tempi; si scelgono solo quelli "con i tempi", e quelli con una durata vicina al file caricato vengono prima.
   - I tempi del testo sono quelli del brano intero: l'app toglie l'inizio del ritaglio, così le righe cadono nel punto giusto della parte studiata.
-  - **Trascrivi la voce**: se il brano non c'è, Whisper "base" ascolta la traccia della voce separata, sul telefono. Riconosce da solo la lingua (sui 30 s con più voce) e trascrive con i tempi. Toglie le frasi inventate tipiche ("Subtítulos…", righe ripetute). Circa 80 MB da scaricare la prima volta; poi circa 15 s per 30 s di brano su computer, di più sul telefono.
-  - Serve Internet per cercare e per scaricare i modelli la prima volta. Nella versione web dentro Claude la rete esterna è bloccata: il testo funziona nell'app Android (o in un browser normale).
+  - **Trascrizione automatica**: nell'app Android, appena finita la separazione, Whisper "base" trascrive da solo la traccia della voce, in sottofondo. Si può usare il player intanto; quando ha finito compare "Testo trascritto" e il testo è nella linguetta Testo. Riconosce la lingua da solo (sui 30 s con più voce) e trascrive con i tempi; toglie le frasi inventate tipiche ("Subtítulos…", righe ripetute).
+  - **Whisper è dentro l'app** (circa 80 MB, più 26 MB del motore): niente download e funziona anche senza Internet. Gira sul processore (non sulla GPU, dove su alcuni telefoni dava errore).
+  - **Trascrivi la voce** rifà la trascrizione a mano. Se il progetto ha già un testo, la trascrizione automatica non lo sostituisce.
+  - **Cerca** (LRCLIB) serve Internet. Nel browser, fuori dall'app, Whisper si scarica la prima volta; nella versione web dentro Claude la rete esterna è bloccata.
 - **Lettura**:
   - la riga cantata è grande e bianca, quelle passate sbiadite; la pagina scorre da sola (si ferma per 2,5 s se scorri col dito);
   - tocco su una riga: il brano va lì;
@@ -207,8 +209,8 @@ Si apre a tutto schermo da "Mappa"; la freccia in giù o Indietro la chiude. In 
   - **Correggi il testo**, **Elimina la riga**.
   - Dal tasto ⋯: anticipa o ritarda tutto di 0,5 s, traduci di nuovo, cerca un altro testo.
 - **Traduzione**:
-  - l'app riconosce la lingua del testo e lo traduce sul telefono con Opus-MT (circa 110 MB da scaricare la prima volta), in **italiano** di default;
-  - parte da sola appena il testo è pronto; la traduzione compare piccola sotto ogni riga;
+  - l'app riconosce la lingua del testo e lo traduce sul telefono con Opus-MT (circa 110 MB da scaricare la prima volta, serve Internet), in **italiano** di default;
+  - **non parte da sola**: si avvia con il tasto "Traduci in italiano"; la traduzione compare piccola sotto ogni riga;
   - il tasto **Traduzione** la mostra o la nasconde;
   - se nelle Impostazioni scegli un'altra lingua, il tasto diventa "Traduci in …";
   - se non esiste un modello diretto per la coppia di lingue, traduce passando dall'inglese.
@@ -334,6 +336,8 @@ Il conteggio sparisce: si ascolta e si tocca.
 ---
 
 ## Registro modifiche
+
+- **25/11/2026**: separazione nativa senza tetto di memoria (tracce in file mappati: 3:20 separati con 300 MB di heap, risultati identici). Whisper dentro l'app: trascrizione automatica dopo ogni import, senza download, sul processore (corretto l'errore "Cannot set properties of null" sul telefono). Traduzione solo a richiesta. Indietro/swipe di Android gestiti dall'app.
 
 - **25/11/2026**: separazione con meno memoria per i brani lunghi: divisione bongo/güira a blocchi di 30 s (risultato identico) e "Altro" sommato sul posto. Picco su 4 minuti da circa 1,6 GB a circa 0,8 GB.
 

@@ -7,3 +7,6 @@ test/*.png
 _test/
 node_modules/
 .DS_Store
+app/asr/whisper-base/
+app/asr/ort/
+app/asr/transformers.min.js

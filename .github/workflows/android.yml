@@ -47,6 +47,32 @@ jobs:
       - name: Dipendenze
         run: npm ci
 
+      - name: Whisper dentro l'app (modello e runtime, niente download sul telefono)
+        uses: actions/cache@v4
+        with:
+          path: |
+            app/asr/whisper-base
+            app/asr/ort
+            app/asr/transformers.min.js
+          key: asr-whisper-base-q8-tjs-4.3.2-ort-1.31.0-dev.20260914-8d85527a0
+
+      - name: Scarica Whisper base (se non è in cache)
+        run: |
+          set -e
+          W=app/asr/whisper-base; O=app/asr/ort
+          mkdir -p $W/onnx $O
+          for f in config.json generation_config.json preprocessor_config.json tokenizer.json tokenizer_config.json \
+                   onnx/encoder_model_quantized.onnx onnx/decoder_model_merged_quantized.onnx; do
+            [ -s "$W/$f" ] || curl -sSL --fail --retry 3 -o "$W/$f" "https://huggingface.co/Xenova/whisper-base/resolve/main/$f"
+          done
+          ORT=https://cdn.jsdelivr.net/npm/onnxruntime-web@1.31.0-dev.20260914-8d85527a0/dist
+          for f in ort-wasm-simd-threaded.asyncify.mjs ort-wasm-simd-threaded.asyncify.wasm; do
+            [ -s "$O/$f" ] || curl -sSL --fail --retry 3 -o "$O/$f" "$ORT/$f"
+          done
+          [ -s app/asr/transformers.min.js ] || curl -sSL --fail --retry 3 -o app/asr/transformers.min.js \
+            "https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.2/dist/transformers.min.js"
+          du -sh $W $O
+
       - name: Copia l'app web nel progetto Android
         run: npx cap sync android
 

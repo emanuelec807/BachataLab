@@ -486,7 +486,7 @@ $('createBtn').addEventListener('click', async () => {
       clearInterval(procClock); setSteps(steps, steps.length - 1); $('procStage').textContent = 'Trovo il ritmo e salvo…'; $('procWhat').textContent = 'Ritmo'; $('procLeft').textContent = 'quasi fatto'; setProgress(1, 0.5);
       const args = { name, stems: m.stems, dur, offset, srcDur, withG, kind, file, thumb };
       for (;;) {
-        try { const id = await saveNew(args); procRunning = false; history.replaceState(null, '', '#player'); openPlayer(id); return; }
+        try { const id = await saveNew(args); procRunning = false; history.replaceState(null, '', '#player'); await openPlayer(id); autoLyrics(id); return; }
         catch (e) {
           const quota = e && (e.name === 'QuotaExceededError' || /quota/i.test(e.message || ''));
           const again = await dialog(quota ? 'Spazio insufficiente' : 'Salvataggio non riuscito', textEl(quota ? 'Il telefono non ha spazio per salvare questo progetto. Libera spazio (o elimina un progetto) e riprova.' : 'Non riesco a salvare il progetto: ' + (e && e.message || e)), [['Rinuncia', false], ['Riprova', true, true]]);
@@ -649,7 +649,7 @@ function closePlayer(skipSave) {
   const v = $('vid'); try { v.pause(); } catch (e) {} if (v.getAttribute('src')) { v.removeAttribute('src'); v.load(); }
   if (vidUrl) { URL.revokeObjectURL(vidUrl); vidUrl = null; }
   if ($('train').classList.contains('on')) { training = null; $('train').classList.remove('on'); }
-  exitFs(true); closePop(true); closeMap(true); $('lyrRes').innerHTML = ''; $('lyrQ').value = ''; lyrStatus(); cur = null; loopRange = null; loopMode = null; abA = null; waveImgs = {}; releaseWake();
+  exitFs(true); closePop(true); closeMap(true); $('lyrRes').innerHTML = ''; $('lyrQ').value = ''; cur = null; loopRange = null; loopMode = null; abA = null; waveImgs = {}; releaseWake();
 }
 async function openPlayer(id) {
   const my = ++opening;
@@ -1548,16 +1548,34 @@ function detectLang(text) {
 }
 let lyrW = null, lyrJob = 0, lyrCb = {}, lyrIdx = -2, lyrEls = [], lyrUser = 0, lyrBusy = false;
 const mbs = v => Math.round(v / 1e6) + ' MB';
-function lyrStatus(text, frac) {
-  $('lyrStat').hidden = !text; if (!text) return;
-  $('lyrStatT').textContent = text; const b = $('lyrBar');
+// The status line belongs to the project the running job works on (a transcription keeps going
+// when you open another project), so it shows only there.
+let lyrFor = null, lyrSt = null;
+function lyrStatus(text, frac) { lyrSt = text ? { text, frac } : null; paintLyrStatus(); }
+function paintLyrStatus() {
+  const show = !!lyrSt && !!cur && (!lyrFor || cur.id === lyrFor);
+  $('lyrStat').hidden = !show; $('lyrAsr').disabled = lyrBusy;
+  if (!show) return;
+  $('lyrStatT').textContent = lyrSt.text; const b = $('lyrBar'), frac = lyrSt.frac;
   b.style.width = frac == null ? '100%' : Math.round(Math.max(0.03, frac) * 100) + '%'; b.style.opacity = frac == null ? 0.35 : 1;
 }
+// Applies a change to a project whether it is open or not (the job may end after you left it).
+async function updateProject(pid, fn) {
+  if (cur && cur.id === pid) { fn(cur); persist(); renderLyrics(); return; }
+  try { const p = await getProject(pid); if (p) { fn(p); await putProject(p); } } catch (e) {}
+}
+// Whisper ships inside the Android app: then every new project is transcribed right after the separation.
+let asrLocal = null;
+async function hasLocalAsr() {
+  if (asrLocal == null) { try { asrLocal = (await fetch('asr/whisper-base/config.json')).ok; } catch (e) { asrLocal = false; } }
+  return asrLocal;
+}
+async function autoLyrics(pid) { if (await hasLocalAsr()) lyrTranscribe(pid, true); }
 function lyrWorker() {
   if (lyrW) return lyrW;
-  lyrW = new Worker('lyricsworker.js?v=2', { type: 'module' });
+  lyrW = new Worker('lyricsworker.js?v=4', { type: 'module' });
   lyrW.onmessage = e => { const m = e.data;
-    if (m.type === 'progress') lyrStatus((m.stage === 'asr' ? 'Scarico Whisper' : 'Scarico il traduttore') + ` · ${mbs(m.loaded)} di ${mbs(m.total)}`, m.loaded / m.total);
+    if (m.type === 'progress') lyrStatus((m.stage === 'asr' ? (asrLocal ? 'Carico Whisper' : 'Scarico Whisper') : 'Scarico il traduttore') + ` · ${mbs(m.loaded)} di ${mbs(m.total)}`, m.loaded / m.total);
     else if (m.type === 'stage') lyrStatus('Riconosco la lingua e trascrivo la voce…', null);
     else if (m.type === 'trstep') lyrStatus(`Traduco… ${m.done} di ${m.total} righe`, m.done / m.total);
     else { const cb = lyrCb[m.id]; delete lyrCb[m.id]; if (cb) m.type === 'error' ? cb.rej(new Error(m.msg)) : cb.res(m); } };
@@ -1595,17 +1613,17 @@ function pickLyrics(x) {
   if (!lines.some(l => l.text)) { toast('Nella parte che hai ritagliato questo testo non ha righe cantate'); return; }
   setLyrics({ src: 'LRCLIB', title: x.trackName + ' · ' + x.artistName, lines, lang: detectLang(lines.map(l => l.text).join(' ')) });
 }
-async function lyrTranscribe() {
-  if (!cur || lyrBusy) return; lyrBusy = true; $('lyrAsr').disabled = true;
+async function lyrTranscribe(pid, auto) {
+  pid = pid || (cur && cur.id); if (!pid || lyrBusy) return; lyrBusy = true; lyrFor = pid;
   try {
     lyrStatus('Preparo la voce…', null);
-    const st = await getStems(cur.id), [L, R] = st.data.vocals, n = L.length;
+    const st = await getStems(pid), [L, R] = st.data.vocals, n = L.length;
     const buf = new AudioBuffer({ length: n, numberOfChannels: 1, sampleRate: SR }), ch = buf.getChannelData(0);
     for (let i = 0; i < n; i++) ch[i] = (L[i] + R[i]) / 65536;
     const oc = new OfflineAudioContext(1, Math.ceil(n * 16000 / SR), 16000), bs = oc.createBufferSource();
     bs.buffer = buf; bs.connect(oc.destination); bs.start();
     const audio = (await oc.startRendering()).getChannelData(0).slice();
-    lyrStatus('Preparo Whisper…', null);
+    lyrStatus(asrLocal ? 'Carico Whisper…' : 'Preparo Whisper…', null);
     const r = await lyrCall({ type: 'asr', audio }, [audio.buffer]);
     const bad = /subt[ií]tul|amara\.org|gracias por ver|suscr[ií]b|thanks for watching|^[\s♪.…-]*$/i;
     let lines = [];
@@ -1618,38 +1636,38 @@ async function lyrTranscribe() {
     if (!lines.length) throw new Error('nella voce separata non ho sentito parole');
     const withGaps = []; // an empty line ends a sung line when a long pause follows
     lines.forEach((l, i) => { withGaps.push({ t: l.t, text: l.text }); const nx = lines[i + 1]; if (l.e != null && (!nx || nx.t - l.e > 2)) withGaps.push({ t: +l.e.toFixed(2), text: '' }); });
-    lyrBusy = false; $('lyrAsr').disabled = false;
-    setLyrics({ src: 'Whisper', title: 'Trascrizione della voce', lines: withGaps, lang: r.lang || detectLang(r.text || lines.map(l => l.text).join(' ')) });
-  } catch (e) { lyrStatus(); toast('Trascrizione non riuscita: ' + netMsg(e)); }
-  finally { lyrBusy = false; $('lyrAsr').disabled = false; }
+    lyrBusy = false; lyrStatus();
+    const lang = r.lang || detectLang(r.text || lines.map(l => l.text).join(' '));
+    await updateProject(pid, p => { if (!auto || !p.lyrics) p.lyrics = { src: 'Whisper', title: 'Trascrizione della voce', lang, shift: 0, trLang: null, lines: withGaps }; });
+    if (auto) toast('Testo trascritto: lo trovi in Mappa → Testo');
+  } catch (e) { lyrStatus(); if (!auto || cur && cur.id === pid) toast('Trascrizione non riuscita: ' + netMsg(e)); console.warn('asr', e); }
+  finally { lyrBusy = false; lyrFor = null; paintLyrStatus(); }
 }
+// The translation is never automatic: the "Traduci" button starts it.
 function setLyrics(L) {
   cur.lyrics = { src: L.src, title: L.title, lang: L.lang, shift: 0, trLang: null, lines: L.lines };
-  persist(); lyrStatus(); renderLyrics();
-  const tgt = ls.get('trLang', 'it');
-  if (tgt && L.lang && L.lang !== tgt) lyrTranslate();
+  persist(); renderLyrics();
 }
 async function lyrTranslate() {
   const L = cur && cur.lyrics, tgt = ls.get('trLang', 'it'); if (!L || lyrBusy) return;
   if (!tgt) return toast('Traduzione spenta nelle Impostazioni');
   if (!L.lang) return toast('Non riesco a capire la lingua del testo');
   if (L.lang === tgt) return toast('Il testo è già in ' + LANGS[tgt]);
-  lyrBusy = true; const proj = cur;
+  lyrBusy = true; const pid = cur.id; lyrFor = pid;
   try {
     lyrStatus('Preparo il traduttore…', null);
     const idx = L.lines.map((l, i) => l.text ? i : -1).filter(i => i >= 0);
     const r = await lyrCall({ type: 'tr', src: L.lang, tgt, lines: idx.map(i => L.lines[i].text) });
-    idx.forEach((i, k) => { L.lines[i].tr = r.out[k]; }); L.trLang = tgt; ls.set('lyrShowTr', true);
-    if (cur === proj) { persist(); renderLyrics(); } else putProject(proj).catch(() => {});
-    lyrStatus();
+    ls.set('lyrShowTr', true); lyrBusy = false; lyrStatus();
+    await updateProject(pid, p => { const P = p.lyrics; if (!P || P.lines.length !== L.lines.length) return; idx.forEach((i, k) => { P.lines[i].tr = r.out[k]; }); P.trLang = tgt; });
   } catch (e) { lyrStatus(); toast('Traduzione non riuscita: ' + netMsg(e)); }
-  finally { lyrBusy = false; }
+  finally { lyrBusy = false; lyrFor = null; paintLyrStatus(); }
 }
 function renderLyrics() {
   if (!cur) return;
   const L = cur.lyrics, has = !!(L && L.lines && L.lines.length);
   $('lyrFind').hidden = has; $('lyrTools').hidden = !has; $('lyrHint').hidden = !has;
-  lyrIdx = -2; lyrEls = [];
+  lyrIdx = -2; lyrEls = []; paintLyrStatus();
   if (!has) { $('lyr').innerHTML = ''; if (!$('lyrQ').value) $('lyrQ').value = cur.name; return; }
   const tgt = ls.get('trLang', 'it'), showTr = ls.get('lyrShowTr', true) && L.trLang === tgt;
   $('lyrSrc').textContent = L.src + (L.lang ? ' · ' + LANGS[L.lang] : '') + (L.shift ? ` · spostato ${L.shift > 0 ? '+' : ''}${L.shift.toFixed(1).replace('.', ',')} s` : '');
@@ -1696,7 +1714,7 @@ async function lyrMoreMenu() {
   $('lyrSearch').addEventListener('click', lyrSearch);
   $('lyrQ').addEventListener('keydown', e => { if (e.key === 'Enter') lyrSearch(); });
   $('lyrRes').addEventListener('click', e => { const b = e.target.closest('[data-li]'); if (b && !b.disabled) pickLyrics(lyrResults[+b.dataset.li]); });
-  $('lyrAsr').addEventListener('click', lyrTranscribe);
+  $('lyrAsr').addEventListener('click', () => lyrTranscribe());
   $('lyrTr').addEventListener('click', () => { const L = cur && cur.lyrics; if (!L) return;
     if (L.trLang !== ls.get('trLang', 'it')) return lyrTranslate();
     ls.set('lyrShowTr', !ls.get('lyrShowTr', true)); renderLyrics(); });
@@ -1714,6 +1732,21 @@ async function lyrMoreMenu() {
     const L = cur.lyrics, l = L.lines[+p.dataset.i]; lyrUser = 0; seekTo(Math.max(0, l.t + (L.shift || 0)), false); });
   $('trLang').addEventListener('change', e => { ls.set('trLang', e.target.value); toast(e.target.value ? 'Traduzione in ' + LANGS[e.target.value] : 'Traduzione spenta'); });
 })();
+
+// ---------- Android back (button and edge swipe) ----------
+// Without a listener Android closes the app at once. Here back walks the app like the browser does:
+// dialog, popup, full screen, training, map, then the screen before; on the home it puts the app
+// in the background instead of closing it.
+if (NATIVE && window.Capacitor.addListener) {
+  try {
+    window.Capacitor.addListener('App', 'backButton', () => {
+      if (dlgResolve) return closeDialog(false);
+      if (location.hash) return history.back();
+      if (!$('s-home').classList.contains('on')) return go('home');
+      window.Capacitor.nativePromise('App', 'minimizeApp').catch(() => window.Capacitor.nativePromise('App', 'exitApp').catch(() => {}));
+    });
+  } catch (e) {}
+}
 
 // ---------- start ----------
 if (location.hash) history.replaceState(null, '', location.pathname);

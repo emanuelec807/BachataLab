@@ -1,12 +1,17 @@
 // Lyrics models, run off the main thread: Whisper "base" transcribes the vocal stem,
 // Opus-MT translates the lines. Library and models are downloaded the first time and cached.
+// In the Android app Whisper, the library and its runtime ship inside the app (folder asr/): nothing to
+// download. Elsewhere (a plain browser) they come from the CDN and Hugging Face the first time.
 const LIB = 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.2/dist/transformers.min.js';
-let T = null, asr = null;
+const LOCAL = new URL('asr/', self.location.href).href;
+let T = null, asr = null, local = false;
 const tr = {};
 
 async function lib() {
   if (!T) {
-    T = await import(LIB);
+    try { const r = await fetch(LOCAL + 'whisper-base/config.json'); local = r.ok && (await r.json()).model_type === 'whisper'; } catch (e) { local = false; }
+    T = await import(local ? LOCAL + 'transformers.min.js' : LIB);
+    if (local) T.env.backends.onnx.wasm.wasmPaths = LOCAL + 'ort/';
     T.env.allowLocalModels = false;
     try { T.env.backends.onnx.wasm.numThreads = self.crossOriginIsolated ? Math.min(4, navigator.hardwareConcurrency || 2) : 1; } catch (e) {}
   }
@@ -25,11 +30,17 @@ function progress(stage) {
   };
 }
 
+function useHub(remote) {
+  T.env.remoteHost = remote ? 'https://huggingface.co/' : LOCAL;
+  T.env.remotePathTemplate = remote ? '{model}/resolve/{revision}/' : '{model}/';
+}
+
 async function translator(src, tgt) {
   const key = src + '-' + tgt;
   if (!tr[key]) {
     const t = await lib();
-    tr[key] = t.pipeline('translation', 'Xenova/opus-mt-' + key, { dtype: 'q8', progress_callback: progress('tr') });
+    useHub(true); t.env.useBrowserCache = true;
+    tr[key] = t.pipeline('translation', 'Xenova/opus-mt-' + key, { dtype: 'q8', device: 'wasm', progress_callback: progress('tr') });
     tr[key].catch(() => { delete tr[key]; });
   }
   return tr[key];
@@ -65,7 +76,9 @@ onmessage = async ({ data: m }) => {
   try {
     if (m.type === 'asr') {
       const t = await lib();
-      if (!asr) asr = await t.pipeline('automatic-speech-recognition', 'Xenova/whisper-base', { dtype: 'q8', progress_callback: progress('asr') });
+      // device 'wasm' on purpose: on phones with WebGPU the library would pick the GPU, where Whisper failed
+      // the bundled model is served as if it were the hub: <app>/asr/whisper-base/<file>
+      if (!asr) { useHub(!local); t.env.useBrowserCache = !local; asr = await t.pipeline('automatic-speech-recognition', local ? 'whisper-base' : 'Xenova/whisper-base', { dtype: 'q8', device: 'wasm', progress_callback: progress('asr') }); }
       postMessage({ type: 'stage', stage: 'run' });
       let lang = m.lang; try { lang = lang || await detectLang(t, m.audio); } catch (e) { lang = 'es'; }
       const out = await asr(m.audio, { return_timestamps: true, chunk_length_s: 30, stride_length_s: 5, task: 'transcribe', language: lang });
