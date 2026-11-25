@@ -371,7 +371,7 @@ Il conteggio sparisce: si ascolta e si tocca.
   Si può avviare anche a mano da Actions → "APK Android" → "Run workflow".
 - **Firma**: senza segreti configurati usa la chiave `android-signing/sideload.jks` del repository, così ogni nuova versione si installa sopra la precedente senza perdere i progetti. Per il Play Store servono una chiave privata e i segreti `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`: se ci sono, il workflow usa quelli. Cambiare chiave obbliga a disinstallare l'app una volta.
 
-## 13. Nuovo design (in lavorazione)
+## 12. Nuovo design (in lavorazione)
 
 Disegnato nella tela "Bachata Lab · nuovo design" su Claude. Stile pulito ispirato a Moises: sfondo quasi nero, un solo colore principale (da scegliere: corallo, lime, azzurro, viola, menta o rosa). Diventerà l'interfaccia dell'app quando sarà approvato. Decisioni prese finora:
 
@@ -399,7 +399,7 @@ Disegnato nella tela "Bachata Lab · nuovo design" su Claude. Stile pulito ispir
   - note sui singoli tempi;
   - scelta della guida audio negli esercizi.
 
-## 12. Limiti noti
+## 13. Limiti noti
 
 - Non ancora provata su un telefono Android vero: tempi e memoria vengono da prove su computer.
 - La separazione richiede lo schermo acceso e la pagina aperta.
