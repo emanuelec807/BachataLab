@@ -1218,9 +1218,18 @@ function renderMapHeads(full) {
 }
 $('mapHeads').addEventListener('click', e => { const b = e.target.closest('.mhd'); if (!b || !mapMute) return; const id = b.dataset.id;
   mapMute[id] = !mapMute[id]; applyGains(); mapStatic = null; renderMapHeads(); vibrate(10); });
-// The map shows 4 phrases (32 counts) at a time; a drag scrolls, a tap goes there.
+// The map shows some phrases at a time (zoom + / −, down to the whole song); a drag scrolls, a tap goes there.
+const ZOOMS = [1, 2, 4, 8, 16, 0]; // phrases per screen, 0 = the whole song
+let mapZoom = Math.min(ZOOMS.length - 1, Math.max(0, ls.get('mapZoom', 2)));
+function setMapZoom(k) {
+  mapZoom = Math.min(ZOOMS.length - 1, Math.max(0, k)); ls.set('mapZoom', mapZoom); mapView = null; mapStatic = null;
+  const z = ZOOMS[mapZoom]; $('zLbl').textContent = z ? z + (z === 1 ? ' frase' : ' frasi') : 'tutta';
+  $('zIn').disabled = mapZoom === 0; $('zOut').disabled = mapZoom === ZOOMS.length - 1;
+  if (player && mapOpen()) drawMap(player.position);
+}
 function mapWindow(t) {
-  const per = 60 / cur.bpm, span = 32 * per, first = hasBeats() ? beatTime(phraseStartIdx(0)) : 0;
+  if (!ZOOMS[mapZoom] || !hasBeats()) { if (!ZOOMS[mapZoom]) return { a: 0, span: player.duration, per: 60 / cur.bpm }; }
+  const per = 60 / cur.bpm, span = (ZOOMS[mapZoom] || 4) * 8 * per, first = hasBeats() ? beatTime(phraseStartIdx(0)) : 0;
   if (mapView == null || t < mapView || t > mapView + span) { const k = Math.floor((t - first) / span); mapView = first + Math.max(0, k) * span; }
   return { a: mapView, span, per };
 }
@@ -1236,10 +1245,13 @@ function drawMap(t) {
     const top = 24, laneH = (H - top - 8) / STEMS.length, rate = cur.envRate || 10, n = Math.floor(W / 3);
     // phrase lines and numbers, count ticks
     if (hasBeats()) {
-      const i0 = nearestBeat(a); g.font = '700 12px Inter,system-ui,sans-serif';
-      for (let i = i0 - 1; i <= i0 + 33; i++) { const bt = beatTime(i); if (bt < a - 0.01 || bt > a + span) continue; const x = (bt - a) / span * W, c = countOf(i);
-        g.fillStyle = cc('--ink'); g.globalAlpha = c === 1 ? 0.35 : 0.08; g.fillRect(x, c === 1 ? 0 : top - 6, 1, c === 1 ? H : H - top + 6);
-        if (c === 1) { g.globalAlpha = 1; g.fillStyle = cc('--ink3'); g.fillText(String(phraseInfo(bt + 0.01).pn), x + 4, 15); }
+      const i0 = Math.max(0, nearestBeat(a)), nb = Math.ceil(span / per) + 2, phW = 8 * per / span * W;
+      const ticks = phW > 60, every = phW >= 26 ? 1 : phW >= 13 ? 2 : phW >= 7 ? 4 : 8; // fewer labels when zoomed out
+      g.font = '700 12px Inter,system-ui,sans-serif';
+      for (let i = i0 - 1; i <= i0 + nb; i++) { const bt = beatTime(i); if (bt < a - 0.01 || bt > a + span) continue; const x = (bt - a) / span * W, c = countOf(i);
+        if (c !== 1 && !ticks) continue;
+        g.fillStyle = cc('--ink'); g.globalAlpha = c === 1 ? (ticks ? 0.35 : 0.18) : 0.08; g.fillRect(x, c === 1 ? 0 : top - 6, 1, c === 1 ? H : H - top + 6);
+        if (c === 1) { const pn = phraseInfo(bt + 0.01).pn; if ((pn - 1) % every === 0) { g.globalAlpha = 1; g.fillStyle = cc('--ink3'); g.fillText(String(pn), x + 3, 15); } }
         if (notesAt(i).length) { g.globalAlpha = 1; g.fillStyle = cc('--acc'); g.beginPath(); g.arc(x, top - 6, 3.5, 0, 7); g.fill(); } }
       g.globalAlpha = 1;
     }
@@ -1268,14 +1280,21 @@ function drawMap(t) {
   const el = $('mapBox'); let sx = 0, moved = false, down = false, lp = 0;
   const tAt = e => { const b = el.getBoundingClientRect(), { a, span } = mapDrag || mapWindow(player.position); return a + (e.clientX - b.left) / b.width * span; };
   el.addEventListener('pointerdown', e => { if (!player) return; down = true; moved = false; sx = e.clientX; el.setPointerCapture(e.pointerId);
-    const w = mapWindow(player.position); mapDrag = { a: w.a, span: w.span, a0: w.a };
+    const w = mapWindow(player.position); mapDrag = ZOOMS[mapZoom] ? { a: w.a, span: w.span, a0: w.a } : null;
     const t0 = tAt(e); clearTimeout(lp); lp = setTimeout(() => { if (!moved && hasBeats()) { down = false; mapDrag = null; editNote(nearestBeat(t0)); } }, 600); });
   el.addEventListener('pointermove', e => { if (!down || !mapDrag) return; const dx = e.clientX - sx; if (Math.abs(dx) > 8) { moved = true; clearTimeout(lp); }
     if (moved) { const b = el.getBoundingClientRect(); mapDrag.a = Math.max(-mapDrag.span * 0.1, Math.min(player.duration - mapDrag.span * 0.5, mapDrag.a0 - dx / b.width * mapDrag.span)); drawMap(player.position); } });
   el.addEventListener('pointerup', e => { clearTimeout(lp); if (!down) return; down = false;
-    if (!moved) { const t = tAt(e); mapDrag = null; mapView = null; seekTo(hasBeats() ? beatTime(nearestBeat(t)) : t, false); }
+    if (!moved || !mapDrag) { const t = tAt(e); mapDrag = null; mapView = null; seekTo(hasBeats() ? beatTime(nearestBeat(t)) : t, false); }
     else { mapView = mapDrag.a; mapDrag = null; } });
   el.addEventListener('pointercancel', () => { clearTimeout(lp); down = false; mapDrag = null; });
+  $('zIn').addEventListener('click', () => setMapZoom(mapZoom - 1)); $('zOut').addEventListener('click', () => setMapZoom(mapZoom + 1));
+  // two fingers: pinch to zoom
+  let pd = 0; el.addEventListener('touchstart', e => { if (e.touches.length === 2) pd = Math.abs(e.touches[0].clientX - e.touches[1].clientX); }, { passive: true });
+  el.addEventListener('touchmove', e => { if (e.touches.length !== 2 || !pd) return; const d = Math.abs(e.touches[0].clientX - e.touches[1].clientX);
+    if (d > pd * 1.6) { setMapZoom(mapZoom - 1); pd = d; } else if (d < pd / 1.6) { setMapZoom(mapZoom + 1); pd = d; } }, { passive: true });
+  el.addEventListener('touchend', () => { pd = 0; }, { passive: true });
+  setMapZoom(mapZoom);
 })();
 if (window.ResizeObserver) new ResizeObserver(() => { if (cur && player) { drawStemWaves(); if (mapOpen()) { mapStatic = null; drawMap(player.position); } } }).observe(document.body);
 window.__themeHook = () => { if (cur && player) { drawStemWaves(); mapStatic = null; } };

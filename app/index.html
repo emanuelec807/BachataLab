@@ -206,14 +206,14 @@ select{font:600 14px var(--body);min-height:40px;border:0;border-radius:10px;bac
 .note:empty{display:none}
 .shd{display:flex;justify-content:space-between;align-items:center;padding:10px 20px 0}
 .shd h2{font-size:15px;font-weight:600}
-#stems{padding:0 16px;flex:1 1 0!important;min-height:0;display:flex;flex-direction:column;justify-content:space-evenly}
-.stem{--lv:0;display:flex;align-items:center;gap:10px;height:50px;max-height:54px;flex:1}
-.stem .bar{width:6px;height:30px;border-radius:3px;background:var(--c);flex:none;opacity:calc(.35 + var(--lv) * .65)}
+#stems{padding:0 16px 6px;flex:1 1 0!important;min-height:0;display:flex;flex-direction:column;justify-content:space-evenly}
+.stem{--lv:0;display:flex;align-items:center;gap:10px;height:52px;max-height:58px;flex:1;margin:2px 0;padding:0 8px 0 12px;border-radius:16px;background:color-mix(in srgb,var(--c) calc(var(--lv) * 30%),var(--s1));box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--c) calc(var(--lv) * 70%),transparent);transition:background .08s}
+.stem .bar{width:6px;height:34px;border-radius:3px;background:var(--c);flex:none;opacity:calc(.35 + var(--lv) * .65)}
 .stem .nm{width:70px;flex:none;background:none;min-height:44px;padding:0;flex-direction:column;align-items:flex-start;justify-content:center;gap:0;border-radius:8px}
 .stem .nm b{font:600 14px var(--body)}
 .stem .nm span{font:500 11px var(--body);color:var(--ink3)}
-.stem .vr{flex:1;min-width:0;height:44px}.stem .vr::-webkit-slider-thumb{background:var(--tc)}.stem .vr::-moz-range-thumb{background:var(--tc)}
-.stem .ms{width:36px;min-height:36px;height:36px;padding:0;border-radius:10px;background:var(--s2);color:var(--ink2);font:700 13px var(--body)}
+.stem .vr{flex:1;min-width:0;height:44px}.stem .vr::-webkit-slider-runnable-track{height:8px;border-radius:4px}.stem .vr::-webkit-slider-thumb{width:26px;height:26px;margin-top:-9px}.stem .vr::-moz-range-track{height:8px}.stem .vr::-moz-range-progress{height:8px;border-radius:4px}.stem .vr::-webkit-slider-thumb{background:var(--tc)}.stem .vr::-moz-range-thumb{background:var(--tc)}
+.stem .ms{width:40px;min-height:40px;height:40px;padding:0;border-radius:10px;background:var(--s2);color:var(--ink2);font:700 13px var(--body)}
 .stem .ms.m.on{background:var(--ink);color:var(--bg)}
 .stem .ms.s.on{background:var(--tap);color:#0B0C10}
 .stem.off{opacity:.5}
@@ -320,6 +320,9 @@ select{font:600 14px var(--body);min-height:40px;border:0;border-radius:10px;bac
 .minfo{display:flex;align-items:center;gap:8px;padding:10px 16px 0;font-size:12px;color:var(--ink3);min-height:40px}
 #mapLoop{height:30px;padding:0 12px;border-radius:15px;box-shadow:inset 0 0 0 2px var(--acc);display:flex;align-items:center;font:600 12px var(--body);color:var(--ink);white-space:nowrap}
 #mapLoop:empty{display:none}
+.mzoom{display:flex;align-items:center;gap:2px;background:var(--s1);border-radius:12px;padding:2px}
+.mzoom button{width:40px;min-height:36px;padding:0;background:transparent;font:700 20px var(--body);color:var(--ink)}
+.mzoom button:disabled{opacity:.3}.mzoom b{min-width:58px;text-align:center;font:600 12px var(--body);color:var(--ink2)}
 .movw{position:relative;height:6px;margin:8px 16px 0;border-radius:3px;background:var(--s2)}
 #mapOvWin{position:absolute;top:0;bottom:0;border-radius:3px;background:var(--mute)}
 #mapOvPos{position:absolute;top:-3px;width:2px;height:12px;background:var(--acc)}
@@ -621,9 +624,9 @@ select{font:600 14px var(--body);min-height:40px;border:0;border-radius:10px;bac
   <div id="mapPaneS" style="display:flex;flex-direction:column;flex:1 1 0;min-height:0">
     <div class="mheads" id="mapHeads"></div>
     <div class="mbox" id="mapBox"><canvas id="mapCv"></canvas></div>
-    <div class="minfo"><span id="mapLoop"></span><span id="mapInfo"></span></div>
+    <div class="minfo"><span id="mapLoop"></span><span id="mapInfo" class="grow"></span><span class="mzoom"><button id="zOut" aria-label="Vedi più canzone">−</button><b id="zLbl"></b><button id="zIn" aria-label="Ingrandisci">+</button></span></div>
     <div class="movw"><i id="mapOvWin"></i><i id="mapOvPos"></i></div>
-    <p class="mhint">Tocca le onde per andare lì · scorri per le altre frasi · tieni premuto per una nota</p>
+    <p class="mhint">Tocca le onde per andare lì · scorri per le altre frasi · − + per lo zoom</p>
   </div>
   <div class="mtext" id="mapPaneT" hidden>
     <div class="lyrFind" id="lyrFind">
@@ -696,6 +699,6 @@ select{font:600 14px var(--body);min-height:40px;border:0;border-radius:10px;bac
 <script src="player.js"></script>
 <script src="beats.js"></script>
 <script src="separate.js"></script>
-<script src="app.js?v=63"></script>
+<script src="app.js?v=64"></script>
 </body>
 </html>

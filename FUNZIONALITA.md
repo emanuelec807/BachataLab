@@ -133,7 +133,7 @@ Tutto il player sta in **una sola schermata senza scorrere** (pensato per 390×7
 - Se il ritmo non è stato trovato, al posto del numero c'è il tempo in minuti e secondi, con un avviso.
 
 ### 5.3 Strumenti
-- Una **riga per strumento** (Voce, Chitarra, Basso, Bongo, Güira, Altro), ognuna con:
+- Una **riga per strumento** (Voce, Chitarra, Basso, Bongo, Güira, Altro). Ogni riga è un riquadro che **si illumina nel colore dello strumento** quando suona (più forte suona, più si accende), con:
   - nome e **volume in %**: un tocco apre il **popup del volume** (cursore 0–200%, 100% = originale, Spegni, Solo, ripristino a 100%);
   - una **linea del volume** nel colore dello strumento: si trascina da 0 a 200%, si aggancia al 100% vicino al centro e sta a 0 quando lo strumento è spento;
   - **M** (spegni) e **S** (solo). Si possono mettere più strumenti in solo.
@@ -179,7 +179,8 @@ Si apre a tutto schermo da "Mappa"; la freccia in giù o Indietro la chiude. In 
 - **È una vista del player, non un player a parte**: velocità, metronomo, mix e loop restano quelli del player.
 - **Strumenti**:
   - sei pulsanti degli strumenti che si **illuminano nel loro colore** mentre suonano ("suona", "forte", "pausa");
-  - sotto, le **forme d'onda** di ogni strumento su un asse orizzontale, 4 frasi alla volta con il numero di ogni frase; una linea segna dove sei; il loop attivo è disegnato come un riquadro; le note sono puntini;
+  - sotto, le **forme d'onda** di ogni strumento su un asse orizzontale, con il numero di ogni frase;
+  - **zoom − / +**: 1, 2, 4 (predefinito), 8 o 16 frasi per schermata, oppure **tutta la canzone** senza scorrere; anche con due dita (pinch). Lo zoom si ricorda. Da lontano spariscono le tacche dei tempi e i numeri di frase si diradano; una linea segna dove sei; il loop attivo è disegnato come un riquadro; le note sono puntini;
   - **tocco sulle onde**: va lì; **scorrere**: mostra le altre frasi; **tieni premuto**: aggiungi, modifica o elimina una **nota** su quel tempo (fino a 60 caratteri, es. "giro", "dip");
   - −8 / −4 / +4 / +8 funzionano come nel player (spostano anche il loop).
 - **Toccare un pulsante strumento lo spegne solo dentro la mappa.** Uscendo dalla mappa tutti gli strumenti tornano come erano nel player.
@@ -328,6 +329,8 @@ Il conteggio sparisce: si ascolta e si tocca.
 ---
 
 ## Registro modifiche
+
+- **25/11/2026**: righe degli strumenti più spesse, che si illuminano quando lo strumento suona; zoom − / + nella mappa fino a tutta la canzone.
 
 - **25/11/2026**: corretto il blocco a 100% su "Trovo il ritmo e salvo" (introdotto con il testo sincronizzato). Un errore alla fine della separazione ora mostra un messaggio invece di restare fermo.
 
