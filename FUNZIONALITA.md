@@ -77,7 +77,9 @@ Bachata Lab è un'app per studiare la **musicalità in bachata**. Carichi una ca
 5. **6 tracce separate**: Voce, Chitarra, Basso, Bongo, Güira, Altro. La **güira è sempre separata** dal bongo: non è più un'opzione.
    - Il modello riconosce anche il **piano**. Se nel brano il piano suona davvero (almeno il 3% del suono del brano e il 35% di "Altro"), diventa una **settima traccia** "Piano"; altrimenti resta dentro "Altro". Nella bachata di solito non c'è (su "Frío" è 0%).
    - Tutto quello che il modello non riconosce (requinto, synth, archi, fiati, fisarmonica, effetti) va in "Altro".
-   - **"Altro" prende il nome di quello che c'è dentro.** Dopo la separazione YAMNet (Google, 7,5 MB, dentro l'app) ascolta le parti dove "Altro" suona e riconosce la famiglia: **Requinto** (corde pizzicate acute), **Fisarmonica**, **Tastiere**, **Archi** o **Fiati**. La traccia prende quel nome solo se una famiglia vince nettamente; altrimenti resta "Altro". Su "Pobre de Mí" (Mickey Then) diventa "Requinto"; su "Frío" resta "Altro".
+   - **"Altro" prende il nome di quello che c'è dentro.** Dopo la separazione YAMNet (Google, 7,5 MB, dentro l'app) ascolta le parti dove "Altro" suona e riconosce la famiglia: **Requinto** (corde pizzicate acute), **Fisarmonica**, **Tastiere**, **Archi** o **Fiati**. La traccia prende quel nome solo se una famiglia vince nettamente; altrimenti resta "Altro".
+     - Se lo strumento principale è meno del 70% di quello che si riconosce, la riga dice **"Requinto · + altro"** (nella mappa "Requinto +"): vuol dire che lì suona anche altro.
+     - Toccando il nome si apre il popup del volume con il dettaglio, momento per momento. Su "Pobre de Mí" (Mickey Then): requinto 42%, campanelli ed effetti 7%, archi 7%, fiati 6%, fisarmonica 5%, tastiere 4%, non riconosciuto 29% → "Requinto + altro". Su "Frío" resta "Altro".
    - Il requinto viene diviso dal modello in due: una parte resta in "Chitarra", il resto (gli arpeggi più acuti) va in questa traccia. Separarlo del tutto dalla chitarra ritmica non è possibile con questi modelli: con AudioSep e descrizioni come "mandolino" o "chitarra solista" non si distinguono le due chitarre (provato).
    - I progetti fatti prima vengono riconosciuti la prima volta che si aprono.
 6. **Tempo stimato**: impara la velocità reale del telefono dopo ogni progetto (separatamente per app e browser). Nel browser, al primo utilizzo, avvisa che scarica anche i modelli (circa 160 MB, una volta sola).
@@ -339,6 +341,8 @@ Il conteggio sparisce: si ascolta e si tocca.
 ---
 
 ## Registro modifiche
+
+- **25/11/2026**: "Altro" dice anche se dentro c'è altro oltre allo strumento principale ("Requinto + altro") e mostra il dettaglio nel popup del volume.
 
 - **25/11/2026**: "Altro" prende il nome dello strumento riconosciuto (Requinto, Fisarmonica, Tastiere, Archi, Fiati) con YAMNet. APK più leggero: modelli di separazione come file .onnx unici invece del base64 e libreria di ONNX Runtime compressa (circa 50 MB in meno).
 

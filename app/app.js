@@ -16,7 +16,10 @@ const STEMS = [];
 // altroName: the instrument family recognised in Altro (e.g. "Requinto"), shown as the track's name
 function useStems(piano, altroName) {
   STEMS.length = 0;
-  for (const s of ALL_STEMS) { if (s.id === 'piano' && !piano) continue; STEMS.push(s.id === 'altro' && altroName ? Object.assign({}, s, { n: altroName, d: 'riconosciuto in Altro' }) : s); }
+  for (const s of ALL_STEMS) { if (s.id === 'piano' && !piano) continue;
+    // "Requinto + altro": the name is the main instrument, "+ altro" says other things play there too
+    const mixed = altroName && / \+ altro$/.test(altroName), main = altroName && altroName.replace(/ \+ altro$/, '');
+    STEMS.push(s.id === 'altro' && altroName ? Object.assign({}, s, { n: main, extra: mixed ? '+ altro' : '', d: 'riconosciuto in Altro' }) : s); }
 }
 useStems(false);
 const PRESETS = [
@@ -609,6 +612,7 @@ function splitPiano(stems, n) {
   else delete stems.piano;
   return keep;
 }
+let lastAltroParts = null; // what nameAltro heard, moment by moment (saved in the project)
 // YAMNet (tagworker.js) says which instrument family plays in Altro; null when no family clearly wins.
 async function nameAltro(altro, n) {
   try {
@@ -618,9 +622,10 @@ async function nameAltro(altro, n) {
     bs.buffer = buf; bs.connect(oc.destination); bs.start();
     const x = (await oc.startRendering()).getChannelData(0).slice();
     const r = await new Promise(res => {
-      const w = new Worker('tagworker.js?v=1'), done = v => { clearTimeout(to); w.terminate(); res(v || {}); }, to = setTimeout(() => done({}), 90000);
+      const w = new Worker('tagworker.js?v=2'), done = v => { clearTimeout(to); w.terminate(); res(v || {}); }, to = setTimeout(() => done({}), 90000);
       w.onmessage = e => done(e.data); w.onerror = () => done({}); w.postMessage({ audio: x }, [x.buffer]);
     });
+    lastAltroParts = r.parts ? { parts: r.parts, unsure: r.unsure } : null;
     return r.name || null;
   } catch (e) { return null; }
 }
@@ -634,7 +639,7 @@ async function saveNew({ name, stems, dur, offset, srcDur, withG, kind, file, th
   try {
     await tx('stems', 'readwrite', s => s.put({ id, n, sr: SR, data }));
     if (kind === 'video') await tx('media', 'readwrite', s => s.put({ id, blob: file, type: file.type || 'video/mp4' }));
-    const p = normalize({ id, name, kind, thumb, dur, offset, srcDur, piano, altroName, created: Date.now(), updated: Date.now(), withGuira: withG,
+    const p = normalize({ id, name, kind, thumb, dur, offset, srcDur, piano, altroName, altroParts: lastAltroParts, created: Date.now(), updated: Date.now(), withGuira: withG,
       bpm: bt.bpm, bpmDetected: bt.bpm, beats, beatsDetected: beats.slice(), confidence: bt.confidence, oneIdx, oneDetected: oneIdx,
       env: envelopes(stems, n), envRate: 20, mirror: kind === 'video', oneAlgo: 2 });
     try { await navigator.storage.persist(); } catch (e) {}
@@ -711,8 +716,8 @@ async function openPlayer(id) {
     requestAnimationFrame(() => { drawTimelineStatic(); syncVideo(true); });
     raf = requestAnimationFrame(tick);
     // projects made before the naming: listen to Altro once, in the background
-    if (cur.altroName === undefined) { const proj = cur; nameAltro(stems.altro, stems.altro[0].length).then(nm => {
-      proj.altroName = nm || null; if (cur !== proj) return putProject(proj).catch(() => {});
+    if (cur.altroName === undefined || cur.altroParts === undefined) { const proj = cur; nameAltro(stems.altro, stems.altro[0].length).then(nm => {
+      proj.altroName = nm || null; proj.altroParts = lastAltroParts; if (cur !== proj) return putProject(proj).catch(() => {});
       persist(); if (nm) { useStems(!!stems.piano, nm); renderPads(); if (mapOpen()) renderMapHeads(true); toast('In Altro c\'è soprattutto: ' + nm); } }); }
   } catch (e) {
     busy(); closePlayer(true); await dialog('Progetto non leggibile', textEl('Non riesco ad aprire questo progetto (' + (e && e.message || e) + ').'), [['OK', 0, true]]); go('home');
@@ -827,7 +832,8 @@ function refreshPadStates() {
     const id = row.dataset.id, off = isOff(id), g = Math.round(cur.gains[id] * 100);
     row.classList.toggle('off', off);
     const vr = row.querySelector('.vr'); if (vr && document.activeElement !== vr) { vr.value = cur.mute[id] ? 0 : g; fillRange(vr); }
-    row.querySelector('.nm span').textContent = cur.mute[id] || g === 0 ? 'Spento' : anySolo() && !cur.solo[id] ? 'Escluso' : g + '%';
+    const ex = (STEMS.find(s => s.id === id) || {}).extra;
+    row.querySelector('.nm span').textContent = (cur.mute[id] || g === 0 ? 'Spento' : anySolo() && !cur.solo[id] ? 'Escluso' : g + '%') + (ex ? ' · ' + ex : '');
     row.querySelector('.m').classList.toggle('on', !!cur.mute[id]); row.querySelector('.s').classList.toggle('on', !!cur.solo[id]);
     row.querySelector('.m').setAttribute('aria-pressed', String(!!cur.mute[id])); row.querySelector('.s').setAttribute('aria-pressed', String(!!cur.solo[id]));
   }
@@ -911,7 +917,10 @@ $('allOn').addEventListener('click', () => { if (!cur) return; cur.mute = {}; cu
 let volId = null;
 function openVol(id) {
   volId = id; const s = STEMS.find(x => x.id === id);
-  $('volName').textContent = s.n; $('popVol').style.setProperty('--c', `var(--c-${id})`); $('volRange').style.setProperty('--tc', `var(--c-${id})`);
+  $('volName').textContent = s.n + (s.extra ? ' ' + s.extra : '');
+  const ap = id === 'altro' && cur.altroParts; $('volInfo').hidden = !ap;
+  if (ap) $('volInfo').textContent = 'Dentro, momento per momento: ' + ap.parts.map(([n, v]) => n + ' ' + v + '%').join(', ') + (ap.unsure ? ', non riconosciuto ' + ap.unsure + '%' : '') + '.';
+  $('popVol').style.setProperty('--c', `var(--c-${id})`); $('volRange').style.setProperty('--tc', `var(--c-${id})`);
   renderVol(); openPop('popVol');
 }
 function renderVol() { if (!volId) return; const g = Math.round(cur.gains[volId] * 100); $('volRange').value = g; fillRange($('volRange')); $('volVal').textContent = cur.mute[volId] ? 'Spento' : g + '%';
@@ -1254,7 +1263,7 @@ function renderMapHeads(full) {
   if (!mapOpen() || !player) return;
   const t = player.position;
   if (full) $('mapHeads').classList.toggle('n7', STEMS.length > 6);
-  if (full) $('mapHeads').innerHTML = STEMS.map(s => `<button class="mhd" data-id="${s.id}" style="--c:var(--c-${s.id})"><b>${s.n}</b><span></span></button>`).join('');
+  if (full) $('mapHeads').innerHTML = STEMS.map(s => `<button class="mhd" data-id="${s.id}" style="--c:var(--c-${s.id})"><b>${s.n}${s.extra ? ' +' : ''}</b><span></span></button>`).join('');
   for (const b of $('mapHeads').children) {
     const id = b.dataset.id, off = mapMute[id], lv = levelAt(id, t), lit = !off && lv > 0.15;
     b.classList.toggle('lit', lit); b.classList.toggle('off', off);

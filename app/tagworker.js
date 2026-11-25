@@ -11,7 +11,9 @@ const GROUPS = {
   Tastiere: [147, 148, 149, 150, 151, 152, 153, 154, 155], // keyboard, piano, electric piano, organs, synthesizer, sampler, harpsichord
   Archi: [184, 185, 186, 187, 188], // bowed strings, string section, violin, pizzicato, cello
   Fiati: [180, 181, 182, 183, 190, 191, 192, 193], // brass, horn, trumpet, trombone, woodwinds, flute, sax, clarinet
+  'Campanelli/effetti': [195, 200, 201, 489, 385, 383, 382, 176, 174, 177], // bell, chime, wind chime, jingle, ringtone, telephone, alarm, glockenspiel, mallets, vibraphone
 };
+const LABEL = { Requinto: 'requinto', Fisarmonica: 'fisarmonica', Tastiere: 'tastiere', Archi: 'archi', Fiati: 'fiati', 'Campanelli/effetti': 'campanelli ed effetti' };
 
 // log-mel patches as YAMNet's features.py: 25 ms Hann frames every 10 ms, |FFT 512|, 64 mel 125–7500 Hz, ln(x + 0.001), 96 frames every 48
 function melMatrix() {
@@ -61,9 +63,16 @@ self.onmessage = async ({ data: m }) => {
     const sc = out.scores.data, mean = new Float32Array(521);
     for (let k = 0; k < act.length; k++) for (let c = 0; c < 521; c++) mean[c] += sc[k * 521 + c] / act.length;
     const scores = {}; for (const g2 in GROUPS) scores[g2] = Math.max(...GROUPS[g2].map(i => mean[i]));
-    const rank = Object.entries(scores).sort((a, b) => b[1] - a[1]);
-    // a name only when one family clearly wins; otherwise the track stays "Altro"
-    const name = rank[0][1] >= 0.06 && rank[0][1] >= 2 * rank[1][1] ? rank[0][0] : null;
-    postMessage({ name, scores, active: act.length / np });
+    // what plays moment by moment: the winning family of each 0.96 s patch, if any is clear
+    const count = {}; let sure = 0;
+    for (let k = 0; k < act.length; k++) { let best = null, bv = 0.05;
+      for (const g2 in GROUPS) { const v = Math.max(...GROUPS[g2].map(i => sc[k * 521 + i])); if (v > bv) { bv = v; best = g2; } }
+      if (best) { count[best] = (count[best] || 0) + 1; sure++; } }
+    const parts = Object.entries(count).sort((a, b) => b[1] - a[1]).map(([g2, c]) => [LABEL[g2], Math.round(c / act.length * 100)]);
+    const rank = Object.entries(scores).filter(([g2]) => g2 !== 'Campanelli/effetti').sort((a, b) => b[1] - a[1]);
+    // a name only when one family clearly wins; "+ altro" when it is less than 70% of what can be recognised
+    let name = rank[0][1] >= 0.06 && rank[0][1] >= 2 * rank[1][1] ? rank[0][0] : null;
+    if (name && (count[name] || 0) < 0.7 * sure) name += ' + altro';
+    postMessage({ name, scores, parts, unsure: Math.round((act.length - sure) / act.length * 100), active: act.length / np });
   } catch (e) { postMessage({ name: null, error: String(e && e.message || e) }); }
 };
