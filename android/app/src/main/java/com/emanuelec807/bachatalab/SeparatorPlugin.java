@@ -17,6 +17,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.FloatBuffer;
 import java.nio.ShortBuffer;
 import java.util.Map;
 
@@ -113,15 +114,17 @@ public class SeparatorPlugin extends Plugin {
             o.setMemoryPatternOptimization(false);
             demucs = env.createSession(dm.getAbsolutePath(), o);
             if (gm != null) guira = env.createSession(gm.getAbsolutePath(), o);
+            File tmp = new File(ctx.getCacheDir(), "septmp"); tmp.mkdirs();
+            File[] old = tmp.listFiles(); if (old != null) for (File f : old) f.delete();
+            Separator.tmpDir = tmp;
             state = "running";
-            float[][] in = input;
-            Map<String, float[][]> stems = new Separator(env, demucs, guira).separate(in[0], in[1], withGuira,
+            float[][] in = input; input = null; // the separator frees the channels after the first step
+            Map<String, FloatBuffer[]> stems = new Separator(env, demucs, guira).separate(in, withGuira,
                 (s, i, n) -> { stage = s; pi = i; pn = n; }, () -> cancel);
-            input = null;
             stage = "write"; pi = 0; pn = stems.size();
             File dir = new File(ctx.getFilesDir(), "sep"); dir.mkdirs();
             JSObject fl = new JSObject();
-            for (Map.Entry<String, float[][]> e : stems.entrySet()) {
+            for (Map.Entry<String, FloatBuffer[]> e : stems.entrySet()) {
                 File f = new File(dir, e.getKey() + ".pcm");
                 writePcm(f, e.getValue());
                 fl.put(e.getKey(), f.getAbsolutePath());
@@ -140,10 +143,10 @@ public class SeparatorPlugin extends Plugin {
     }
 
     /** Planar int16 little-endian: all of the left channel, then all of the right. */
-    private static void writePcm(File f, float[][] st) throws Exception {
+    private static void writePcm(File f, FloatBuffer[] st) throws Exception {
         try (OutputStream os = new BufferedOutputStream(new FileOutputStream(f), 1 << 16)) {
             byte[] buf = new byte[8192]; int k = 0;
-            for (float[] ch : st) for (float v : ch) {
+            for (FloatBuffer ch : st) for (int i = 0, n = ch.capacity(); i < n; i++) { float v = ch.get(i);
                 int s = Math.round(Math.max(-1f, Math.min(1f, v)) * 32767f);
                 buf[k++] = (byte) s; buf[k++] = (byte) (s >> 8);
                 if (k == buf.length) { os.write(buf); k = 0; }

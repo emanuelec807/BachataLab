@@ -3,6 +3,9 @@ package com.emanuelec807.bachatalab;
 import ai.onnxruntime.OnnxTensor;
 import ai.onnxruntime.OrtEnvironment;
 import ai.onnxruntime.OrtSession;
+import java.io.File;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -31,6 +34,21 @@ public final class Separator {
     public Separator(OrtEnvironment env, OrtSession demucs, OrtSession guira) {
         this.env = env; this.demucs = demucs; this.guira = guira;
     }
+
+    // The whole-song tracks live in memory-mapped temporary files, outside the Java heap. Android caps the
+    // heap of an app (often 512 MB even with largeHeap, and there allocateDirect counts against it too):
+    // six stereo tracks of a 3-4 minute song did not fit, so the separation fell back to the slow browser
+    // version. A mapping uses free RAM like any memory, and the system can page it to storage if needed.
+    public static File tmpDir = new File(System.getProperty("java.io.tmpdir"));
+    static FloatBuffer newBuf(int n) throws java.io.IOException {
+        File f = File.createTempFile("sep", ".f32", tmpDir);
+        try (java.io.RandomAccessFile raf = new java.io.RandomAccessFile(f, "rw")) {
+            raf.setLength(n * 4L);
+            ByteBuffer m = raf.getChannel().map(java.nio.channels.FileChannel.MapMode.READ_WRITE, 0, n * 4L);
+            return m.order(ByteOrder.nativeOrder()).asFloatBuffer();
+        } finally { f.delete(); } // the mapping stays valid; the space is freed when the buffer is collected
+    }
+    public static float[] range(FloatBuffer b, int a, int e) { float[] x = new float[e - a]; FloatBuffer d = b.duplicate(); d.position(a); d.get(x); return x; }
 
     // ---------- FFT ----------
     private static final Map<Integer, Object[]> plans = new HashMap<>();
@@ -169,12 +187,13 @@ public final class Separator {
         FloatBuffer b = t.getFloatBuffer(); float[] a = new float[b.remaining()]; b.get(a); return a;
     }
 
-    Map<String, float[][]> demucsAll(float[] left, float[] right, Progress pr, Cancel cc) throws Exception {
+    Map<String, FloatBuffer[]> demucsAll(float[] left, float[] right, Progress pr, Cancel cc) throws Exception {
         int total = left.length, overlap = (int) Math.floor(L * OVERLAP), stride = L - overlap;
         int n = Math.max(1, (int) Math.ceil((double) total / stride));
         float[] win = new float[L]; java.util.Arrays.fill(win, 1f);
         for (int i = 0; i < overlap; i++) { float v = (float) i / (overlap - 1); win[i] = v; win[L - 1 - i] = v; }
-        float[][][] out = new float[SOURCES.length][2][total];
+        FloatBuffer[][] out = new FloatBuffer[SOURCES.length][2];
+        for (int k = 0; k < SOURCES.length; k++) for (int c = 0; c < 2; c++) out[k][c] = newBuf(total);
         float[] wsum = new float[total];
         for (int i = 0; i < n; i++) {
             if (cc.cancelled()) throw new InterruptedException("cancelled");
@@ -194,14 +213,14 @@ public final class Separator {
             }
             float[][][] wav = demucsIspec(zout, SOURCES.length, T[0]);
             for (int k = 0; k < SOURCES.length; k++) for (int c = 0; c < 2; c++) {
-                float[] o = out[k][c], w = wav[k][c]; int tb = (k * 2 + c) * L;
-                for (int j = 0; j < len; j++) o[s + j] += (w[j] + xt[tb + j]) * win[j];
+                FloatBuffer o = out[k][c]; float[] w = wav[k][c]; int tb = (k * 2 + c) * L;
+                for (int j = 0; j < len; j++) o.put(s + j, o.get(s + j) + (w[j] + xt[tb + j]) * win[j]);
             }
             for (int j = 0; j < len; j++) wsum[s + j] += win[j];
             pr.on("demucs", i + 1, n);
         }
-        for (float[][] st : out) for (float[] ch : st) for (int j = 0; j < total; j++) ch[j] /= Math.max(wsum[j], 1e-8f);
-        Map<String, float[][]> stems = new HashMap<>();
+        for (FloatBuffer[] st : out) for (FloatBuffer ch : st) for (int j = 0; j < total; j++) ch.put(j, ch.get(j) / Math.max(wsum[j], 1e-8f));
+        Map<String, FloatBuffer[]> stems = new HashMap<>();
         for (int k = 0; k < SOURCES.length; k++) stems.put(SOURCES[k], out[k]);
         return stems;
     }
@@ -239,17 +258,16 @@ public final class Separator {
     // window): the STFT frames line up with the whole-song ones, so the result is the same, but the
     // memory no longer grows with the length of the song (a full STFT of 4 minutes took about 1 GB).
     static final int SPLIT_SEG = 512 * 2560, SPLIT_PAD = 512 * 8;
-    static float[][][] splitDrums(float[][] drums, float[] guira44) {
-        int n = drums[0].length;
-        if (n <= SPLIT_SEG + 2 * SPLIT_PAD) return splitBlock(drums, guira44);
-        float[][] gu = new float[2][n], bo = new float[2][n];
+    static void splitDrums(FloatBuffer[] drums, float[] guira44, FloatBuffer[] gu, FloatBuffer[] bo) {
+        int n = drums[0].capacity();
         for (int s = 0; s < n; s += SPLIT_SEG) {
             int a = Math.max(0, s - SPLIT_PAD), b = Math.min(n, s + SPLIT_SEG + SPLIT_PAD), cnt = Math.min(SPLIT_SEG, n - s);
-            float[][] d = {java.util.Arrays.copyOfRange(drums[0], a, b), java.util.Arrays.copyOfRange(drums[1], a, b)};
-            float[][][] r = splitBlock(d, java.util.Arrays.copyOfRange(guira44, a, b));
-            for (int c = 0; c < 2; c++) { System.arraycopy(r[0][c], s - a, gu[c], s, cnt); System.arraycopy(r[1][c], s - a, bo[c], s, cnt); }
+            float[][][] r = splitBlock(new float[][]{range(drums[0], a, b), range(drums[1], a, b)}, java.util.Arrays.copyOfRange(guira44, a, b));
+            for (int c = 0; c < 2; c++) {
+                FloatBuffer g = gu[c].duplicate(); g.position(s); g.put(r[0][c], s - a, cnt);
+                FloatBuffer o = bo[c].duplicate(); o.position(s); o.put(r[1][c], s - a, cnt);
+            }
         }
-        return new float[][][]{gu, bo};
     }
 
     static float[][][] splitBlock(float[][] drums, float[] guira44) {
@@ -271,25 +289,27 @@ public final class Separator {
         return new float[][][]{gu, bo};
     }
 
-    /** Full pipeline; keys: vocals, guitar, bass, bongo, guira, altro (= other + piano), piano (stereo each). */
-    public Map<String, float[][]> separate(float[] left, float[] right, boolean withGuira, Progress pr, Cancel cc) throws Exception {
-        Map<String, float[][]> dem = demucsAll(left, right, pr, cc);
+    /** Full pipeline; keys: vocals, guitar, bass, bongo, guira, altro (= other + piano), piano (stereo each).
+     *  The input channels in[0], in[1] are released after the first step to free memory. */
+    public Map<String, FloatBuffer[]> separate(float[][] in, boolean withGuira, Progress pr, Cancel cc) throws Exception {
+        Map<String, FloatBuffer[]> dem = demucsAll(in[0], in[1], pr, cc);
+        in[0] = null; in[1] = null;
         pr.on("resample", 0, 0);
-        float[][] d = dem.get("drums"); int n = d[0].length;
-        float[][] bongo, guiraSt;
-        if (!withGuira || guira == null) { bongo = d; guiraSt = new float[][]{new float[n], new float[n]}; }
+        FloatBuffer[] d = dem.remove("drums"); int n = d[0].capacity();
+        FloatBuffer[] bongo, guiraSt;
+        if (!withGuira || guira == null) { bongo = d; guiraSt = new FloatBuffer[]{newBuf(n), newBuf(n)}; }
         else {
-            float[] mono = new float[n]; for (int i = 0; i < n; i++) mono[i] = 0.5f * (d[0][i] + d[1][i]);
-            float[] g32 = guiraAll(resample(mono, SR, GSR), pr, cc);
-            float[] gfull = resample(g32, GSR, SR), g44 = new float[n];
-            System.arraycopy(gfull, 0, g44, 0, Math.min(n, gfull.length));
+            float[] mono = new float[n]; for (int i = 0; i < n; i++) mono[i] = 0.5f * (d[0].get(i) + d[1].get(i));
+            float[] m32 = resample(mono, SR, GSR); mono = null;
+            float[] g32 = guiraAll(m32, pr, cc); m32 = null;
+            float[] g44 = java.util.Arrays.copyOf(resample(g32, GSR, SR), n); g32 = null;
             pr.on("split", 0, 0);
-            float[][][] sp = splitDrums(d, g44); guiraSt = sp[0]; bongo = sp[1];
+            guiraSt = new FloatBuffer[]{newBuf(n), newBuf(n)}; bongo = new FloatBuffer[]{newBuf(n), newBuf(n)};
+            splitDrums(d, g44, guiraSt, bongo);
         }
-        dem.remove("drums"); d = null; // no longer needed: frees memory before the last steps
-        float[][] altro = dem.get("other"), p = dem.get("piano"); // altro = other + piano, summed in place
-        for (int c = 0; c < 2; c++) for (int i = 0; i < n; i++) altro[c][i] += p[c][i];
-        Map<String, float[][]> res = new LinkedHashMap<>();
+        FloatBuffer[] altro = dem.get("other"), p = dem.get("piano"); // altro = other + piano, summed in place
+        for (int c = 0; c < 2; c++) for (int i = 0; i < n; i++) altro[c].put(i, altro[c].get(i) + p[c].get(i));
+        Map<String, FloatBuffer[]> res = new LinkedHashMap<>();
         res.put("vocals", dem.get("vocals")); res.put("guitar", dem.get("guitar")); res.put("bass", dem.get("bass"));
         res.put("bongo", bongo); res.put("guira", guiraSt); res.put("altro", altro); res.put("piano", p); // kept as a track by the app only if it really plays
         return res;
