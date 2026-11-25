@@ -60,6 +60,9 @@ I modelli si scaricano una volta e restano nella cache del browser. Il picco di 
 - [AudioSep](https://github.com/Audio-AGI/AudioSep) (MIT): separatore ResUNet30. La query di testo è calcolata con CLAP.
 - [ONNX Runtime Web](https://github.com/microsoft/onnxruntime) (MIT).
 - [SoundTouchJS](https://github.com/cutterbl/SoundTouchJS) (LGPL-2.1), inclusa in `player.js` per cambiare velocità mantenendo il tono.
+- [Transformers.js](https://github.com/huggingface/transformers.js) (Apache-2.0), caricata da jsDelivr solo per testo e traduzione.
+- [Whisper base](https://huggingface.co/Xenova/whisper-base) (MIT) per trascrivere la voce; [Opus-MT](https://huggingface.co/Helsinki-NLP) (CC-BY 4.0) per tradurre.
+- Testi sincronizzati da [LRCLIB](https://lrclib.net).
 - [lamejs](https://github.com/zhuker/lamejs) (LGPL-3.0), in `app/lame.min.js`, per creare l'MP3 del mix.
 - Plugin Capacitor `@capacitor/filesystem` e `@capacitor/share` (MIT), per salvare e condividere l'MP3 nell'app Android.
 

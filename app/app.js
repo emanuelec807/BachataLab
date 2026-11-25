@@ -243,7 +243,7 @@ async function renderSettings() {
   $('accentList').innerHTML = ACCENTS.map((a, i) => `<button data-acc-i="${i}" class="${i === ai ? 'on' : ''}" style="--c:${isLight() ? a[2] : a[1]}" aria-label="Colore ${a[0]}"></button>`).join('');
   $('accentName').textContent = ACCENTS[ai][0] + (ai === 0 ? ' (predefinito)' : '');
   $('accentHint').textContent = isLight() ? 'tonalità più scura sul chiaro' : '';
-  const o = tapOffset(); $('calTxt2').textContent = o == null ? 'Non calibrato' : Math.round(o * 1000) + ' ms tra suono e tocco';
+  $('trLang').value = ls.get('trLang', 'it'); const o = tapOffset(); $('calTxt2').textContent = o == null ? 'Non calibrato' : Math.round(o * 1000) + ' ms tra suono e tocco';
   const mb = v => v >= 1e9 ? (v / 1e9).toFixed(1) + ' GB' : Math.round(v / 1e6) + ' MB';
   let est = {}, models = [], n = homeList.length;
   try { est = await navigator.storage.estimate(); } catch (e) {}
@@ -477,7 +477,7 @@ $('createBtn').addEventListener('click', async () => {
       if (worker) { worker.terminate(); worker = null; }
       const workS = (Date.now() - tWork) / 1000; ls.set(SPEED_KEY(), Math.max(0.05, Math.min(10, workS / (dur * (wD + wG)))));
       clearInterval(procClock); setSteps(steps, steps.length - 1); $('procStage').textContent = 'Trovo il ritmo e salvo…'; $('procWhat').textContent = 'Ritmo'; $('procLeft').textContent = 'quasi fatto'; setProgress(1, 0.5);
-      const args = { name, stems: m.stems, dur, offset, withG, kind, file, thumb };
+      const args = { name, stems: m.stems, dur, offset, srcDur: src.buf.duration, withG, kind, file, thumb };
       for (;;) {
         try { const id = await saveNew(args); procRunning = false; history.replaceState(null, '', '#player'); openPlayer(id); return; }
         catch (e) {
@@ -583,7 +583,7 @@ function guessOne(stems, beats, n) {
   const score = k => mean(k) + 0.1 * bass[k] / bmax;
   return score(p4) >= score(p4 + 4) ? p4 : p4 + 4;
 }
-async function saveNew({ name, stems, dur, offset, withG, kind, file, thumb }) {
+async function saveNew({ name, stems, dur, offset, srcDur, withG, kind, file, thumb }) {
   const n = stems.vocals[0].length, id = 'p' + Date.now().toString(36);
   let bt = { bpm: 0, beats: new Float64Array(0), confidence: 0 };
   try { bt = BeatTracker.analyze(rhythmMono(stems, n), SR); } catch (e) {}
@@ -592,7 +592,7 @@ async function saveNew({ name, stems, dur, offset, withG, kind, file, thumb }) {
   try {
     await tx('stems', 'readwrite', s => s.put({ id, n, sr: SR, data }));
     if (kind === 'video') await tx('media', 'readwrite', s => s.put({ id, blob: file, type: file.type || 'video/mp4' }));
-    const p = normalize({ id, name, kind, thumb, dur, offset, created: Date.now(), updated: Date.now(), withGuira: withG,
+    const p = normalize({ id, name, kind, thumb, dur, offset, srcDur, created: Date.now(), updated: Date.now(), withGuira: withG,
       bpm: bt.bpm, bpmDetected: bt.bpm, beats, beatsDetected: beats.slice(), confidence: bt.confidence, oneIdx, oneDetected: oneIdx,
       env: envelopes(stems, n), envRate: 20, mirror: kind === 'video', oneAlgo: 2 });
     try { await navigator.storage.persist(); } catch (e) {}
@@ -626,7 +626,7 @@ function closePlayer(skipSave) {
   const v = $('vid'); try { v.pause(); } catch (e) {} if (v.getAttribute('src')) { v.removeAttribute('src'); v.load(); }
   if (vidUrl) { URL.revokeObjectURL(vidUrl); vidUrl = null; }
   if ($('train').classList.contains('on')) { training = null; $('train').classList.remove('on'); }
-  exitFs(true); closePop(true); closeMap(true); cur = null; loopRange = null; loopMode = null; abA = null; waveImgs = {}; releaseWake();
+  exitFs(true); closePop(true); closeMap(true); $('lyrRes').innerHTML = ''; $('lyrQ').value = ''; lyrStatus(); cur = null; loopRange = null; loopMode = null; abA = null; waveImgs = {}; releaseWake();
 }
 async function openPlayer(id) {
   const my = ++opening;
@@ -770,7 +770,7 @@ $('stage').querySelector('.fsbar').addEventListener('click', e => { const b = e.
 // ---- instruments: one row each (audio) or a compact pad (video); the waveform fills in as the song plays ----
 function renderPads() {
   $('stems').innerHTML = STEMS.map(s => `<div class="stem" data-id="${s.id}" style="--c:var(--c-${s.id})"><i class="bar"></i>
-    <button class="nm" data-vol aria-label="Volume ${s.n}"><b>${s.n}</b><span></span></button><canvas></canvas>
+    <button class="nm" data-vol aria-label="Volume ${s.n}"><b>${s.n}</b><span></span></button><input type="range" class="vr" min="0" max="200" step="5" style="--tc:var(--c-${s.id})" aria-label="Volume ${s.n}">
     <button class="ms m" aria-label="Spegni ${s.n}">M</button><button class="ms s" aria-label="Solo ${s.n}">S</button></div>`).join('');
   $('minipads').innerHTML = STEMS.map(s => `<button class="mpad" data-id="${s.id}" style="--c:var(--c-${s.id})"><i></i>${s.n}</button>`).join('');
   refreshPadStates(); requestAnimationFrame(drawStemWaves);
@@ -779,6 +779,7 @@ function refreshPadStates() {
   for (const row of document.querySelectorAll('#stems .stem')) {
     const id = row.dataset.id, off = isOff(id), g = Math.round(cur.gains[id] * 100);
     row.classList.toggle('off', off);
+    const vr = row.querySelector('.vr'); if (vr && document.activeElement !== vr) { vr.value = cur.mute[id] ? 0 : g; fillRange(vr); }
     row.querySelector('.nm span').textContent = cur.mute[id] || g === 0 ? 'Spento' : anySolo() && !cur.solo[id] ? 'Escluso' : g + '%';
     row.querySelector('.m').classList.toggle('on', !!cur.mute[id]); row.querySelector('.s').classList.toggle('on', !!cur.solo[id]);
     row.querySelector('.m').setAttribute('aria-pressed', String(!!cur.mute[id])); row.querySelector('.s').setAttribute('aria-pressed', String(!!cur.solo[id]));
@@ -803,9 +804,9 @@ function updatePads(t) {
 }
 // Each row's waveform is drawn twice offscreen (bright and dim); every frame shows the bright part up to the playhead.
 let waveImgs = {};
-function drawStemWaves() {
+function drawStemWaves() { // the player rows now have a volume line instead of a waveform
   waveImgs = {};
-  if (!cur || !player || isVideo()) return;
+  if (!cur || !player || isVideo() || !document.querySelector('#stems canvas')) return;
   const dpr = Math.min(2, devicePixelRatio || 1), dur = player.duration, dim = cc('--s3');
   for (const row of document.querySelectorAll('#stems .stem')) {
     const id = row.dataset.id, cv = row.querySelector('canvas'), W = cv.clientWidth, H = cv.clientHeight; if (!W) continue;
@@ -832,6 +833,11 @@ function drawWaveProgress(t) {
 // Shared by the rows, the pads, the volume popup and the map, so they always agree.
 function toggleMute(id) { cur.mute[id] = !cur.mute[id]; if (cur.mute[id]) cur.solo[id] = false; else if (cur.gains[id] === 0) cur.gains[id] = 1; }
 function toggleSolo(id) { cur.solo[id] = !cur.solo[id]; if (cur.solo[id]) { cur.mute[id] = false; if (cur.gains[id] === 0) cur.gains[id] = 1; } }
+// volume line on each row: 0–200%, sticks to 100% near the middle
+$('stems').addEventListener('input', e => { const vr = e.target.closest('.vr'); if (!vr) return; const id = vr.closest('.stem').dataset.id;
+  let v = +vr.value; if (Math.abs(v - 100) <= 5) { v = 100; vr.value = 100; fillRange(vr); }
+  cur.gains[id] = v / 100; cur.mute[id] = v === 0 ? cur.mute[id] : false; applyGains(); refreshPadStates(); persist(); });
+$('stems').addEventListener('change', e => { if (e.target.closest('.vr')) e.target.blur(); });
 $('stems').addEventListener('click', e => {
   const row = e.target.closest('.stem'); if (!row) return; const id = row.dataset.id;
   if (e.target.closest('.m')) { toggleMute(id); mixerChanged(); }
@@ -1476,6 +1482,194 @@ function stopTraining(keepOpen) {
   if (tr.wasLoop && !keepOpen && player) { setLoop(tr.wasLoop[0], tr.wasLoop[1]); loopMode = 'ab'; updateLoopBtns(); }
 }
 
+
+// ---------- lyrics: LRCLIB first, Whisper on the vocal stem as a fallback, Opus-MT for the translation ----------
+const LANGS = { it: 'italiano', en: 'inglese', es: 'spagnolo', fr: 'francese', de: 'tedesco', pt: 'portoghese' };
+const STOP = {
+  es: 'de la que el en y los se del las un por con no una su para es al lo como más pero sus le ya me mi tu te yo amor quiero corazón eres estoy sin cuando porque todo',
+  en: 'the and to of in is you that it i me my your love be on with for don\'t can just baby what know when all',
+  pt: 'de que não o e é um uma do da em você eu meu minha com para ao seu sua amor coração tá não sem quando',
+  it: 'di che non il la e è un una per con mi ti io sei amore cuore ma come anche tutto quando perché',
+  fr: 'de la le et les des que je tu pas un une est il elle mon ma ton toi moi pour avec amour coeur'
+};
+const STOPSET = Object.fromEntries(Object.entries(STOP).map(([k, v]) => [k, new Set(v.split(' '))]));
+function detectLang(text) {
+  const words = text.toLowerCase().match(/[a-zà-öø-ÿñ']+/g) || [], score = {};
+  for (const k in STOPSET) score[k] = 0;
+  for (const w of words) for (const k in STOPSET) if (STOPSET[k].has(w)) score[k]++;
+  // a few letters that only one language uses
+  if (/ñ|¿|¡/.test(text)) score.es += 3; if (/ã|õ|ç/.test(text)) score.pt += 3; if (/\bthe\b/i.test(text)) score.en += 2;
+  const best = Object.entries(score).sort((a, b) => b[1] - a[1])[0];
+  return best && best[1] >= 2 ? best[0] : null;
+}
+let lyrW = null, lyrJob = 0, lyrCb = {}, lyrIdx = -2, lyrEls = [], lyrUser = 0, lyrBusy = false;
+const mbs = v => Math.round(v / 1e6) + ' MB';
+function lyrStatus(text, frac) {
+  $('lyrStat').hidden = !text; if (!text) return;
+  $('lyrStatT').textContent = text; const b = $('lyrBar');
+  b.style.width = frac == null ? '100%' : Math.round(Math.max(0.03, frac) * 100) + '%'; b.style.opacity = frac == null ? 0.35 : 1;
+}
+function lyrWorker() {
+  if (lyrW) return lyrW;
+  lyrW = new Worker('lyricsworker.js?v=2', { type: 'module' });
+  lyrW.onmessage = e => { const m = e.data;
+    if (m.type === 'progress') lyrStatus((m.stage === 'asr' ? 'Scarico Whisper' : 'Scarico il traduttore') + ` · ${mbs(m.loaded)} di ${mbs(m.total)}`, m.loaded / m.total);
+    else if (m.type === 'stage') lyrStatus('Riconosco la lingua e trascrivo la voce…', null);
+    else if (m.type === 'trstep') lyrStatus(`Traduco… ${m.done} di ${m.total} righe`, m.done / m.total);
+    else { const cb = lyrCb[m.id]; delete lyrCb[m.id]; if (cb) m.type === 'error' ? cb.rej(new Error(m.msg)) : cb.res(m); } };
+  lyrW.onerror = e => { for (const k in lyrCb) lyrCb[k].rej(new Error(e.message || 'errore del modello')); lyrCb = {}; lyrW = null; };
+  return lyrW;
+}
+function lyrCall(msg, transfer) { const id = ++lyrJob; return new Promise((res, rej) => { lyrCb[id] = { res, rej }; lyrWorker().postMessage(Object.assign({ id }, msg), transfer || []); }); }
+const netMsg = e => /fetch|network|load|import|Failed/i.test(e && e.message || '') ? 'serve Internet la prima volta' + (NATIVE ? '' : ' (nella versione web dentro Claude è bloccato: usa l\'app Android)') : (e && e.message || String(e));
+
+function parseLrc(s) {
+  const out = [];
+  for (const line of String(s || '').split(/\r?\n/)) {
+    const tags = [...line.matchAll(/\[(\d+):(\d+(?:[.:]\d+)?)\]/g)]; if (!tags.length) continue;
+    const text = line.replace(/\[[^\]]*\]/g, '').trim();
+    for (const t of tags) out.push({ t: +t[1] * 60 + parseFloat(t[2].replace(':', '.')), text });
+  }
+  return out.sort((a, b) => a.t - b.t);
+}
+let lyrResults = [];
+async function lyrSearch() {
+  const q = $('lyrQ').value.trim(); if (!q || !cur) return;
+  $('lyrRes').innerHTML = '<p class="small mute">Cerco…</p>';
+  let list;
+  try { const r = await fetch('https://lrclib.net/api/search?q=' + encodeURIComponent(q)); if (!r.ok) throw new Error('HTTP ' + r.status); list = await r.json(); }
+  catch (e) { $('lyrRes').innerHTML = `<p class="small mute">Ricerca non riuscita: ${esc(netMsg(e))}.</p>`; return; }
+  const sd = cur.srcDur || 0;
+  lyrResults = list.filter(x => !x.instrumental && (x.syncedLyrics || x.plainLyrics))
+    .sort((a, b) => (!!b.syncedLyrics - !!a.syncedLyrics) || (sd ? Math.abs(a.duration - sd) - Math.abs(b.duration - sd) : 0)).slice(0, 6);
+  if (!lyrResults.length) { $('lyrRes').innerHTML = '<p class="small mute">Nessun testo trovato. Prova con titolo e artista, oppure trascrivi la voce.</p>'; return; }
+  $('lyrRes').innerHTML = lyrResults.map((x, i) => `<button data-li="${i}"${x.syncedLyrics ? '' : ' disabled'}><span class="rn"><b>${esc(x.trackName)}</b><span class="small mute">${esc(x.artistName)} · ${fmt(x.duration)}</span></span><span class="small ${x.syncedLyrics ? '' : 'mute'}">${x.syncedLyrics ? 'con i tempi' : 'senza tempi'}</span></button>`).join('');
+}
+function pickLyrics(x) {
+  const off = cur.offset || 0, dur = cur.dur;
+  const lines = parseLrc(x.syncedLyrics).map(l => ({ t: +(l.t - off).toFixed(2), text: l.text })).filter(l => l.t > -1.5 && l.t < dur + 0.5);
+  if (!lines.some(l => l.text)) { toast('Nella parte che hai ritagliato questo testo non ha righe cantate'); return; }
+  setLyrics({ src: 'LRCLIB', title: x.trackName + ' · ' + x.artistName, lines, lang: detectLang(lines.map(l => l.text).join(' ')) });
+}
+async function lyrTranscribe() {
+  if (!cur || lyrBusy) return; lyrBusy = true; $('lyrAsr').disabled = true;
+  try {
+    lyrStatus('Preparo la voce…', null);
+    const st = await getStems(cur.id), [L, R] = st.data.vocals, n = L.length;
+    const buf = new AudioBuffer({ length: n, numberOfChannels: 1, sampleRate: SR }), ch = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) ch[i] = (L[i] + R[i]) / 65536;
+    const oc = new OfflineAudioContext(1, Math.ceil(n * 16000 / SR), 16000), bs = oc.createBufferSource();
+    bs.buffer = buf; bs.connect(oc.destination); bs.start();
+    const audio = (await oc.startRendering()).getChannelData(0).slice();
+    lyrStatus('Preparo Whisper…', null);
+    const r = await lyrCall({ type: 'asr', audio }, [audio.buffer]);
+    const bad = /subt[ií]tul|amara\.org|gracias por ver|suscr[ií]b|thanks for watching|^[\s♪.…-]*$/i;
+    let lines = [];
+    for (const c of r.chunks) {
+      const text = String(c.text || '').trim(), t = c.timestamp && c.timestamp[0], e = c.timestamp && c.timestamp[1];
+      if (t == null || text.length < 2 || bad.test(text)) continue;
+      const k = lines.length; if (k >= 2 && lines[k - 1].text === text && lines[k - 2].text === text) continue; // stuck on a loop
+      lines.push({ t: +t.toFixed(2), e, text });
+    }
+    if (!lines.length) throw new Error('nella voce separata non ho sentito parole');
+    const withGaps = []; // an empty line ends a sung line when a long pause follows
+    lines.forEach((l, i) => { withGaps.push({ t: l.t, text: l.text }); const nx = lines[i + 1]; if (l.e != null && (!nx || nx.t - l.e > 2)) withGaps.push({ t: +l.e.toFixed(2), text: '' }); });
+    lyrBusy = false; $('lyrAsr').disabled = false;
+    setLyrics({ src: 'Whisper', title: 'Trascrizione della voce', lines: withGaps, lang: r.lang || detectLang(r.text || lines.map(l => l.text).join(' ')) });
+  } catch (e) { lyrStatus(); toast('Trascrizione non riuscita: ' + netMsg(e)); }
+  finally { lyrBusy = false; $('lyrAsr').disabled = false; }
+}
+function setLyrics(L) {
+  cur.lyrics = { src: L.src, title: L.title, lang: L.lang, shift: 0, trLang: null, lines: L.lines };
+  persist(); lyrStatus(); renderLyrics();
+  const tgt = ls.get('trLang', 'it');
+  if (tgt && L.lang && L.lang !== tgt) lyrTranslate();
+}
+async function lyrTranslate() {
+  const L = cur && cur.lyrics, tgt = ls.get('trLang', 'it'); if (!L || lyrBusy) return;
+  if (!tgt) return toast('Traduzione spenta nelle Impostazioni');
+  if (!L.lang) return toast('Non riesco a capire la lingua del testo');
+  if (L.lang === tgt) return toast('Il testo è già in ' + LANGS[tgt]);
+  lyrBusy = true; const proj = cur;
+  try {
+    lyrStatus('Preparo il traduttore…', null);
+    const idx = L.lines.map((l, i) => l.text ? i : -1).filter(i => i >= 0);
+    const r = await lyrCall({ type: 'tr', src: L.lang, tgt, lines: idx.map(i => L.lines[i].text) });
+    idx.forEach((i, k) => { L.lines[i].tr = r.out[k]; }); L.trLang = tgt; ls.set('lyrShowTr', true);
+    if (cur === proj) { persist(); renderLyrics(); } else putProject(proj).catch(() => {});
+    lyrStatus();
+  } catch (e) { lyrStatus(); toast('Traduzione non riuscita: ' + netMsg(e)); }
+  finally { lyrBusy = false; }
+}
+function renderLyrics() {
+  if (!cur) return;
+  const L = cur.lyrics, has = !!(L && L.lines && L.lines.length);
+  $('lyrFind').hidden = has; $('lyrTools').hidden = !has; $('lyrHint').hidden = !has;
+  lyrIdx = -2; lyrEls = [];
+  if (!has) { $('lyr').innerHTML = ''; if (!$('lyrQ').value) $('lyrQ').value = cur.name; return; }
+  const tgt = ls.get('trLang', 'it'), showTr = ls.get('lyrShowTr', true) && L.trLang === tgt;
+  $('lyrSrc').textContent = L.src + (L.lang ? ' · ' + LANGS[L.lang] : '') + (L.shift ? ` · spostato ${L.shift > 0 ? '+' : ''}${L.shift.toFixed(1).replace('.', ',')} s` : '');
+  const can = tgt && L.lang && L.lang !== tgt;
+  $('lyrTr').hidden = !can; $('lyrTr').classList.toggle('on', showTr);
+  $('lyrTr').textContent = L.trLang === tgt ? 'Traduzione' : 'Traduci in ' + LANGS[tgt];
+  $('lyr').innerHTML = L.lines.map((l, i) => l.text ? `<p data-i="${i}">${esc(l.text)}${showTr && l.tr ? `<span class="tr">${esc(l.tr)}</span>` : ''}</p>` : '').join('');
+  for (const p of $('lyr').children) lyrEls[+p.dataset.i] = p;
+  if (player) lyricsTick(player.position, true);
+}
+lyricsTick = (t, force) => {
+  const L = cur && cur.lyrics; if (!L || !L.lines || $('mapPaneT').hidden || !mapOpen()) return;
+  const s = L.shift || 0; let i = -1;
+  for (let k = 0; k < L.lines.length; k++) { if (L.lines[k].t + s <= t + 0.05) i = k; else break; }
+  if (i >= 0 && !L.lines[i].text) i = -1;
+  if (i === lyrIdx && !force) return; lyrIdx = i;
+  lyrEls.forEach((p, k) => { if (!p) return; p.classList.toggle('now', k === i); p.classList.toggle('past', i >= 0 ? k < i : (L.lines[k].t + s < t)); });
+  const el = lyrEls[i] || lyrEls.find((p, k) => p && L.lines[k].t + s > t);
+  if (el && performance.now() - lyrUser > 2500) { const pane = $('mapPaneT'), top = el.offsetTop - pane.clientHeight * 0.32; pane.scrollTo({ top, behavior: force ? 'auto' : 'smooth' }); }
+};
+window.openLyrics = renderLyrics;
+async function lyrLineMenu(i) {
+  const L = cur.lyrics, l = L.lines[i]; if (!l || !player) return;
+  const v = await dialog(l.text, null, [['Questa riga inizia adesso', 'all'], ['Sposta solo questa riga qui', 'one'], ['Correggi il testo', 'edit'], ['Elimina la riga', 'del'], ['Chiudi', null, true]]);
+  const now = player.position;
+  if (v === 'all') { L.shift = +(now - l.t).toFixed(2); toast('Testo allineato'); }
+  else if (v === 'one') { l.t = +(now - (L.shift || 0)).toFixed(2); L.lines.sort((a, b) => a.t - b.t); }
+  else if (v === 'edit') {
+    const inp = document.createElement('input'); inp.type = 'text'; inp.value = l.text; inp.maxLength = 160;
+    const ok = await dialog('Correggi la riga', inp, [['Annulla', false], ['Salva', true, true]]);
+    if (!ok || !inp.value.trim()) return; if (inp.value.trim() !== l.text) { l.text = inp.value.trim(); delete l.tr; }
+  } else if (v === 'del') L.lines.splice(i, 1);
+  else return;
+  persist(); renderLyrics();
+}
+async function lyrMoreMenu() {
+  const L = cur && cur.lyrics; if (!L) return;
+  const v = await dialog(L.title || 'Testo', null, [['Anticipa il testo di 0,5 s', -0.5], ['Ritarda il testo di 0,5 s', 0.5], ['Traduci di nuovo', 'tr'], ['Cerca un altro testo', 'new'], ['Chiudi', null, true]]);
+  if (typeof v === 'number') { L.shift = +((L.shift || 0) + v).toFixed(2); persist(); renderLyrics(); }
+  else if (v === 'tr') { L.trLang = null; lyrTranslate(); }
+  else if (v === 'new') { if (await dialog('Cercare un altro testo?', textEl('Il testo attuale e le tue correzioni vengono tolti.'), [['Annulla', false], ['Cerca', true, true]])) { cur.lyrics = null; persist(); $('lyrRes').innerHTML = ''; renderLyrics(); } }
+}
+(function lyricsInput() {
+  $('lyrSearch').addEventListener('click', lyrSearch);
+  $('lyrQ').addEventListener('keydown', e => { if (e.key === 'Enter') lyrSearch(); });
+  $('lyrRes').addEventListener('click', e => { const b = e.target.closest('[data-li]'); if (b && !b.disabled) pickLyrics(lyrResults[+b.dataset.li]); });
+  $('lyrAsr').addEventListener('click', lyrTranscribe);
+  $('lyrTr').addEventListener('click', () => { const L = cur && cur.lyrics; if (!L) return;
+    if (L.trLang !== ls.get('trLang', 'it')) return lyrTranslate();
+    ls.set('lyrShowTr', !ls.get('lyrShowTr', true)); renderLyrics(); });
+  $('lyrMore').addEventListener('click', lyrMoreMenu);
+  const pane = $('mapPaneT'), mark = () => { lyrUser = performance.now(); };
+  pane.addEventListener('touchmove', mark, { passive: true }); pane.addEventListener('wheel', mark, { passive: true });
+  let lp = 0, fired = false;
+  $('lyr').addEventListener('pointerdown', e => { const p = e.target.closest('[data-i]'); if (!p) return; fired = false; clearTimeout(lp);
+    lp = setTimeout(() => { fired = true; vibrate(15); lyrLineMenu(+p.dataset.i); }, 500); });
+  const stop = () => clearTimeout(lp);
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(k => $('lyr').addEventListener(k, stop));
+  $('lyr').addEventListener('pointermove', e => { if (Math.abs(e.movementY) > 2) stop(); });
+  $('lyr').addEventListener('contextmenu', e => e.preventDefault());
+  $('lyr').addEventListener('click', e => { const p = e.target.closest('[data-i]'); if (!p || fired) { fired = false; return; }
+    const L = cur.lyrics, l = L.lines[+p.dataset.i]; lyrUser = 0; seekTo(Math.max(0, l.t + (L.shift || 0)), false); });
+  $('trLang').addEventListener('change', e => { ls.set('trLang', e.target.value); toast(e.target.value ? 'Traduzione in ' + LANGS[e.target.value] : 'Traduzione spenta'); });
+})();
 
 // ---------- start ----------
 if (location.hash) history.replaceState(null, '', location.pathname);
