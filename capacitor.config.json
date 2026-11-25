@@ -1,0 +1,9 @@
+{
+  "appId": "com.emanuelec807.bachatalab",
+  "appName": "Bachata Lab",
+  "webDir": "app",
+  "backgroundColor": "#0f131c",
+  "android": {
+    "backgroundColor": "#0f131c"
+  }
+}
