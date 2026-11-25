@@ -4,7 +4,7 @@ Questo file descrive **tutto quello che fa l'app e come si comporta**. È il rif
 
 Bachata Lab è un'app per studiare la **musicalità in bachata**. Carichi una canzone o un video, l'app la divide nei suoi strumenti **direttamente sul telefono** e ti fa ascoltare, contare e allenare l'orecchio frase per frase.
 
-- Piattaforma: app web per il browser del telefono (Chrome su Android). In futuro: APK Android.
+- Piattaforma: app web per il browser del telefono (Chrome su Android) e **app Android (APK)**, costruita automaticamente da GitHub Actions.
 - Privacy: nessun server. Il brano, le tracce separate e i modelli restano nel browser del telefono.
 - Stile di conteggio: **solo bachata**. Il conteggio va da 1 a 8 e il **tap** cade sempre sul **4** e sull'**8**. Non esistono modalità salsa, On1 od On2.
 
@@ -345,7 +345,22 @@ Il conteggio sparisce: si ascolta e si tocca.
 
 ---
 
-## 11. Limiti noti
+## 11. App Android (APK)
+
+- L'APK contiene la stessa app web, impacchettata con **Capacitor** (Android 7.0 o più recente).
+- I **modelli sono dentro l'app** (APK di circa 120 MB): niente download al primo progetto e nessuna seconda copia nella cache. Le Impostazioni lo indicano ("dentro l'app") e nascondono "Elimina i modelli scaricati".
+- Lo **schermo resta acceso** durante la separazione e con un progetto aperto, tramite il plugin KeepAwake.
+- Il tasto Indietro di Android segue la stessa navigazione dell'app (chiude pannelli e overlay, poi torna alla home).
+- I font si scaricano da Internet la prima volta; senza connessione l'app usa i font di sistema.
+- **Come si costruisce**: a ogni modifica su `main` (cartelle `app/`, `android/` o configurazione) il workflow GitHub Actions "APK Android":
+  1. copia `app/` nel progetto Android;
+  2. compila l'APK;
+  3. lo firma;
+  4. lo pubblica nelle **Release** del repository come `BachataLab-5.0.N.apk` (N = numero della build, usato anche come versionCode).
+  Si può avviare anche a mano da Actions → "APK Android" → "Run workflow".
+- **Firma**: senza segreti configurati usa la chiave `android-signing/sideload.jks` del repository, così ogni nuova versione si installa sopra la precedente senza perdere i progetti. Per il Play Store servono una chiave privata e i segreti `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`: se ci sono, il workflow usa quelli. Cambiare chiave obbliga a disinstallare l'app una volta.
+
+## 12. Limiti noti
 
 - Non ancora provata su un telefono Android vero: tempi e memoria vengono da prove su computer.
 - La separazione richiede lo schermo acceso e la pagina aperta.
@@ -355,6 +370,8 @@ Il conteggio sparisce: si ascolta e si tocca.
 ---
 
 ## Registro modifiche
+
+- **25/11/2026**: app Android (APK) con Capacitor, costruita da GitHub Actions e pubblicata nelle Release. Modelli inclusi nell'APK, schermo sempre acceso con il plugin KeepAwake, icona dell'app.
 
 - **25/11/2026**: nuovo design "Stage Studio Pulse" da Google Stitch.
   - Home con spazio, ricerca, stato del mix sulle schede e barra in basso (Progetti, Lab, Allenati, Impostazioni); nuova finestra Impostazioni.

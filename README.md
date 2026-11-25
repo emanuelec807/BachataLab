@@ -15,6 +15,8 @@ app/        l'app pronta da servire (HTML + JS, nessuna build necessaria)
   separate.js       STFT/ISTFT e pipeline di separazione (Demucs + güira)
   worker.js         Web Worker: scarica i modelli e li esegue con ONNX Runtime Web
   models/           modelli ONNX (fp16) divisi in parti base64
+android/    progetto Android (Capacitor) che impacchetta app/
+assets/     icona e splash dell'app Android
 build/      sorgente e script di build di player.js
 tools/      script Python: esportazione ONNX dei modelli e verifiche
 test/       test in Node e script Playwright
@@ -30,6 +32,18 @@ python3 -m http.server 8000
 ```
 
 Poi apri `http://localhost:8000` (da telefono: l'indirizzo del computer nella stessa rete). Per usarla dal telefono senza computer si può pubblicare la cartella `app/` con GitHub Pages.
+
+## App Android (APK)
+
+Il workflow **APK Android** (`.github/workflows/android.yml`) costruisce l'APK con Capacitor a ogni push su `main` e lo pubblica nelle [Release](../../releases). Dal telefono: apri l'ultima release, scarica `BachataLab-5.0.N.apk` e installalo.
+
+In locale servono Node 22, JDK 21 e l'Android SDK (piattaforma 36):
+
+```bash
+npm ci
+npx cap sync android
+cd android && ./gradlew assembleRelease
+```
 
 ## Modelli
 

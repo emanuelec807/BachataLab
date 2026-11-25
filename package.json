@@ -1,0 +1,18 @@
+{
+  "name": "bachata-lab",
+  "version": "5.0.0",
+  "private": true,
+  "description": "Bachata Lab: app per la musicalità in bachata (web e Android)",
+  "scripts": {
+    "serve": "python3 -m http.server 8000 --directory app",
+    "android:sync": "cap sync android"
+  },
+  "dependencies": {
+    "@capacitor-community/keep-awake": "^8.0.1",
+    "@capacitor/android": "^8.6.2",
+    "@capacitor/core": "^8.6.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.6.2"
+  }
+}

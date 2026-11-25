@@ -13,7 +13,9 @@ let sessions = null, cancelled = false;
 
 const post = (m, t) => self.postMessage(m, t || []);
 
+let noCache = false; // inside the Android app the model files are local: no second copy in the cache
 async function openCache() {
+  if (noCache) return null;
   try { return await caches.open('bachata-models-' + MODEL_VERSION); } catch (e) { return null; }
 }
 
@@ -68,6 +70,7 @@ async function init(needGuira) {
 }
 
 self.onmessage = async (ev) => {
+  if (ev.data && ev.data.noCache) noCache = true;
   const m = ev.data;
   try {
     if (m.type === 'init') await init(m.guira !== false);

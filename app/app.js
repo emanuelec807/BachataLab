@@ -216,8 +216,8 @@ async function openSettings() {
   try { models = (await caches.keys()).filter(k => k.startsWith('bachata-models')); } catch (e) {}
   const row = (a, b) => `<div class="setrow"><span>${a}</span><b>${b}</b></div>`;
   wrap.innerHTML = row('Progetti salvati', homeList.length) + row('Spazio usato', mb(est.usage || 0)) + row('Spazio disponibile', mb(est.quota || 0)) +
-    row('Modelli di separazione', models.length ? 'scaricati' : 'non ancora') + row('Versione', 'Bachata Lab 5');
-  const b1 = document.createElement('button'); b1.className = 'setbtn'; b1.innerHTML = ico('close') + 'Elimina i modelli scaricati (circa 160 MB)'; b1.disabled = !models.length;
+    row('Modelli di separazione', NATIVE ? "dentro l'app" : models.length ? 'scaricati' : 'non ancora') + row('Versione', 'Bachata Lab 5' + (NATIVE ? ' · app Android' : ''));
+  const b1 = document.createElement('button'); b1.className = 'setbtn'; b1.innerHTML = ico('close') + 'Elimina i modelli scaricati (circa 160 MB)'; b1.disabled = !models.length; b1.hidden = NATIVE;
   b1.onclick = async () => { for (const k of models) { try { await caches.delete(k); } catch (e) {} } ls.set('modelsCached', false); b1.disabled = true; toast('Modelli eliminati: si riscaricano al prossimo progetto'); };
   const b2 = document.createElement('button'); b2.className = 'setbtn'; b2.innerHTML = ico('bulb') + 'Mostra di nuovo i suggerimenti';
   b2.onclick = () => { ls.set('padTipSeen', false); toast('Suggerimenti riattivati'); };
@@ -290,7 +290,7 @@ function drawRegion() {
   const dur = region.e - region.s, withG = $('optGuira').checked;
   $('rs').textContent = fmt(region.s); $('re').textContent = fmt(region.e); $('rd').textContent = fmt(dur);
   $('rdS').innerHTML = `${Math.round(dur)} secondi<br>${dur < 30 ? 'una frase' : dur <= 90 ? 'ideale per studiare' : 'sezione lunga'}`;
-  const first = !ls.get('modelsCached', false);
+  const first = !NATIVE && !ls.get('modelsCached', false);
   $('estMin').textContent = '~' + estimateMinutes(dur, withG) + ' min';
   $('est').innerHTML = `<div class="nt">${ico(first ? 'dl' : 'shield')}<span>${first ? '<b style="color:var(--ink)">Primo utilizzo:</b> scarico anche i modelli di separazione (circa 160 MB, una volta sola, meglio con il Wi‑Fi). Poi tutto funziona senza Internet.' : 'Tutto avviene su questo telefono, senza Internet e senza caricare il brano da nessuna parte.'}${ls.get('speedFactor', null) == null ? ' La stima si corregge dopo il primo progetto.' : ''}</span></div>`;
   $('regionWarn').innerHTML = dur > MAX_REGION ? `<div class="alert">${ico('warn')}<span><b>Massimo 3 minuti:</b> accorcia la parte.</span></div>`
@@ -366,12 +366,19 @@ async function regionAt44k(buf, s, e) {
 let worker = null, procRunning = false;
 // Wake lock: one shared request at a time; held while separating or while a project is open.
 let wakeLock = null, wakeReq = null;
+// Inside the Android app (Capacitor) the screen stays on through the KeepAwake plugin.
+const NATIVE = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+// The page runs without the Capacitor JS bundle, so the plugin is called straight through the native bridge.
+const nativeAwake = () => NATIVE && typeof window.Capacitor.nativePromise === 'function' && {
+  keepAwake: () => window.Capacitor.nativePromise('KeepAwake', 'keepAwake', {}), allowSleep: () => window.Capacitor.nativePromise('KeepAwake', 'allowSleep', {}) };
 async function keepAwake() {
+  const ka = nativeAwake(); if (ka) { if (!wakeLock) { try { await ka.keepAwake(); wakeLock = { native: true }; } catch (e) {} } return; }
   if (wakeLock || wakeReq || !('wakeLock' in navigator)) return;
   wakeReq = navigator.wakeLock.request('screen').then(l => { wakeLock = l; l.addEventListener('release', () => { if (wakeLock === l) wakeLock = null; }); }).catch(() => {}).finally(() => { wakeReq = null; });
   await wakeReq;
 }
-async function releaseWake() { if (wakeReq) await wakeReq; const l = wakeLock; wakeLock = null; try { l && l.release(); } catch (e) {} }
+async function releaseWake() { const ka = nativeAwake(); if (ka) { if (wakeLock) { wakeLock = null; try { await ka.allowSleep(); } catch (e) {} } return; }
+  if (wakeReq) await wakeReq; const l = wakeLock; wakeLock = null; try { l && l.release(); } catch (e) {} }
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') { if (procRunning || cur) keepAwake(); }
   else if (player && player.isPlaying) pausePlayer();
@@ -447,7 +454,7 @@ $('createBtn').addEventListener('click', async () => {
     }
   };
   worker.onerror = e => { if (worker) worker.onmessage({ data: { type: 'error', message: e.message || 'errore interno' } }); };
-  worker.postMessage({ type: 'separate', left, right, guira: withG }, [left.buffer, right.buffer]);
+  worker.postMessage({ type: 'separate', left, right, guira: withG, noCache: NATIVE }, [left.buffer, right.buffer]);
 });
 $('cancelBtn').addEventListener('click', async () => {
   if (!procRunning) return;
