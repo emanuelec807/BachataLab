@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+*.wav
+*.mp3
+*.mp4
+*.png
+_test/
+node_modules/
+.DS_Store
