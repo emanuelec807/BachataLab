@@ -254,7 +254,7 @@ public final class Separator {
         return new float[][][]{gu, bo};
     }
 
-    /** Full pipeline; keys: vocals, guitar, bass, bongo, guira, altro (stereo each). */
+    /** Full pipeline; keys: vocals, guitar, bass, bongo, guira, altro (= other + piano), piano (stereo each). */
     public Map<String, float[][]> separate(float[] left, float[] right, boolean withGuira, Progress pr, Cancel cc) throws Exception {
         Map<String, float[][]> dem = demucsAll(left, right, pr, cc);
         pr.on("resample", 0, 0);
@@ -273,7 +273,7 @@ public final class Separator {
         for (int c = 0; c < 2; c++) for (int i = 0; i < n; i++) altro[c][i] = o[c][i] + p[c][i];
         Map<String, float[][]> res = new LinkedHashMap<>();
         res.put("vocals", dem.get("vocals")); res.put("guitar", dem.get("guitar")); res.put("bass", dem.get("bass"));
-        res.put("bongo", bongo); res.put("guira", guiraSt); res.put("altro", altro);
+        res.put("bongo", bongo); res.put("guira", guiraSt); res.put("altro", altro); res.put("piano", p); // kept as a track by the app only if it really plays
         return res;
     }
 }

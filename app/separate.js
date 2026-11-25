@@ -291,7 +291,8 @@
       sp = splitDrums(d, g44);
     }
     const altro = [0, 1].map(c => { const a = new Float32Array(n), o = dem.other[c], p = dem.piano[c]; for (let i = 0; i < n; i++) a[i] = o[i] + p[i]; return a; });
-    return { vocals: dem.vocals, guitar: dem.guitar, bass: dem.bass, bongo: sp.bongo, guira: sp.guira, altro };
+    // piano also comes back on its own: the app keeps it as a track only if it really plays (otherwise it stays in altro)
+    return { vocals: dem.vocals, guitar: dem.guitar, bass: dem.bass, bongo: sp.bongo, guira: sp.guira, altro, piano: dem.piano };
   }
 
   // Rough seconds of work per second of audio, used for the estimate shown before starting.

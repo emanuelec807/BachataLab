@@ -74,6 +74,8 @@ Bachata Lab è un'app per studiare la **musicalità in bachata**. Carichi una ca
    - Limiti: **minimo 8 s, massimo 3 min**. Oltre i 2 minuti compare un avviso; oltre i 3 minuti il tasto si disattiva.
    - File oltre i 350 MB vengono rifiutati con un messaggio. Un file che il telefono non riesce a leggere dà un messaggio chiaro.
 5. **6 tracce separate**: Voce, Chitarra, Basso, Bongo, Güira, Altro. La **güira è sempre separata** dal bongo: non è più un'opzione.
+   - Il modello riconosce anche il **piano**. Se nel brano il piano suona davvero (almeno il 3% del suono del brano e il 35% di "Altro"), diventa una **settima traccia** "Piano"; altrimenti resta dentro "Altro". Nella bachata di solito non c'è (su "Frío" è 0%).
+   - Tutto quello che il modello non riconosce (synth, archi, fiati, fisarmonica, effetti) va in "Altro".
 6. **Tempo stimato**: impara la velocità reale del telefono dopo ogni progetto (separatamente per app e browser). Nel browser, al primo utilizzo, avvisa che scarica anche i modelli (circa 160 MB, una volta sola).
 7. **Separa gli strumenti** avvia la separazione. La freccia indietro torna alla home.
 
@@ -133,7 +135,8 @@ Tutto il player sta in **una sola schermata senza scorrere** (pensato per 390×7
 - Se il ritmo non è stato trovato, al posto del numero c'è il tempo in minuti e secondi, con un avviso.
 
 ### 5.3 Strumenti
-- Una **riga per strumento** (Voce, Chitarra, Basso, Bongo, Güira, Altro). Ogni riga è un riquadro che **si illumina nel colore dello strumento** quando suona (più forte suona, più si accende), con:
+- Una **riga per strumento** (Voce, Chitarra, Basso, Bongo, Güira, eventualmente Piano, Altro), con:
+  - a sinistra una **stanghetta spessa** nel colore dello strumento, che si accende quando lo strumento suona;
   - nome e **volume in %**: un tocco apre il **popup del volume** (cursore 0–200%, 100% = originale, Spegni, Solo, ripristino a 100%);
   - una **linea del volume** nel colore dello strumento: si trascina da 0 a 200%, si aggancia al 100% vicino al centro e sta a 0 quando lo strumento è spento;
   - **M** (spegni) e **S** (solo). Si possono mettere più strumenti in solo.
@@ -283,7 +286,8 @@ Il conteggio sparisce: si ascolta e si tocca.
 - **Separazione degli strumenti**: Demucs **htdemucs_6s** (27,4 milioni di parametri) esportato in ONNX.
   - Lavora a pezzi di 7,8 s, sovrapposti del 25%.
   - I calcoli che trasformano l'audio in spettro e ritorno (STFT/ISTFT) li fa l'app in JavaScript.
-  - Dà: voce, chitarra, basso, batteria, piano, altro. Nell'app "Altro" contiene piano + altro, e "Batteria" diventa il gruppo bongo/percussioni.
+  - Dà: voce, chitarra, basso, batteria, piano, altro. "Batteria" diventa il gruppo bongo/percussioni. Il piano diventa una traccia sua solo se suona davvero (vedi §3), altrimenti va in "Altro".
+- **Velocità misurata su un telefono vero**: Vivo X300 (Dimensity 9500), app Android: circa 1 minuto per 1 minuto di brano.
 - **Güira**: AudioSep ResUNet30 (29,8 milioni di parametri).
   - La descrizione testuale della güira ("guiro scraping metal scraper") è calcolata una volta e salvata dentro il modello.
   - Lavora a 32 kHz a finestre di 5 s.
@@ -321,7 +325,7 @@ Il conteggio sparisce: si ascolta e si tocca.
 
 ## 13. Limiti noti
 
-- Non ancora provata su un telefono Android vero: tempi e memoria vengono da prove su computer.
+- Provata su un solo telefono (Vivo X300, Dimensity 9500). La separazione usa la CPU (4 core), uguale su tutti i telefoni a 64 bit: MediaTek, Snapdragon, Tensor, Kirin, Xiaomi.
 - La separazione richiede lo schermo acceso e la pagina aperta.
 - Un ritaglio può durare al massimo 3 minuti; consigliati 30–90 secondi.
 - I dati stanno nel browser: cancellando i dati del sito si perdono i progetti.
@@ -329,6 +333,8 @@ Il conteggio sparisce: si ascolta e si tocca.
 ---
 
 ## Registro modifiche
+
+- **25/11/2026**: tornate le righe degli strumenti di prima, con la stanghetta colorata più spessa. Piano come settima traccia solo quando suona davvero; con 7 strumenti la mappa mostra i pulsanti su 4 colonne.
 
 - **25/11/2026**: righe degli strumenti più spesse, che si illuminano quando lo strumento suona; zoom − / + nella mappa fino a tutta la canzone.
 

@@ -2,14 +2,19 @@
 /* global StemPlayer, BeatTracker, Separator */
 {
 const $ = id => document.getElementById(id);
-const STEMS = [
+// Piano is a track only in the projects where it really plays; otherwise it stays inside "Altro".
+const ALL_STEMS = [
   { id: 'vocals', n: 'Voce', d: '' },
   { id: 'guitar', n: 'Chitarra', d: 'requinto + ritmica' },
   { id: 'bass', n: 'Basso', d: '' },
   { id: 'bongo', n: 'Bongo', d: '+ cencerro, altre perc.' },
   { id: 'guira', n: 'Güira', d: '' },
-  { id: 'altro', n: 'Altro', d: 'synth, archi, piano' },
+  { id: 'piano', n: 'Piano', d: '' },
+  { id: 'altro', n: 'Altro', d: 'synth, archi, fiati' },
 ];
+const STEMS = [];
+function useStems(piano) { STEMS.length = 0; for (const s of ALL_STEMS) if (s.id !== 'piano' || piano) STEMS.push(s); }
+useStems(false);
 const PRESETS = [
   { n: 'Completo', g: [100, 100, 100, 100, 100, 100] },
   { n: "Trova l'1", g: [0, 0, 100, 0, 150, 0] },
@@ -23,6 +28,7 @@ const PRESETS = [
 // Before the first run on this phone the estimate assumes a phone is about twice as slow.
 const COST = { demucs: 2.4, guira: 2.4 };
 const MARK_NAMES = ['Intro', 'Derecho', 'Majao', 'Mambo', 'Break', 'Finale'];
+const PIANO_MIX = 0.03, PIANO_ALTRO = 0.35; // piano share of the whole song and of Altro to show it as a track
 const SR = 44100, MAX_REGION = 180, MAX_FILE = 350e6, TAP_LAG = 0.15;
 const fmt = t => { t = Math.max(0, t || 0); const m = Math.floor(t / 60), s = Math.floor(t % 60); return m + ':' + String(s).padStart(2, '0'); };
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -149,7 +155,7 @@ function audioCtx() {
 
 // ---------- HOME ----------
 let homeFilter = 'all', homeSort = ls.get('homeSort', 'recent'), homeList = [];
-const SICON = { vocals: 'vocals', guitar: 'guitar', bass: 'bass', bongo: 'bongo', guira: 'guira', altro: 'altro' };
+const SICON = { vocals: 'vocals', guitar: 'guitar', bass: 'bass', bongo: 'bongo', guira: 'guira', altro: 'altro', piano: 'altro' };
 const sico = (id, cls) => `<svg class="i${cls ? ' ' + cls : ''}"><use href="#s-${SICON[id]}"/></svg>`;
 function whenTxt(ts) {
   const d = new Date(ts), now = new Date(), day = 864e5, hm = d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
@@ -186,7 +192,7 @@ async function renderHome() {
     const th = p.kind === 'video' ? `${p.thumb ? `<img src="${esc(p.thumb)}" alt="">` : ''}<span class="vt">VIDEO</span>` : bars.map(h => `<i style="height:${h}px"></i>`).join('');
     return `<div class="proj" data-id="${esc(p.id)}" role="button" tabindex="0">
       <div class="th">${th}</div>
-      <div class="tx"><b>${esc(p.name)}</b><div class="m1">${fmt(p.dur)} · ${p.bpm ? Math.round(p.bpm) + ' BPM' : 'ritmo ?'} · ${p.withGuira === false ? 5 : 6} tracce</div>
+      <div class="tx"><b>${esc(p.name)}</b><div class="m1">${fmt(p.dur)} · ${p.bpm ? Math.round(p.bpm) + ' BPM' : 'ritmo ?'} · ${p.withGuira === false ? 5 : p.piano ? 7 : 6} tracce</div>
         <div class="m2" style="--sc:${sc}"><i></i>${esc(st)}${mk}</div></div>
       <span class="when">${whenTxt(p.updated)}</span><button class="icon" data-menu="${esc(p.id)}" aria-label="Opzioni">${ico('more')}</button></div>`; }).join('');
   if (list.length && !shown.length) $('projects').innerHTML = '<p class="mute" style="padding:14px 8px">Nessun progetto trovato.</p>';
@@ -586,8 +592,21 @@ function guessOne(stems, beats, n) {
   const score = k => mean(k) + 0.1 * bass[k] / bmax;
   return score(p4) >= score(p4 + 4) ? p4 : p4 + 4;
 }
+// Piano becomes a track only when it really plays: a fair share of the song and of "Altro" (which includes it).
+// Otherwise it stays inside Altro, as before. Returns true when kept.
+function splitPiano(stems, n) {
+  if (!stems.piano) return false;
+  const E = x => { let e = 0; for (const c of x) for (let i = 0; i < n; i += 2) e += c[i] * c[i]; return e; };
+  let all = 0; for (const id of ['vocals', 'guitar', 'bass', 'bongo', 'guira', 'altro']) all += E(stems[id]);
+  const pe = E(stems.piano), ae = E(stems.altro);
+  const keep = all > 0 && pe / all > PIANO_MIX && pe / (ae || 1) > PIANO_ALTRO;
+  if (keep) for (let c = 0; c < 2; c++) { const a = stems.altro[c], p = stems.piano[c]; for (let i = 0; i < n; i++) a[i] -= p[i]; }
+  else delete stems.piano;
+  return keep;
+}
 async function saveNew({ name, stems, dur, offset, srcDur, withG, kind, file, thumb }) {
   const n = stems.vocals[0].length, id = 'p' + Date.now().toString(36);
+  const piano = splitPiano(stems, n); useStems(piano);
   let bt = { bpm: 0, beats: new Float64Array(0), confidence: 0 };
   try { bt = BeatTracker.analyze(rhythmMono(stems, n), SR); } catch (e) {}
   const beats = Array.from(bt.beats), oneIdx = guessOne(stems, beats, n);
@@ -595,7 +614,7 @@ async function saveNew({ name, stems, dur, offset, srcDur, withG, kind, file, th
   try {
     await tx('stems', 'readwrite', s => s.put({ id, n, sr: SR, data }));
     if (kind === 'video') await tx('media', 'readwrite', s => s.put({ id, blob: file, type: file.type || 'video/mp4' }));
-    const p = normalize({ id, name, kind, thumb, dur, offset, srcDur, created: Date.now(), updated: Date.now(), withGuira: withG,
+    const p = normalize({ id, name, kind, thumb, dur, offset, srcDur, piano, created: Date.now(), updated: Date.now(), withGuira: withG,
       bpm: bt.bpm, bpmDetected: bt.bpm, beats, beatsDetected: beats.slice(), confidence: bt.confidence, oneIdx, oneDetected: oneIdx,
       env: envelopes(stems, n), envRate: 20, mirror: kind === 'video', oneAlgo: 2 });
     try { await navigator.storage.persist(); } catch (e) {}
@@ -641,6 +660,7 @@ async function openPlayer(id) {
   if (my !== opening) return;
   if (!p || !st) { busy(); toast('Progetto non leggibile'); return go('home'); }
   try {
+    useStems(!!st.data.piano);
     cur = normalize(p);
     const stems = {}; for (const s of STEMS) stems[s.id] = [toF32(st.data[s.id][0]), toF32(st.data[s.id][1])];
     st = null;
@@ -1209,6 +1229,7 @@ $('mapTabS').addEventListener('click', () => mapTab('S')); $('mapTabT').addEvent
 function renderMapHeads(full) {
   if (!mapOpen() || !player) return;
   const t = player.position;
+  if (full) $('mapHeads').classList.toggle('n7', STEMS.length > 6);
   if (full) $('mapHeads').innerHTML = STEMS.map(s => `<button class="mhd" data-id="${s.id}" style="--c:var(--c-${s.id})"><b>${s.n}</b><span></span></button>`).join('');
   for (const b of $('mapHeads').children) {
     const id = b.dataset.id, off = mapMute[id], lv = levelAt(id, t), lit = !off && lv > 0.15;
