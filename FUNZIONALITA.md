@@ -53,6 +53,7 @@ Bachata Lab è un'app per studiare la **musicalità in bachata**. Carichi una ca
 - **Tema**: Scuro (predefinito), Chiaro o Come il telefono.
 - **Colore** principale da una lista: Corallo (predefinito), Lime, Azzurro, Viola, Menta, Rosa. Nel tema chiaro si usa una tonalità più scura dello stesso colore, così si legge bene.
 - **Ritardo dell'audio**: mostra il ritardo misurato e il tasto **Calibra** (vedi §9).
+- **Traduci il testo in**: Italiano (predefinito), English, Español, Français, Deutsch, Português, oppure Non tradurre.
 - **Memoria**: progetti e spazio usato, dove stanno i modelli ("dentro l'app" nell'APK), versione. Nel browser c'è anche "Elimina modelli" (circa 160 MB, si riscaricano al prossimo progetto).
 
 ---
@@ -134,7 +135,7 @@ Tutto il player sta in **una sola schermata senza scorrere** (pensato per 390×7
 ### 5.3 Strumenti
 - Una **riga per strumento** (Voce, Chitarra, Basso, Bongo, Güira, Altro), ognuna con:
   - nome e **volume in %**: un tocco apre il **popup del volume** (cursore 0–200%, 100% = originale, Spegni, Solo, ripristino a 100%);
-  - la **forma d'onda** del brano nel colore dello strumento, più accesa fino a dove sei arrivato;
+  - una **linea del volume** nel colore dello strumento: si trascina da 0 a 200%, si aggancia al 100% vicino al centro e sta a 0 quando lo strumento è spento;
   - **M** (spegni) e **S** (solo). Si possono mettere più strumenti in solo.
 - Uno strumento spento o escluso dal solo ha la riga sbiadita.
 - **Accendi tutti**: toglie muti e solo e riporta a 100% gli strumenti a volume 0.
@@ -183,7 +184,30 @@ Si apre a tutto schermo da "Mappa"; la freccia in giù o Indietro la chiude. In 
   - −8 / −4 / +4 / +8 funzionano come nel player (spostano anche il loop).
 - **Toccare un pulsante strumento lo spegne solo dentro la mappa.** Uscendo dalla mappa tutti gli strumenti tornano come erano nel player.
   - Uno strumento che nel player era spento o a volume 0 parte spento nella mappa; toccandolo si accende a 100%, sempre solo nella mappa.
-- **Testo**: per ora un segnaposto "Testo in arrivo" (vedi §12).
+- **Testo**: il testo sincronizzato, con la traduzione (§5.10).
+
+### 5.10 Testo sincronizzato e traduzione
+- **Trovare il testo** (la prima volta, nella linguetta Testo della mappa):
+  - **Cerca** su LRCLIB con titolo e artista (il campo parte dal nome del progetto). I risultati mostrano titolo, artista, durata e se hanno i tempi; si scelgono solo quelli "con i tempi", e quelli con una durata vicina al file caricato vengono prima.
+  - I tempi del testo sono quelli del brano intero: l'app toglie l'inizio del ritaglio, così le righe cadono nel punto giusto della parte studiata.
+  - **Trascrivi la voce**: se il brano non c'è, Whisper "base" ascolta la traccia della voce separata, sul telefono. Riconosce da solo la lingua (sui 30 s con più voce) e trascrive con i tempi. Toglie le frasi inventate tipiche ("Subtítulos…", righe ripetute). Circa 80 MB da scaricare la prima volta; poi circa 15 s per 30 s di brano su computer, di più sul telefono.
+  - Serve Internet per cercare e per scaricare i modelli la prima volta. Nella versione web dentro Claude la rete esterna è bloccata: il testo funziona nell'app Android (o in un browser normale).
+- **Lettura**:
+  - la riga cantata è grande e bianca, quelle passate sbiadite; la pagina scorre da sola (si ferma per 2,5 s se scorri col dito);
+  - tocco su una riga: il brano va lì;
+  - in alto: la fonte (LRCLIB o Whisper), la lingua e lo spostamento applicato.
+- **Correggere**, tenendo premuta una riga:
+  - **Questa riga inizia adesso**: sposta tutto il testo, per allinearlo a un'altra versione del brano;
+  - **Sposta solo questa riga qui**;
+  - **Correggi il testo**, **Elimina la riga**.
+  - Dal tasto ⋯: anticipa o ritarda tutto di 0,5 s, traduci di nuovo, cerca un altro testo.
+- **Traduzione**:
+  - l'app riconosce la lingua del testo e lo traduce sul telefono con Opus-MT (circa 110 MB da scaricare la prima volta), in **italiano** di default;
+  - parte da sola appena il testo è pronto; la traduzione compare piccola sotto ogni riga;
+  - il tasto **Traduzione** la mostra o la nasconde;
+  - se nelle Impostazioni scegli un'altra lingua, il tasto diventa "Traduci in …";
+  - se non esiste un modello diretto per la coppia di lingue, traduce passando dall'inglese.
+- Testo, correzioni e traduzione si salvano nel progetto e restano anche senza Internet.
 
 ### 5.9 Comportamenti automatici
 - La musica si **ferma** se l'app va in secondo piano o se il telefono interrompe l'audio.
@@ -289,17 +313,10 @@ Il conteggio sparisce: si ascolta e si tocca.
   Si può avviare anche a mano da Actions → "APK Android" → "Run workflow".
 - **Firma**: senza segreti configurati usa la chiave `android-signing/sideload.jks` del repository, così ogni nuova versione si installa sopra la precedente senza perdere i progetti. Per il Play Store servono una chiave privata e i segreti `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`: se ci sono, il workflow usa quelli. Cambiare chiave obbliga a disinstallare l'app una volta.
 
-## 12. In lavorazione
+## 12. Note aperte
 
-- **Testo sincronizzato** (linguetta Testo della mappa): la riga cantata che si accende, con il conteggio sempre visibile in alto.
-  - Prima si cerca il testo su LRCLIB (serve Internet).
-  - Se il brano non c'è, si trascrive la voce separata con Whisper "base" sul telefono.
-  - Una riga sbagliata si potrà correggere a mano.
-- **Traduzione del testo**:
-  - l'app riconosce la lingua e traduce sul telefono (Opus-MT, scaricato la prima volta);
-  - in **italiano** di default, cambiabile nelle Impostazioni;
-  - la traduzione compare piccola sotto ogni riga e si può nascondere.
 - **Ritardo nel conteggio degli esercizi**: l'utente l'ha notato con l'altoparlante del telefono. Sui telefoni Android anche l'altoparlante può avere 100–250 ms di ritardo che il browser non dichiara: va calibrato con l'altoparlante. Se invece è l'1 a essere nel posto sbagliato, si corregge con "L'1 è qui".
+- Testo e traduzione non sono ancora stati provati su un telefono vero (velocità di Whisper e memoria).
 
 ## 13. Limiti noti
 
@@ -311,6 +328,8 @@ Il conteggio sparisce: si ascolta e si tocca.
 ---
 
 ## Registro modifiche
+
+- **25/11/2026**: testo sincronizzato nella mappa (LRCLIB, oppure Whisper sulla voce separata con riconoscimento della lingua), correzione delle righe, traduzione sul telefono con Opus-MT (italiano di default, lingua nelle Impostazioni). Nel player le forme d'onda degli strumenti sono sostituite da una linea per il volume.
 
 - **25/11/2026**: nuovo design ispirato a Moises, disegnato con Claude.
   - Tema scuro, chiaro o come il telefono; colore principale a scelta (Corallo predefinito).
