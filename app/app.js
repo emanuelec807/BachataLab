@@ -29,7 +29,7 @@ const PRESETS = [
 const COST = { demucs: 2.4, guira: 2.4 };
 const MARK_NAMES = ['Intro', 'Derecho', 'Majao', 'Mambo', 'Break', 'Finale'];
 const PIANO_MIX = 0.03, PIANO_ALTRO = 0.35; // piano share of the whole song and of Altro to show it as a track
-const SR = 44100, MAX_REGION = 180, MAX_FILE = 350e6, TAP_LAG = 0.15;
+const SR = 44100, MAX_FILE = 350e6, TAP_LAG = 0.15;
 const fmt = t => { t = Math.max(0, t || 0); const m = Math.floor(t / 60), s = Math.floor(t % 60); return m + ':' + String(s).padStart(2, '0'); };
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const probe = document.createElement('i'); probe.style.display = 'none'; document.body.append(probe);
@@ -331,9 +331,9 @@ function drawRegion() {
   $('rdS').textContent = dur < 30 ? 'Una frase · meglio 30–90 s' : dur <= 90 ? 'Durata ideale per studiare' : 'Parte lunga · meglio 30–90 s';
   const first = !NATIVE && !ls.get('modelsCached', false);
   $('est').textContent = `Circa ${estimateMinutes(dur, withG)} min · tutto sul telefono` + (first ? ' · la prima volta scarica anche i modelli (160 MB)' : '');
-  $('regionWarn').innerHTML = dur > MAX_REGION ? '<div class="alert"><b>Massimo 3 minuti:</b> accorcia la parte.</div>'
+  $('regionWarn').innerHTML = dur > 180 ? '<div class="alert"><b>Parte lunga:</b> serve molta memoria. Sui telefoni con meno di 8 GB potrebbe non riuscire.</div>'
     : dur > 120 ? '<div class="alert">Le parti oltre i 2 minuti richiedono più memoria e più tempo sul telefono.</div>' : '';
-  $('createBtn').disabled = dur < 8 || dur > MAX_REGION;
+  $('createBtn').disabled = dur < 8;
 }
 
 (function regionDrag() {
@@ -373,6 +373,7 @@ async function startPreview() {
 const previewPos = () => preview ? preview.from + (audioCtx().currentTime - preview.t0) : region.s;
 $('preview').addEventListener('click', () => (preview ? stopPreview() : startPreview()));
 $('startHere').addEventListener('click', () => { const t = previewPos(); region.s = Math.max(0, Math.min(t, region.e - 8)); drawRegion(); toast('Inizio a ' + fmt(region.s)); startPreview(); });
+$('allSong').addEventListener('click', () => { if (!src) return; stopPreview(); region = { s: 0, e: src.buf.duration }; drawRegion(); });
 $('endHere').addEventListener('click', () => { const t = previewPos(); region.e = Math.min(src.buf.duration, Math.max(t, region.s + 8)); drawRegion(); toast('Fine a ' + fmt(region.e)); stopPreview(); });
 window.addEventListener('resize', () => { if ($('s-new').classList.contains('on')) drawRegion(); if (cur) drawTimelineStatic(); });
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { for (const k in colorCache) delete colorCache[k]; drawTimelineStatic(); });

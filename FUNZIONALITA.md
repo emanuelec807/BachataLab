@@ -71,7 +71,8 @@ Bachata Lab è un'app per studiare la **musicalità in bachata**. Carichi una ca
    - **Forma d'onda** con le maniglie di inizio e fine: si trascinano, e si muove la maniglia più vicina al dito.
    - **−1 s / +1 s** per l'inizio e per la fine.
    - **Ascolta la parte** suona solo la parte scelta. Mentre suona: **Inizio qui** sposta l'inizio dove sei, **Fine qui** sposta la fine e ferma.
-   - Limiti: **minimo 8 s, massimo 3 min**. Oltre i 2 minuti compare un avviso; oltre i 3 minuti il tasto si disattiva.
+   - **Tutto il brano** seleziona la canzone intera.
+   - Limiti: **minimo 8 s, nessun massimo**. Oltre i 2 minuti compare un avviso (più memoria e più tempo); oltre i 3 minuti avvisa che sui telefoni con meno di 8 GB potrebbe non riuscire. Se la separazione nativa finisce la memoria, l'app passa a quella nel browser (molto più lenta).
    - File oltre i 350 MB vengono rifiutati con un messaggio. Un file che il telefono non riesce a leggere dà un messaggio chiaro.
 5. **6 tracce separate**: Voce, Chitarra, Basso, Bongo, Güira, Altro. La **güira è sempre separata** dal bongo: non è più un'opzione.
    - Il modello riconosce anche il **piano**. Se nel brano il piano suona davvero (almeno il 3% del suono del brano e il 35% di "Altro"), diventa una **settima traccia** "Piano"; altrimenti resta dentro "Altro". Nella bachata di solito non c'è (su "Frío" è 0%).
@@ -327,12 +328,14 @@ Il conteggio sparisce: si ascolta e si tocca.
 
 - Provata su un solo telefono (Vivo X300, Dimensity 9500). La separazione usa la CPU (4 core), uguale su tutti i telefoni a 64 bit: MediaTek, Snapdragon, Tensor, Kirin, Xiaomi.
 - La separazione richiede lo schermo acceso e la pagina aperta.
-- Un ritaglio può durare al massimo 3 minuti; consigliati 30–90 secondi.
+- Nessun limite di durata, ma la memoria cresce con la lunghezza: circa 250 MB nell'app per ogni minuto di brano. Consigliati 30–90 secondi.
 - I dati stanno nel browser: cancellando i dati del sito si perdono i progetti.
 
 ---
 
 ## Registro modifiche
+
+- **25/11/2026**: tolto il limite dei 3 minuti; tasto "Tutto il brano".
 
 - **25/11/2026**: tornate le righe degli strumenti di prima, con la stanghetta colorata più spessa. Piano come settima traccia solo quando suona davvero; con 7 strumenti la mappa mostra i pulsanti su 4 colonne.
 
