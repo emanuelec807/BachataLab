@@ -633,10 +633,10 @@ select{font:600 14px var(--body);min-height:40px;border:0;border-radius:10px;bac
   <div class="mtext" id="mapPaneT" hidden>
     <div class="lyrFind" id="lyrFind">
       <b class="lt">Testo sincronizzato</b>
-      <p class="small mute">Cerco il testo online con i tempi di ogni riga. Se il brano non c'è, trascrivo la voce separata sul telefono.</p>
-      <div class="lq"><input type="text" id="lyrQ" placeholder="Titolo e artista" aria-label="Titolo e artista" maxlength="80"><button class="primary" id="lyrSearch">Cerca</button></div>
+      <p class="small mute">Cerca la canzone con titolo e artista: il testo arriva da LRCLIB, con i tempi di ogni riga. Se non c'è, puoi generarlo dalla voce separata con Whisper.</p>
+      <div class="lq"><input type="text" id="lyrQ" placeholder="Titolo e artista, es. Frío Jensen" aria-label="Titolo e artista" maxlength="80"><button class="primary" id="lyrSearch">Cerca</button></div>
       <div id="lyrRes"></div>
-      <button id="lyrAsr" class="lasr"><span><b>Trascrivi la voce</b><span class="small mute" id="lyrAsrSub">Whisper sul telefono</span></span></button>
+      <button id="lyrAsr" class="lasr"><span><b>Genera con Whisper</b><span class="small mute" id="lyrAsrSub">Trascrive la voce separata, sul telefono · circa un minuto</span></span></button>
     </div>
     <div class="lyrTools" id="lyrTools" hidden>
       <span class="small mute grow" id="lyrSrc"></span>
@@ -701,6 +701,6 @@ select{font:600 14px var(--body);min-height:40px;border:0;border-radius:10px;bac
 <script src="player.js"></script>
 <script src="beats.js"></script>
 <script src="separate.js"></script>
-<script src="app.js?v=69"></script>
+<script src="app.js?v=71"></script>
 </body>
 </html>

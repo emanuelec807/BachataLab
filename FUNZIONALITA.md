@@ -197,13 +197,13 @@ Si apre a tutto schermo da "Mappa"; la freccia in giù o Indietro la chiude. In 
 - **Testo**: il testo sincronizzato, con la traduzione (§5.10).
 
 ### 5.10 Testo sincronizzato e traduzione
-- **Trovare il testo** (la prima volta, nella linguetta Testo della mappa):
-  - **Cerca** su LRCLIB con titolo e artista (il campo parte dal nome del progetto). I risultati mostrano titolo, artista, durata e se hanno i tempi; si scelgono solo quelli "con i tempi", e quelli con una durata vicina al file caricato vengono prima.
-  - I tempi del testo sono quelli del brano intero: l'app toglie l'inizio del ritaglio, così le righe cadono nel punto giusto della parte studiata.
-  - **Trascrizione automatica**: nell'app Android, appena finita la separazione, Whisper "base" trascrive da solo la traccia della voce, in sottofondo. Si può usare il player intanto; quando ha finito compare "Testo trascritto" e il testo è nella linguetta Testo. Riconosce la lingua da solo (sui 30 s con più voce) e trascrive con i tempi; toglie le frasi inventate tipiche ("Subtítulos…", righe ripetute).
-  - **Whisper è dentro l'app** (circa 80 MB, più 26 MB del motore): niente download e funziona anche senza Internet. Gira sul processore (non sulla GPU, dove su alcuni telefoni dava errore).
-  - **Trascrivi la voce** rifà la trascrizione a mano. Se il progetto ha già un testo, la trascrizione automatica non lo sostituisce.
-  - **Cerca** (LRCLIB) serve Internet. Nel browser, fuori dall'app, Whisper si scarica la prima volta; nella versione web dentro Claude la rete esterna è bloccata.
+- **Da dove arriva il testo**: da **LRCLIB** (lrclib.net), un archivio libero e gratuito di testi con il tempo di ogni riga, scritto dagli utenti. Non ci sono altri archivi: quelli commerciali (Musixmatch e simili) chiedono una chiave a pagamento e non permettono questo uso.
+- **Trovare il testo** (linguetta Testo della mappa):
+  - **Cerca** con titolo e artista. Il campo parte dal nome del progetto ripulito ("JENSEN FRIO (Official Video)" → "JENSEN FRIO"). I risultati mostrano titolo, artista, durata e se hanno i tempi; si scelgono solo quelli "con i tempi", e quelli con una durata vicina al file caricato vengono prima.
+  - **Come va a tempo**: i tempi di LRCLIB sono quelli della canzone pubblicata. L'app toglie l'inizio del ritaglio, poi **allinea il testo alla voce separata**: prova a far scorrere tutte le righe fino a ±40 s e tiene lo spostamento per cui l'inizio delle righe cade dove la voce attacca. Lo applica solo se è nettamente migliore di ogni altro (sui test ritrova spostamenti di 3–14 s al decimo di secondo; su un segnale a caso non trova niente e non sposta). Serve per i video con un'intro o le versioni diverse. Compare "Testo allineato alla voce (+x s)".
+  - **Genera con Whisper**: se la canzone non c'è su LRCLIB, Whisper "base" (dentro l'app, nessun download) trascrive la voce separata. Riconosce la lingua da solo, toglie le frasi inventate tipiche e spezza le righe troppo lunghe (alla punteggiatura, altrimenti a circa 40 caratteri) dividendo il tempo in proporzione. Non parte più da solo dopo l'import: lo avvii tu.
+  - Se scegli un testo da LRCLIB mentre Whisper sta lavorando, Whisper si ferma e la sua scritta sparisce (prima restava "Riconosco la lingua…").
+  - Cercare su LRCLIB serve Internet. Nella versione web dentro Claude la rete esterna è bloccata.
 - **Lettura**:
   - la riga cantata è grande e bianca, quelle passate sbiadite; la pagina scorre da sola (si ferma per 2,5 s se scorri col dito);
   - tocco su una riga: il brano va lì;
@@ -212,7 +212,7 @@ Si apre a tutto schermo da "Mappa"; la freccia in giù o Indietro la chiude. In 
   - **Questa riga inizia adesso**: sposta tutto il testo, per allinearlo a un'altra versione del brano;
   - **Sposta solo questa riga qui**;
   - **Correggi il testo**, **Elimina la riga**.
-  - Dal tasto ⋯: anticipa o ritarda tutto di 0,5 s, traduci di nuovo, cerca un altro testo.
+  - Dal tasto ⋯: **Allinea alla voce**, anticipa o ritarda tutto di 0,5 s, traduci di nuovo, cerca un altro testo, **Genera con Whisper** (sostituisce il testo attuale).
 - **Traduzione**:
   - l'app riconosce la lingua del testo e lo traduce sul telefono con Opus-MT (circa 110 MB da scaricare la prima volta, serve Internet), in **italiano** di default;
   - **non parte da sola**: si avvia con il tasto "Traduci in italiano"; la traduzione compare piccola sotto ogni riga;
@@ -341,6 +341,8 @@ Il conteggio sparisce: si ascolta e si tocca.
 ---
 
 ## Registro modifiche
+
+- **26/11/2026**: testi: prima si cerca su LRCLIB, Whisper solo a richiesta; allineamento automatico del testo alla voce; righe lunghe di Whisper spezzate; Whisper si ferma se scegli un testo (la scritta non resta più).
 
 - **25/11/2026**: "Altro" dice anche se dentro c'è altro oltre allo strumento principale ("Requinto + altro") e mostra il dettaglio nel popup del volume.
 

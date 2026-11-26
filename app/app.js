@@ -493,7 +493,7 @@ $('createBtn').addEventListener('click', async () => {
       clearInterval(procClock); setSteps(steps, steps.length - 1); $('procStage').textContent = 'Trovo il ritmo e salvo…'; $('procWhat').textContent = 'Ritmo'; $('procLeft').textContent = 'quasi fatto'; setProgress(1, 0.5);
       const args = { name, stems: m.stems, dur, offset, srcDur, withG, kind, file, thumb };
       for (;;) {
-        try { const id = await saveNew(args); procRunning = false; history.replaceState(null, '', '#player'); await openPlayer(id); autoLyrics(id); return; }
+        try { const id = await saveNew(args); procRunning = false; history.replaceState(null, '', '#player'); await openPlayer(id); return; }
         catch (e) {
           const quota = e && (e.name === 'QuotaExceededError' || /quota/i.test(e.message || ''));
           const again = await dialog(quota ? 'Spazio insufficiente' : 'Salvataggio non riuscito', textEl(quota ? 'Il telefono non ha spazio per salvare questo progetto. Libera spazio (o elimina un progetto) e riprova.' : 'Non riesco a salvare il progetto: ' + (e && e.message || e)), [['Rinuncia', false], ['Riprova', true, true]]);
@@ -1602,7 +1602,6 @@ async function hasLocalAsr() {
   if (asrLocal == null) { try { asrLocal = (await fetch('asr/whisper-base/config.json')).ok; } catch (e) { asrLocal = false; } }
   return asrLocal;
 }
-async function autoLyrics(pid) { if (await hasLocalAsr()) lyrTranscribe(pid, true); }
 function lyrWorker() {
   if (lyrW) return lyrW;
   lyrW = new Worker('lyricsworker.js?v=4', { type: 'module' });
@@ -1617,6 +1616,12 @@ function lyrWorker() {
 function lyrCall(msg, transfer) { const id = ++lyrJob; return new Promise((res, rej) => { lyrCb[id] = { res, rej }; lyrWorker().postMessage(Object.assign({ id }, msg), transfer || []); }); }
 const netMsg = e => /fetch|network|load|import|Failed/i.test(e && e.message || '') ? 'serve Internet la prima volta' + (NATIVE ? '' : ' (nella versione web dentro Claude è bloccato: usa l\'app Android)') : (e && e.message || String(e));
 
+// "JENSEN FRIO (Official Video)" -> "JENSEN FRIO": video and file names carry words that spoil the search
+function cleanTitle(n) {
+  return String(n || '').replace(/[([{][^)\]}]*[)\]}]/g, ' ')
+    .replace(/\b(official|oficial|video|v[ií]deo|lyrics?|letra|audio|hd|4k|remaster(ed)?|en vivo|live)\b/gi, ' ')
+    .replace(/[_|]+/g, ' ').replace(/\s+-\s*$/, '').replace(/\s+/g, ' ').trim();
+}
 function parseLrc(s) {
   const out = [];
   for (const line of String(s || '').split(/\r?\n/)) {
@@ -1639,14 +1644,53 @@ async function lyrSearch() {
   if (!lyrResults.length) { $('lyrRes').innerHTML = '<p class="small mute">Nessun testo trovato. Prova con titolo e artista, oppure trascrivi la voce.</p>'; return; }
   $('lyrRes').innerHTML = lyrResults.map((x, i) => `<button data-li="${i}"${x.syncedLyrics ? '' : ' disabled'}><span class="rn"><b>${esc(x.trackName)}</b><span class="small mute">${esc(x.artistName)} · ${fmt(x.duration)}</span></span><span class="small ${x.syncedLyrics ? '' : 'mute'}">${x.syncedLyrics ? 'con i tempi' : 'senza tempi'}</span></button>`).join('');
 }
+// Stops a running Whisper or translation job: its result would overwrite the text just chosen.
+let lyrCancelled = false;
+function lyrCancel() {
+  if (!lyrBusy) return;
+  lyrCancelled = true;
+  if (lyrW) { lyrW.terminate(); lyrW = null; }
+  for (const k in lyrCb) lyrCb[k].rej(new Error('annullato')); lyrCb = {};
+  lyrBusy = false; lyrFor = null; lyrStatus();
+}
+// LRCLIB times belong to the published recording: a video with an intro or another edit starts them in
+// the wrong place. This finds the shift that puts the line starts on the voice onsets of the separated
+// vocals (it slides the lyrics up to ±40 s and keeps the shift that matches clearly better than any other).
+function alignShift(env, rate, times, dur, range = 40) {
+  const n = env.length, E = new Float64Array(n + 1); for (let i = 0; i < n; i++) E[i + 1] = E[i] + env[i];
+  const avg = (a, b) => { a = Math.max(0, Math.round(a * rate)); b = Math.min(n, Math.round(b * rate)); return b > a ? (E[b] - E[a]) / (b - a) : 0; };
+  const res = [];
+  for (let s = -range; s <= range + 1e-9; s += 0.05) {
+    let sc = 0, k = 0;
+    for (let i = 0; i < times.length; i++) { const u = times[i] + s; if (u < 0.5 || u > dur - 1) continue;
+      const nx = i + 1 < times.length ? Math.min(times[i + 1] + s, u + 4) : u + 3;
+      sc += (avg(u, u + 0.8) - avg(u - 0.7, u - 0.05)) + 0.5 * avg(u, nx); k++; }
+    res.push([s, k >= 4 ? sc / k : -1, k]);
+  }
+  const best = res.reduce((a, b) => b[1] > a[1] ? b : a);
+  // confidence: how much the best beats the best rival at least 1.5 s away
+  const rival = res.filter(r => Math.abs(r[0] - best[0]) >= 1.5).reduce((a, b) => b[1] > a[1] ? b : a, [0, -1]);
+  return { shift: +best[0].toFixed(2), margin: best[1] - rival[1], rival: +rival[0].toFixed(2), lines: best[2] };
+}
+function autoAlign(L, quiet) {
+  const env = cur.env && cur.env.vocals; if (!env || !env.length) return false;
+  const times = L.lines.filter(l => l.text).map(l => l.t), r = alignShift(env, cur.envRate || 10, times, cur.dur);
+  if (r.lines < 4 || r.margin < 0.04) { if (!quiet) toast('Non riesco ad allinearlo da solo: usa «Questa riga inizia adesso»'); return false; }
+  const sh = Math.abs(r.shift) > 0.5 ? r.shift : 0;
+  if (sh !== (L.shift || 0)) { L.shift = sh; toast(sh ? `Testo allineato alla voce (${sh > 0 ? '+' : ''}${sh.toFixed(1).replace('.', ',')} s)` : 'Testo allineato alla voce'); }
+  else if (!quiet) toast('Il testo era già allineato');
+  return true;
+}
 function pickLyrics(x) {
+  lyrCancel();
   const off = cur.offset || 0, dur = cur.dur;
   const lines = parseLrc(x.syncedLyrics).map(l => ({ t: +(l.t - off).toFixed(2), text: l.text })).filter(l => l.t > -1.5 && l.t < dur + 0.5);
   if (!lines.some(l => l.text)) { toast('Nella parte che hai ritagliato questo testo non ha righe cantate'); return; }
   setLyrics({ src: 'LRCLIB', title: x.trackName + ' · ' + x.artistName, lines, lang: detectLang(lines.map(l => l.text).join(' ')) });
+  if (autoAlign(cur.lyrics, true)) { persist(); renderLyrics(); }
 }
 async function lyrTranscribe(pid, auto) {
-  pid = pid || (cur && cur.id); if (!pid || lyrBusy) return; lyrBusy = true; lyrFor = pid;
+  pid = pid || (cur && cur.id); if (!pid || lyrBusy) return; lyrBusy = true; lyrFor = pid; lyrCancelled = false;
   try {
     lyrStatus('Preparo la voce…', null);
     const st = await getStems(pid), [L, R] = st.data.vocals, n = L.length;
@@ -1665,15 +1709,29 @@ async function lyrTranscribe(pid, auto) {
       const k = lines.length; if (k >= 2 && lines[k - 1].text === text && lines[k - 2].text === text) continue; // stuck on a loop
       lines.push({ t: +t.toFixed(2), e, text });
     }
+    // Whisper often returns several sung lines in one piece: split at the punctuation and share the
+    // time by the length of each part, so the lit line follows the singer
+    lines = lines.flatMap((l, i) => {
+      if (l.text.length <= 55) return [l];
+      let parts = l.text.split(/(?<=[,.;:!?¡¿])\s+/).map(x => x.trim()).filter(Boolean);
+      if (parts.length < 2) { // no punctuation: cut at the spaces into pieces of about 40 characters
+        const w = l.text.split(/\s+/), k = Math.ceil(l.text.length / 40), per = Math.ceil(w.length / k); parts = [];
+        for (let i = 0; i < w.length; i += per) parts.push(w.slice(i, i + per).join(' '));
+      }
+      if (parts.length < 2) return [l];
+      const end = l.e != null ? l.e : (lines[i + 1] ? lines[i + 1].t : l.t + parts.length * 2.5), total = parts.reduce((a, x) => a + x.length, 0);
+      let acc = 0;
+      return parts.map((x, k) => { const t0 = l.t + (end - l.t) * acc / total; acc += x.length; return { t: +t0.toFixed(2), e: k === parts.length - 1 ? l.e : null, text: x }; });
+    });
     if (!lines.length) throw new Error('nella voce separata non ho sentito parole');
     const withGaps = []; // an empty line ends a sung line when a long pause follows
     lines.forEach((l, i) => { withGaps.push({ t: l.t, text: l.text }); const nx = lines[i + 1]; if (l.e != null && (!nx || nx.t - l.e > 2)) withGaps.push({ t: +l.e.toFixed(2), text: '' }); });
     lyrBusy = false; lyrStatus();
     const lang = r.lang || detectLang(r.text || lines.map(l => l.text).join(' '));
-    await updateProject(pid, p => { if (!auto || !p.lyrics) p.lyrics = { src: 'Whisper', title: 'Trascrizione della voce', lang, shift: 0, trLang: null, lines: withGaps }; });
-    if (auto) toast('Testo trascritto: lo trovi in Mappa → Testo');
-  } catch (e) { lyrStatus(); if (!auto || cur && cur.id === pid) toast('Trascrizione non riuscita: ' + netMsg(e)); console.warn('asr', e); }
-  finally { lyrBusy = false; lyrFor = null; paintLyrStatus(); }
+    if (lyrCancelled) return;
+    await updateProject(pid, p => { p.lyrics = { src: 'Whisper', title: 'Trascrizione della voce', lang, shift: 0, trLang: null, lines: withGaps }; });
+  } catch (e) { if (lyrCancelled) return; lyrStatus(); toast('Trascrizione non riuscita: ' + netMsg(e)); console.warn('asr', e); }
+  finally { if (!lyrCancelled) { lyrBusy = false; lyrFor = null; } paintLyrStatus(); }
 }
 // The translation is never automatic: the "Traduci" button starts it.
 function setLyrics(L) {
@@ -1685,14 +1743,14 @@ async function lyrTranslate() {
   if (!tgt) return toast('Traduzione spenta nelle Impostazioni');
   if (!L.lang) return toast('Non riesco a capire la lingua del testo');
   if (L.lang === tgt) return toast('Il testo è già in ' + LANGS[tgt]);
-  lyrBusy = true; const pid = cur.id; lyrFor = pid;
+  lyrBusy = true; const pid = cur.id; lyrFor = pid; lyrCancelled = false;
   try {
     lyrStatus('Preparo il traduttore…', null);
     const idx = L.lines.map((l, i) => l.text ? i : -1).filter(i => i >= 0);
     const r = await lyrCall({ type: 'tr', src: L.lang, tgt, lines: idx.map(i => L.lines[i].text) });
     ls.set('lyrShowTr', true); lyrBusy = false; lyrStatus();
     await updateProject(pid, p => { const P = p.lyrics; if (!P || P.lines.length !== L.lines.length) return; idx.forEach((i, k) => { P.lines[i].tr = r.out[k]; }); P.trLang = tgt; });
-  } catch (e) { lyrStatus(); toast('Traduzione non riuscita: ' + netMsg(e)); }
+  } catch (e) { if (lyrCancelled) return; lyrStatus(); toast('Traduzione non riuscita: ' + netMsg(e)); }
   finally { lyrBusy = false; lyrFor = null; paintLyrStatus(); }
 }
 function renderLyrics() {
@@ -1700,7 +1758,7 @@ function renderLyrics() {
   const L = cur.lyrics, has = !!(L && L.lines && L.lines.length);
   $('lyrFind').hidden = has; $('lyrTools').hidden = !has; $('lyrHint').hidden = !has;
   lyrIdx = -2; lyrEls = []; paintLyrStatus();
-  if (!has) { $('lyr').innerHTML = ''; if (!$('lyrQ').value) $('lyrQ').value = cur.name; return; }
+  if (!has) { $('lyr').innerHTML = ''; if (!$('lyrQ').value) $('lyrQ').value = cleanTitle(cur.name); return; }
   const tgt = ls.get('trLang', 'it'), showTr = ls.get('lyrShowTr', true) && L.trLang === tgt;
   $('lyrSrc').textContent = L.src + (L.lang ? ' · ' + LANGS[L.lang] : '') + (L.shift ? ` · spostato ${L.shift > 0 ? '+' : ''}${L.shift.toFixed(1).replace('.', ',')} s` : '');
   const can = tgt && L.lang && L.lang !== tgt;
@@ -1737,9 +1795,11 @@ async function lyrLineMenu(i) {
 }
 async function lyrMoreMenu() {
   const L = cur && cur.lyrics; if (!L) return;
-  const v = await dialog(L.title || 'Testo', null, [['Anticipa il testo di 0,5 s', -0.5], ['Ritarda il testo di 0,5 s', 0.5], ['Traduci di nuovo', 'tr'], ['Cerca un altro testo', 'new'], ['Chiudi', null, true]]);
+  const v = await dialog(L.title || 'Testo', null, [['Allinea alla voce', 'align'], ['Anticipa il testo di 0,5 s', -0.5], ['Ritarda il testo di 0,5 s', 0.5], ['Traduci di nuovo', 'tr'], ['Cerca un altro testo', 'new'], ['Genera con Whisper', 'asr'], ['Chiudi', null, true]]);
   if (typeof v === 'number') { L.shift = +((L.shift || 0) + v).toFixed(2); persist(); renderLyrics(); }
   else if (v === 'tr') { L.trLang = null; lyrTranslate(); }
+  else if (v === 'align') { if (autoAlign(L, false)) { persist(); renderLyrics(); } }
+  else if (v === 'asr') { if (await dialog('Generare il testo con Whisper?', textEl('Whisper ascolta la voce separata e scrive il testo con i tempi. Sostituisce il testo attuale.'), [['Annulla', false], ['Genera', true, true]])) lyrTranscribe(); }
   else if (v === 'new') { if (await dialog('Cercare un altro testo?', textEl('Il testo attuale e le tue correzioni vengono tolti.'), [['Annulla', false], ['Cerca', true, true]])) { cur.lyrics = null; persist(); $('lyrRes').innerHTML = ''; renderLyrics(); } }
 }
 (function lyricsInput() {
