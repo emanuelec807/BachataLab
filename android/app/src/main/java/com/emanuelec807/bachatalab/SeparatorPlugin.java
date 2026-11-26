@@ -164,8 +164,14 @@ public class SeparatorPlugin extends Plugin {
     /** The models ship in the web assets as base64 parts; decode them once into app storage. */
     private File modelFile(Context ctx, String name) throws Exception {
         File dir = new File(ctx.getFilesDir(), "models"); dir.mkdirs();
-        File out = new File(dir, name + ".onnx");
+        // one copy per app version: an update that ships a new model must not reuse the old one
+        long ver = 0;
+        try { android.content.pm.PackageInfo p = ctx.getPackageManager().getPackageInfo(ctx.getPackageName(), 0);
+              ver = android.os.Build.VERSION.SDK_INT >= 28 ? p.getLongVersionCode() : p.versionCode; } catch (Exception ignored) {}
+        File out = new File(dir, name + "." + ver + ".onnx");
         if (out.exists() && out.length() > 1_000_000) return out;
+        File[] olds = dir.listFiles((d, f) -> f.startsWith(name + ".") && f.endsWith(".onnx"));
+        if (olds != null) for (File f : olds) f.delete();
         File tmp = new File(dir, name + ".tmp");
         // the APK build stores the model as one raw file (smaller download); base64 parts are the fallback
         try (InputStream is = ctx.getAssets().open("public/models/" + name + ".onnx");
