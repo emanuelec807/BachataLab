@@ -183,7 +183,7 @@ Tutto il player sta in **una sola schermata senza scorrere** (pensato per 390×7
 - BPM attuali e quelli rilevati.
 - **−1 BPM / +1 BPM**, **Metà**, **Doppio**: la griglia dei tempi viene ricostruita regolare, tenendo fermo l'inizio della frase in cui sei. Limiti 40–240. Ogni cambio spegne il loop.
 - **Tap tempo**: tocca almeno 4 volte sul tempo; dopo 1,6 s senza tocchi applica i BPM (se tra 60 e 220).
-- **L'1 è qui!**: con il brano in riproduzione tocca esattamente sull'1. Il conteggio si sposta sul tempo più vicino al tocco, tenendo conto del ritardo calibrato (o di 0,15 s senza calibrazione). Il loop attivo si riallinea.
+- Non ci sono più pulsanti per spostare l'1: il conteggio viene solo dall'analisi (frase per frase, con le ripartenze dopo i break).
 - **Ripristina**: torna a battiti, BPM e 1 trovati dall'app.
 - **Rinomina** ed **Elimina** il progetto.
 - **Scarica l'MP3 del mix attuale**: crea un MP3 (192 kbps, alla velocità originale) con gli strumenti come li senti, cioè con volumi, muti e solo attuali. Il nome dice cosa manca (es. "Frío - senza voce.mp3").
@@ -279,7 +279,7 @@ Il conteggio sparisce: si ascolta e si tocca.
 
 - **Durata**: 4 frasi (32 tempi) oppure 8 frasi (64 tempi). Se il brano è più corto si usano le frasi disponibili.
 - **Cosa si sente**: Basso + güira (predefinito), Tutti, oppure Il tuo mix.
-- **Ritardo dell'audio · Calibra**: suonano 16 click e tu tocchi su ognuno (i primi 4 servono a prendere il ritmo). L'app misura il ritardo tipico tra suono e tocco (Bluetooth, altoparlante e reazione compresi) e lo toglie da ogni tocco negli esercizi e in "L'1 è qui!". Va rifatta quando cambi cuffie o passi all'altoparlante. Senza calibrazione: 0 ms negli esercizi e 150 ms per "L'1 è qui!".
+- **Ritardo dell'audio · Calibra**: suonano 16 click e tu tocchi su ognuno (i primi 4 servono a prendere il ritmo). L'app misura il ritardo tipico tra suono e tocco (Bluetooth, altoparlante e reazione compresi) e lo toglie da ogni tocco negli esercizi. Va rifatta quando cambi cuffie o passi all'altoparlante. Senza calibrazione: 0 ms.
 - Durante l'esercizio il metronomo è spento; alla fine torna il mix del progetto.
 
 ### 9.2 Sessione
@@ -316,7 +316,6 @@ Il conteggio sparisce: si ascolta e si tocca.
   - **Cambi di tempo**: l'app misura il tempo finestra per finestra (8 s ogni secondo, entro ±25% del tempo medio). Se varia più del 4% (intro lenta, rallentando, cambio di velocità) segue i battiti con un periodo che cambia lungo il brano. Su un test con la seconda metà rallentata del 10% ritrova tutti i battiti della parte lenta; sui brani a tempo costante i battiti restano identici a prima.
   - I BPM mostrati sono la mediana.
 - **L'1, frase per frase**: in bachata gli accordi cambiano sull'1 (e sul 5). Per ogni battito l'app misura quanto cambia l'armonia (chitarra, basso, altro) e quanto è forte il basso; poi segue il conteggio 1–8 battito per battito (algoritmo di Viterbi). Il conteggio può **ripartire** (break di 2 o 4 tempi, battute aggiunte o saltate) solo quando più frasi di fila sono d'accordo, così non salta per sbaglio. Su un brano con 2 tempi tolti a metà ritrova il punto di ripartenza (con circa una frase di ritardo) e il conteggio giusto dopo; su "Frío" e "Pobre de Mí" non trova ripartenze.
-  - **L'1 è qui!** corregge il tratto in cui sei (tutto il brano se non ci sono ripartenze). **Da qui in poi** fa ripartire il conteggio solo da quel battito: per un break che l'app non ha visto.
   - I progetti vecchi vengono rianalizzati una volta all'apertura (battiti con il tempo variabile e ripartenze), solo se il ritmo non è mai stato modificato a mano; se ci sono note sui tempi i battiti restano quelli e si ricalcola solo il conteggio.
   - Cambiare i BPM a mano (±1, metà, doppio) rimette una griglia regolare con un solo 1.
 - **Riproduzione**: le tracce si mescolano in tempo reale con volume per strumento. Il cambio di velocità mantiene il tono (SoundTouch). Il loop è senza interruzioni e il metronomo è sincronizzato ai battiti trovati.
@@ -355,6 +354,8 @@ Il conteggio sparisce: si ascolta e si tocca.
 ---
 
 ## Registro modifiche
+
+- **26/11/2026**: tolti i pulsanti "L'1 è qui!" e "Da qui in poi": il conteggio viene solo dall'analisi.
 
 - **26/11/2026**: cambi di tempo seguiti (tempo locale) e conteggio che riparte dopo i break, con "Da qui in poi"; tracce decompresse in parallelo all'apertura; tolta la chip "Senza playlist".
 

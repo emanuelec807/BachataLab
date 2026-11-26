@@ -921,7 +921,7 @@ function updateBeatInfo() {
   $('bpmOrig').textContent = cur.bpmDetected ? 'Trovati dall\'app: ' + String(Math.round(cur.bpmDetected * 10) / 10).replace('.', ',') + ' BPM' : '';
   if (player) $('pSub').textContent = fmt(player.duration) + (ok ? ' · ' + Math.round(cur.bpm) + ' BPM' : '') + (isVideo() ? ' · video' : '');
   $('beatWarn').textContent = !ok ? 'Ritmo non trovato: i salti vanno a mezzi secondi, usa il Loop A–B.' : cur.confidence < 0.4 ? 'Non sono sicuro del ritmo: controlla l\'1 e i BPM dal menu ⋮.' : '';
-  ['loop4', 'loop8', 'oneBtn'].forEach(id => { $(id).disabled = !ok; });
+  ['loop4', 'loop8'].forEach(id => { $(id).disabled = !ok; });
   applyMet(); drawTimelineStatic(); computePhrases(); renderGrid();
 }
 
@@ -1311,6 +1311,7 @@ document.querySelectorAll('[data-acc]').forEach(b => b.addEventListener('click',
 // Measured delay between a sound and the tap on it (speaker, headphones, reaction), or null if never calibrated.
 const tapOffset = () => ls.get('tapOffset', null);
 // The tap comes a little after the 1 is heard: take the beat nearest to (tap time − delay).
+// (no button any more: the count comes from the analysis) Kept for a possible return of the manual fix:
 // "L'1 è qui!": corrects the part of the song the tap is in (the whole song when there are no breaks).
 // "Da qui in poi": the count changes only from this beat on (a break the app did not notice).
 function setOneHere(fromHere) {
@@ -1324,9 +1325,6 @@ function setOneHere(fromHere) {
   if (loopMode === 4 || loopMode === 8) { const n = loopMode; loopMode = null; beatLoop(n); }
   toast(fromHere ? 'Ok, l\'1 è qui da questo punto in poi' : 'Ok, l\'1 è qui'); vibrate(15);
 }
-$('oneBtn').addEventListener('pointerdown', e => { e.preventDefault(); setOneHere(false); });
-$('oneBtn').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOneHere(false); } });
-$('oneFromBtn').addEventListener('pointerdown', e => { e.preventDefault(); setOneHere(true); });
 function regrid(bpm) {
   const t = player.position, i = Math.max(0, nearestBeat(t)), anchor = beatTime(i - (countOf(i) - 1));
   const g = Array.from(BeatTracker.grid(bpm, anchor, player.duration));
