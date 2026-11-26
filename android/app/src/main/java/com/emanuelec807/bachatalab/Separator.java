@@ -99,8 +99,12 @@ public final class Separator {
 
     /** torch.stft(center=True, reflect, onesided); result index [f * T + t]. */
     static final class Spec { float[] re, im; int F, T; }
-    static Spec stft(double[] x, int nfft, int hop, boolean normalized) {
-        double[] w = hann(nfft), xp = reflectPad(x, nfft / 2, nfft / 2);
+    static Spec stft(double[] x, int nfft, int hop, boolean normalized) { return stft(x, nfft, hop, normalized, hann(nfft)); }
+    private static final Map<Integer, double[]> rects = new HashMap<>();
+    /** rectangular window (torch.stft without a window), used by SCNet */
+    static synchronized double[] rect(int n) { double[] w = rects.get(n); if (w == null) { w = new double[n]; java.util.Arrays.fill(w, 1); rects.put(n, w); } return w; }
+    static Spec stft(double[] x, int nfft, int hop, boolean normalized, double[] w) {
+        double[] xp = reflectPad(x, nfft / 2, nfft / 2);
         Spec s = new Spec(); s.T = 1 + (xp.length - nfft) / hop; s.F = nfft / 2 + 1;
         s.re = new float[s.F * s.T]; s.im = new float[s.F * s.T];
         double[] br = new double[nfft], bi = new double[nfft];
@@ -118,8 +122,8 @@ public final class Separator {
         return stft(d, nfft, hop, normalized);
     }
     /** torch.istft(center=True). */
-    static float[] istft(float[] re, float[] im, int F, int T, int nfft, int hop, int length, boolean normalized) {
-        double[] w = hann(nfft);
+    static float[] istft(float[] re, float[] im, int F, int T, int nfft, int hop, int length, boolean normalized) { return istft(re, im, F, T, nfft, hop, length, normalized, hann(nfft)); }
+    static float[] istft(float[] re, float[] im, int F, int T, int nfft, int hop, int length, boolean normalized, double[] w) {
         int total = nfft + hop * (T - 1);
         double[] y = new double[total], env = new double[total], br = new double[nfft], bi = new double[nfft];
         double scale = (normalized ? Math.sqrt(nfft) : 1) / nfft;
@@ -183,7 +187,7 @@ public final class Separator {
         }
         return res;
     }
-    private static float[] toArray(OnnxTensor t) {
+    static float[] toArray(OnnxTensor t) {
         FloatBuffer b = t.getFloatBuffer(); float[] a = new float[b.remaining()]; b.get(a); return a;
     }
 
@@ -225,7 +229,7 @@ public final class Separator {
         return stems;
     }
 
-    float[] guiraAll(float[] mono32, Progress pr, Cancel cc) throws Exception {
+    static float[] guiraAll(OrtEnvironment env, OrtSession guira, float[] mono32, Progress pr, Cancel cc) throws Exception {
         int total = mono32.length, NL = (int) Math.round(GCTX * GSR), NR = NL, NC = GWIN - NL - NR;
         float[] out = new float[total];
         java.util.List<Integer> all = new java.util.ArrayList<>();
@@ -301,7 +305,7 @@ public final class Separator {
         else {
             float[] mono = new float[n]; for (int i = 0; i < n; i++) mono[i] = 0.5f * (d[0].get(i) + d[1].get(i));
             float[] m32 = resample(mono, SR, GSR); mono = null;
-            float[] g32 = guiraAll(m32, pr, cc); m32 = null;
+            float[] g32 = guiraAll(env, guira, m32, pr, cc); m32 = null;
             float[] g44 = java.util.Arrays.copyOf(resample(g32, GSR, SR), n); g32 = null;
             pr.on("split", 0, 0);
             guiraSt = new FloatBuffer[]{newBuf(n), newBuf(n)}; bongo = new FloatBuffer[]{newBuf(n), newBuf(n)};

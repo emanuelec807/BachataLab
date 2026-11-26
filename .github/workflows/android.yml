@@ -1,9 +1,9 @@
-name: APK Android
+name: APK Android (modelli MIT)
 
 # Builds the Android app (Capacitor) from app/ and publishes the APK as a GitHub Release.
 on:
   push:
-    branches: [main]
+    branches: [modelli-mit]
     paths:
       - 'app/**'
       - 'android/**'
@@ -11,13 +11,14 @@ on:
       - 'package.json'
       - 'package-lock.json'
       - '.github/workflows/android.yml'
+      - 'models-mit/**'
   workflow_dispatch:
 
 permissions:
   contents: write
 
 concurrency:
-  group: apk
+  group: apk-mit
   cancel-in-progress: true
 
 jobs:
@@ -25,7 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 40
     env:
-      VERSION_NAME: 5.0.${{ github.run_number }}
+      VERSION_NAME: 6.0.${{ github.run_number }}-mit
     steps:
       - uses: actions/checkout@v4
 
@@ -81,13 +82,24 @@ jobs:
           python3 - <<'PY'
           import base64, glob, os
           d = 'android/app/src/main/assets/public/models'
-          for name in ('demucs6', 'guira'):
+          for name in ('guira',):
               parts = sorted(glob.glob(f'{d}/{name}.*.b64.txt'), key=lambda p: int(p.split('.')[-3]))
               raw = b''.join(base64.b64decode(open(p, 'rb').read().strip()) for p in parts)
               open(f'{d}/{name}.onnx', 'wb').write(raw)
               for p in parts: os.remove(p)
               print(name, len(parts), 'parti ->', len(raw), 'byte')
+          # branch modelli-mit: no Demucs in the APK, only MIT models (SCNet, Mega 53 reduced, AudioSep)
+          for p in glob.glob(f'{d}/demucs6.*.b64.txt'): os.remove(p)
+          import shutil
+          for name in ('scnet', 'mega'): shutil.copy(f'models-mit/{name}.onnx', f'{d}/{name}.onnx')
+          print(sorted(os.listdir(d)))
           PY
+
+      - name: App di prova separata (si installa accanto a quella normale)
+        run: |
+          sed -i 's/applicationId "com.emanuelec807.bachatalab"/applicationId "com.emanuelec807.bachatalab.mit"/' android/app/build.gradle
+          sed -i 's#<string name="app_name">Bachata Lab</string>#<string name="app_name">Bachata Lab MIT</string>#; s#<string name="title_activity_main">Bachata Lab</string>#<string name="title_activity_main">Bachata Lab MIT</string>#' android/app/src/main/res/values/strings.xml
+          grep -n applicationId android/app/build.gradle; grep app_name android/app/src/main/res/values/strings.xml
 
       - name: Compila l'APK
         working-directory: android
@@ -129,10 +141,12 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: apk-${{ env.VERSION_NAME }}
-          name: Bachata Lab ${{ env.VERSION_NAME }} (APK Android)
+          name: Bachata Lab MIT ${{ env.VERSION_NAME }} (APK di prova)
           body: |
-            APK Android costruito da `${{ github.sha }}`.
+            APK di prova del branch `modelli-mit` (solo modelli con licenza MIT: SCNet, Mega 53 ridotto, AudioSep), costruito da `${{ github.sha }}`.
+            Si installa accanto all'app normale con il nome "Bachata Lab MIT".
             Scarica il file `.apk` qui sotto dal telefono e aprilo per installarlo
             (la prima volta Android chiede di consentire l'installazione da questa fonte).
           files: BachataLab-*.apk
-          make_latest: true
+          make_latest: false
+          prerelease: true

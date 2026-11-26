@@ -28,7 +28,8 @@ import java.util.Map;
  */
 @CapacitorPlugin(name = "Separator")
 public class SeparatorPlugin extends Plugin {
-    private static final String[] MODEL_NAMES = {"demucs6", "guira"};
+    // branch modelli-mit: only MIT-licensed models (SCNet, Mega 53 reduced to guitar + piano, AudioSep güira)
+    private static final String[] MODEL_NAMES = {"scnet", "mega", "guira"};
     private float[][] input;
     private volatile Thread job;
     private volatile boolean cancel;
@@ -99,11 +100,12 @@ public class SeparatorPlugin extends Plugin {
     }
 
     private void work(boolean withGuira) {
-        OrtSession demucs = null, guira = null;
+        OrtSession scnet = null, mega = null, guira = null;
         try {
             Context ctx = getContext();
-            stage = "models"; pi = 0; pn = withGuira ? 2 : 1;
-            File dm = modelFile(ctx, "demucs6"); pi = 1;
+            stage = "models"; pi = 0; pn = withGuira ? 3 : 2;
+            File sm = modelFile(ctx, "scnet"); pi = 1;
+            File mm = modelFile(ctx, "mega"); pi = 2;
             File gm = withGuira ? modelFile(ctx, "guira") : null; pi = pn;
             OrtEnvironment env = OrtEnvironment.getEnvironment();
             OrtSession.SessionOptions o = new OrtSession.SessionOptions();
@@ -112,14 +114,15 @@ public class SeparatorPlugin extends Plugin {
             o.setOptimizationLevel(OrtSession.SessionOptions.OptLevel.ALL_OPT);
             o.setCPUArenaAllocator(false);
             o.setMemoryPatternOptimization(false);
-            demucs = env.createSession(dm.getAbsolutePath(), o);
+            scnet = env.createSession(sm.getAbsolutePath(), o);
+            mega = env.createSession(mm.getAbsolutePath(), o);
             if (gm != null) guira = env.createSession(gm.getAbsolutePath(), o);
             File tmp = new File(ctx.getCacheDir(), "septmp"); tmp.mkdirs();
             File[] old = tmp.listFiles(); if (old != null) for (File f : old) f.delete();
             Separator.tmpDir = tmp;
             state = "running";
             float[][] in = input; input = null; // the separator frees the channels after the first step
-            Map<String, FloatBuffer[]> stems = new Separator(env, demucs, guira).separate(in, withGuira,
+            Map<String, FloatBuffer[]> stems = new MitSeparator(env, scnet, mega, guira).separate(in, withGuira,
                 (s, i, n) -> { stage = s; pi = i; pn = n; }, () -> cancel);
             stage = "write"; pi = 0; pn = stems.size();
             File dir = new File(ctx.getFilesDir(), "sep"); dir.mkdirs();
@@ -136,7 +139,8 @@ public class SeparatorPlugin extends Plugin {
         } catch (Throwable t) {
             error = t.getClass().getSimpleName() + ": " + t.getMessage(); state = "error";
         } finally {
-            try { if (demucs != null) demucs.close(); } catch (Exception ignored) {}
+            try { if (scnet != null) scnet.close(); } catch (Exception ignored) {}
+            try { if (mega != null) mega.close(); } catch (Exception ignored) {}
             try { if (guira != null) guira.close(); } catch (Exception ignored) {}
             job = null;
         }

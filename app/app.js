@@ -45,6 +45,9 @@ const PRESETS = [
 // Seconds of work per second of audio, measured in desktop Chromium (WebAssembly, 1 thread).
 // Before the first run on this phone the estimate assumes a phone is about twice as slow.
 const COST = { demucs: 2.4, guira: 2.4 };
+// Android app, MIT models (branch modelli-mit): seconds per second of audio measured on a 2-core PC (Java + ONNX Runtime):
+// SCNet 1.1, Mega 53 (guitar, piano) 4.5, güira 0.45. The phone's own factor is learned after the first project.
+const NCOST = { scnet: 1.1, mega: 4.5, guira: 0.45 };
 const MARK_NAMES = ['Intro', 'Derecho', 'Majao', 'Mambo', 'Break', T('Finale')];
 const PIANO_MIX = 0.03, PIANO_ALTRO = 0.35; // piano share of the whole song and of Altro to show it as a track
 const SR = 44100, MAX_FILE = 350e6, TAP_LAG = 0.15;
@@ -431,7 +434,7 @@ async function renderSettings() {
   try { models = (await caches.keys()).filter(k => k.startsWith('bachata-models')); } catch (e) {}
   const row = (a, b) => `<div class="setrow"><span class="grow">${a}</span><b>${b}</b></div>`;
   $('setInfo').innerHTML = row(T('Progetti'), n + ' · ' + mb(est.usage || 0)) + row(T('Modelli di separazione'), NATIVE ? T("dentro l'app") : models.length ? T('scaricati') : T('non ancora')) +
-    row(T('Versione'), 'Bachata Lab 6' + (NATIVE ? ' · Android' : '')) + (!NATIVE && models.length ? '<div class="setrow"><span class="grow">' + T('Libera circa 160 MB (si riscaricano al prossimo progetto)') + '</span><button class="pill" id="delModels">' + T('Elimina modelli') + '</button></div>' : '');
+    row(T('Versione'), 'Bachata Lab 6' + (NATIVE ? ' · Android · ' + T('modelli MIT') : '')) + (!NATIVE && models.length ? '<div class="setrow"><span class="grow">' + T('Libera circa 160 MB (si riscaricano al prossimo progetto)') + '</span><button class="pill" id="delModels">' + T('Elimina modelli') + '</button></div>' : '');
   const ok = await opusOK();
   $('setInfo').insertAdjacentHTML('beforeend', row(T('Compressione delle tracce'), ok ? T('attiva (Opus 128 kb/s)') : T('non disponibile qui')));
   if (ok) $('setInfo').insertAdjacentHTML('beforeend', '<div class="setrow"><span class="grow">' + T('I progetti nuovi sono già compressi (circa 10 volte meno spazio). Quelli fatti prima si comprimono quando li apri, oppure tutti qui.') + '</span><button class="pill" id="packAll">' + T('Comprimi') + '</button></div>');
@@ -483,7 +486,8 @@ function seekPreview(t) { if (!src || src.kind !== 'video' || preview) return; c
 // speedFactor: phone time / desktop WebAssembly time, learned after each project (separately for the Android app).
 const SPEED_KEY = () => NATIVE ? 'speedFactorNative' : 'speedFactor';
 function estimateMinutes(dur, withG) {
-  const speed = ls.get(SPEED_KEY(), NATIVE ? 0.6 : 2);
+  if (NATIVE) return Math.max(1, Math.round(dur * (NCOST.scnet + NCOST.mega + (withG ? NCOST.guira : 0)) * ls.get('speedFactorMit', 0.6) / 60));
+  const speed = ls.get(SPEED_KEY(), 2);
   return Math.max(1, Math.round(dur * (COST.demucs + (withG ? COST.guira : 0)) * speed / 60));
 }
 function drawRegion() {
@@ -620,7 +624,8 @@ $('createBtn').addEventListener('click', async () => {
   const name = $('pname').value.trim() || src.name, withG = true;
   const audioOnly = src.kind === 'video' && $('audioOnly').checked; // a video kept only for its sound: no video stored
   const dur = region.e - region.s, offset = region.s, kind = audioOnly ? 'audio' : src.kind, file = src.file;
-  const steps = [NATIVE ? T('Preparo i modelli') : T('Scarico i modelli'), T('Separo voce, chitarra, basso, percussioni'), ...(withG ? [T('Isolo la güira')] : []), T('Trovo il ritmo e salvo')];
+  const steps = NATIVE ? [T('Preparo i modelli'), T('Separo voce, basso, batteria e altro'), T('Separo chitarra e piano'), ...(withG ? [T('Isolo la güira')] : []), T('Trovo il ritmo e salvo')]
+    : [T('Scarico i modelli'), T('Separo voce, chitarra, basso, percussioni'), ...(withG ? [T('Isolo la güira')] : []), T('Trovo il ritmo e salvo')];
   history.replaceState(null, '', '#elabora'); show('proc'); keepAwake();
   $('procThumb').innerHTML = ico(kind === 'video' ? 'video' : 'note');
   $('procTitle').textContent = name; setProgress(0); setSteps(steps, 0);
@@ -632,6 +637,7 @@ $('createBtn').addEventListener('click', async () => {
   catch (e) { procRunning = false; await dialog(T('File non leggibile'), textEl(T('Non riesco a preparare l\'audio di questa parte.')), [['OK', 0, true]]); return go('home'); }
   const srcDur = src.buf.duration; releaseSource();
   const wD = COST.demucs, wG = withG ? COST.guira : 0; let tWork = Date.now(); const est = estimateMinutes(dur, withG);
+  const nS = NCOST.scnet, nM = NCOST.mega, nG = withG ? NCOST.guira : 0, nT = nS + nM + nG; // weights of the native steps
   worker = NATIVE ? nativeWorker() : new Worker('worker.js?v=23');
   worker.onmessage = async ev => {
     const m = ev.data;
@@ -643,9 +649,12 @@ $('createBtn').addEventListener('click', async () => {
     if (m.type === 'ready') { ls.set('modelsCached', true); ls.set('lastThreads', m.threads || 1); setSteps(steps, 1); tWork = Date.now(); setProgress(0); $('procWhat').textContent = T('Separazione'); $('procStage').textContent = T('Separo gli strumenti…'); }
     if (m.type === 'progress') {
       let frac = null, part = null;
+      if (m.stage === 'scnet') { frac = nS / nT * m.i / m.n; part = m.i / m.n; $('procStage').textContent = T('Separo voce, basso, batteria e altro: parte {i} di {n}', { i: m.i, n: m.n }); $('procPart').textContent = m.i + '/' + m.n; }
+      if (m.stage === 'mega') { if ($('procWhat').textContent !== 'Mega') { setSteps(steps, 2); $('procWhat').textContent = 'Mega'; }
+        frac = (nS + nM * m.i / m.n) / nT; part = m.i / m.n; $('procStage').textContent = T('Separo chitarra e piano: parte {i} di {n}', { i: m.i, n: m.n }); $('procPart').textContent = m.i + '/' + m.n; }
       if (m.stage === 'demucs') { frac = wD / (wD + wG) * m.i / m.n; part = m.i / m.n; $('procStage').textContent = T('Separo gli strumenti: parte {i} di {n}', { i: m.i, n: m.n }); $('procPart').textContent = m.i + '/' + m.n; }
-      if (m.stage === 'guira') { if (!document.querySelector('#procSteps li.now .sbar') || $('procWhat').textContent !== 'Güira') { setSteps(steps, 2); $('procWhat').textContent = 'Güira'; }
-        frac = (wD + wG * m.i / m.n) / (wD + wG); part = m.i / m.n; $('procStage').textContent = T('Isolo la güira: parte {i} di {n}', { i: m.i, n: m.n }); $('procPart').textContent = m.i + '/' + m.n; }
+      if (m.stage === 'guira') { if (!document.querySelector('#procSteps li.now .sbar') || $('procWhat').textContent !== 'Güira') { setSteps(steps, NATIVE ? 3 : 2); $('procWhat').textContent = 'Güira'; }
+        frac = NATIVE ? (nS + nM + nG * m.i / m.n) / nT : (wD + wG * m.i / m.n) / (wD + wG); part = m.i / m.n; $('procStage').textContent = T('Isolo la güira: parte {i} di {n}', { i: m.i, n: m.n }); $('procPart').textContent = m.i + '/' + m.n; }
       if (m.stage === 'resample') $('procStage').textContent = T('Preparo la güira');
       if (m.stage === 'split') $('procStage').textContent = T('Divido bongo e güira');
       if (frac != null) {
@@ -663,7 +672,8 @@ $('createBtn').addEventListener('click', async () => {
     }
     if (m.type === 'done') try {
       if (worker) { worker.terminate(); worker = null; }
-      const workS = (Date.now() - tWork) / 1000; ls.set(SPEED_KEY(), Math.max(0.05, Math.min(10, workS / (dur * (wD + wG)))));
+      const workS = (Date.now() - tWork) / 1000;
+      if (NATIVE) ls.set('speedFactorMit', Math.max(0.05, Math.min(10, workS / (dur * nT)))); else ls.set(SPEED_KEY(), Math.max(0.05, Math.min(10, workS / (dur * (wD + wG)))));
       clearInterval(procClock); setSteps(steps, steps.length - 1); $('procStage').textContent = T('Trovo il ritmo e salvo…'); $('procWhat').textContent = T('Ritmo'); $('procLeft').textContent = T('quasi fatto'); setProgress(1, 0.5);
       const args = { name, stems: m.stems, dur, offset, srcDur, withG, kind, file, thumb };
       for (;;) {
@@ -704,7 +714,7 @@ function nativeWorker() {
           await new Promise(r => setTimeout(r, 400)); if (w.stopped) return;
           const s = await call('status');
           if (s.state === 'running' && !ready) { ready = true; emit({ type: 'ready', threads: s.threads }); }
-          if (s.state === 'running' && ['demucs', 'guira', 'resample', 'split'].includes(s.stage)) emit({ type: 'progress', stage: s.stage, i: s.i, n: s.n });
+          if (s.state === 'running' && ['scnet', 'mega', 'demucs', 'guira', 'resample', 'split'].includes(s.stage)) emit({ type: 'progress', stage: s.stage, i: s.i, n: s.n });
           if (s.state === 'error') return fallback(s.error || 'errore');
           if (s.state === 'cancelled') return;
           if (s.state === 'done') {
@@ -719,9 +729,10 @@ function nativeWorker() {
           }
         }
       } catch (e) { fallback(String(e && e.message || e)); }
-      // If the native separator is missing or fails, the slower WebAssembly worker does the job.
+      // Branch modelli-mit: no fallback to the browser version (it would use Demucs): the error is shown as it is.
       function fallback(why) {
-        if (w.stopped) return; console.warn('native separation failed:', why); toast(T('Uso la separazione nel browser (più lenta)'));
+        if (w.stopped) return; console.warn('native separation failed:', why);
+        return emit({ type: 'error', message: why });
         const real = w.real = new Worker('worker.js?v=23');
         real.onmessage = ev => emit(ev.data); real.onerror = e => emit({ type: 'error', message: e.message || T('errore interno') });
         real.postMessage(msg);

@@ -358,6 +358,8 @@ Il conteggio sparisce: si ascolta e si tocca.
 
 ## Registro modifiche
 
+- **26/11/2026 (branch `modelli-mit`, APK di prova «Bachata Lab MIT»)**: separazione solo con modelli a licenza MIT, stesse tracce di prima. SCNet small (starrytong, pesi MIT confermati dall'autore) per voce, basso, batteria e altro; MVSep Mega 53 BS-RoFormer (ZFTurbo, MIT) ridotto alle sole teste chitarra e piano, compresso a int8 e a segmenti da 5 s, applicato all'«altro» di SCNet; AudioSep per la güira (bongo = batteria meno güira, come prima); «Altro» = altro di SCNet meno la chitarra. Demucs non è più nell'APK di prova e non c'è il ripiego sulla versione del browser. Sul PC di prova la separazione è circa 5–6 volte più lenta (quasi tutto Mega 53). L'app di prova si installa accanto a quella normale. Script di esportazione in `tools/mit/`, verifica Java in `test/MitCheck.java`.
+
 - **26/11/2026**: interfaccia in inglese e spagnolo oltre all'italiano: al primo avvio la lingua del telefono (inglese per le altre lingue), scelta nelle Impostazioni, tutti i testi tradotti (anche messaggi, errori, guide ed esercizi). La traduzione dei testi delle canzoni segue la lingua dell'app finché non ne scegli una tu. Corretta la traduzione verso e dal portoghese (prima non funzionava: non esistono modelli diretti). Tema e tasto «Sezioni» non tagliano più le scritte lunghe.
 
 - **26/11/2026**: tolti i pulsanti "L'1 è qui!" e "Da qui in poi": il conteggio viene solo dall'analisi.

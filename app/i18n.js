@@ -186,6 +186,9 @@
     'Whisper ascolta la voce separata e scrive il testo con i tempi. Sostituisce il testo attuale.': 'Whisper listens to the separated vocals and writes the lyrics with timing. It replaces the current lyrics.',
     'Genera': 'Generate', 'Cercare un altro testo?': 'Search other lyrics?', 'Il testo attuale e le tue correzioni vengono tolti.': 'The current lyrics and your fixes are removed.',
     'Traduzione in {x}': 'Translation into {x}', 'Traduzione spenta': 'Translation off', 'Trascrizione della voce': 'Vocals transcription',
+    'Separo voce, basso, batteria e altro': 'Separating vocals, bass, drums and other', 'Separo chitarra e piano': 'Separating guitar and piano',
+    'Separo voce, basso, batteria e altro: parte {i} di {n}': 'Separating vocals, bass, drums and other: part {i} of {n}',
+    'Separo chitarra e piano: parte {i} di {n}': 'Separating guitar and piano: part {i} of {n}', 'modelli MIT': 'MIT models',
   };
 
   const ES = {
@@ -358,6 +361,9 @@
     'Whisper ascolta la voce separata e scrive il testo con i tempi. Sostituisce il testo attuale.': 'Whisper escucha la voz separada y escribe la letra con los tiempos. Sustituye la letra actual.',
     'Genera': 'Generar', 'Cercare un altro testo?': '¿Buscar otra letra?', 'Il testo attuale e le tue correzioni vengono tolti.': 'Se quitan la letra actual y tus correcciones.',
     'Traduzione in {x}': 'Traducción al {x}', 'Traduzione spenta': 'Traducción desactivada', 'Trascrizione della voce': 'Transcripción de la voz',
+    'Separo voce, basso, batteria e altro': 'Separando voz, bajo, batería y otros', 'Separo chitarra e piano': 'Separando guitarra y piano',
+    'Separo voce, basso, batteria e altro: parte {i} di {n}': 'Separando voz, bajo, batería y otros: parte {i} de {n}',
+    'Separo chitarra e piano: parte {i} di {n}': 'Separando guitarra y piano: parte {i} de {n}', 'modelli MIT': 'modelos MIT',
   };
   const DICT = { en: EN, es: ES };
 
