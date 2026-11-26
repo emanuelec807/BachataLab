@@ -182,9 +182,10 @@ async function opusOK() {
 }
 // Stored tracks -> float tracks, whatever the format (old projects: 16-bit PCM)
 async function stemsF32(st, ids) {
-  const out = {};
-  for (const id of ids || Object.keys(st.data)) { const d = st.data[id]; if (!d) continue;
-    out[id] = st.codec === 'opus' ? await decodeStem(d, st.n) : [toF32(d[0]), toF32(d[1])]; }
+  // all tracks decoded at the same time: the browser decodes in parallel, opening is several times faster
+  const out = {}, list = (ids || Object.keys(st.data)).filter(id => st.data[id]);
+  const res = await Promise.all(list.map(id => st.codec === 'opus' ? decodeStem(st.data[id], st.n) : [toF32(st.data[id][0]), toF32(st.data[id][1])]));
+  list.forEach((id, k) => { out[id] = res[k]; });
   return out;
 }
 async function packAllProjects() {
@@ -293,10 +294,8 @@ async function renderHome() {
   // playlists: a song sits in at most one; the chips filter the list
   const pls = getPlaylists(); if (homePl && homePl !== 'none' && !pls.some(x => x.id === homePl)) homePl = '';
   const inPl = p => !homePl || (homePl === 'none' ? !p.playlist || !pls.some(x => x.id === p.playlist) : p.playlist === homePl);
-  const nNone = list.filter(p => !p.playlist || !pls.some(x => x.id === p.playlist)).length;
   $('plChips').innerHTML = !list.length ? '' : [`<button data-pl="" class="${!homePl ? 'on' : ''}">Tutti <span>${list.length}</span></button>`]
     .concat(pls.map(x => `<button data-pl="${esc(x.id)}" class="${homePl === x.id ? 'on' : ''}">${esc(x.name)} <span>${list.filter(p => p.playlist === x.id).length}</span></button>`))
-    .concat(pls.length && nNone ? [`<button data-pl="none" class="${homePl === 'none' ? 'on' : ''}">Senza playlist <span>${nNone}</span></button>`] : [])
     .concat([`<button data-pl="+" class="add">${ico('plus')} Playlist</button>`]).join('');
   const plName = homePl && homePl !== 'none' ? (pls.find(x => x.id === homePl) || {}).name : null;
   $('projTitle').textContent = plName || (homePl === 'none' ? 'Senza playlist' : 'Progetti'); $('plMenu').hidden = !plName;
@@ -315,7 +314,7 @@ async function renderHome() {
   catch (e) { $('homeMeta').textContent = list.length + ' progetti'; }
 }
 // ---------- playlists (stored on this phone, like the projects) ----------
-let homePl = ls.get('homePl', '');
+let homePl = ls.get('homePl', ''); if (homePl === 'none') homePl = '';
 const getPlaylists = () => ls.get('playlists', []);
 const setPlaylists = v => ls.set('playlists', v);
 async function newPlaylist() {
@@ -797,14 +796,17 @@ async function saveNew({ name, stems, dur, offset, srcDur, withG, kind, file, th
   const piano = splitPiano(stems, n), altroName = await nameAltro(stems.altro, n); useStems(piano, altroName);
   let bt = { bpm: 0, beats: new Float64Array(0), confidence: 0 };
   try { bt = BeatTracker.analyze(rhythmMono(stems, n), SR); } catch (e) {}
-  const beats = Array.from(bt.beats), oneIdx = guessOne(stems, beats, n);
+  const beats = Array.from(bt.beats);
+  // where the 1 falls, phrase by phrase (follows breaks that add or skip beats)
+  let anchors; try { anchors = Counts.analyze(stems, beats, n, SR, Separator, 6); } catch (e) { const g = guessOne(stems, beats, n); anchors = [{ i: 0, c: (8 - g) % 8 }]; }
+  const oneIdx = (((anchors[0].i - anchors[0].c) % 8) + 8) % 8;
   $('procStage').textContent = 'Comprimo le tracce per occupare meno spazio…';
   const { data, codec } = await packStems(stems, STEMS.map(s => s.id), n, (k, m) => { $('procStage').textContent = `Comprimo le tracce: ${k} di ${m}`; });
   try {
     await tx('stems', 'readwrite', s => s.put({ id, n, sr: SR, codec, data }));
     if (kind === 'video') await tx('media', 'readwrite', s => s.put({ id, blob: file, type: file.type || 'video/mp4' }));
     const p = normalize({ id, name, kind, thumb, dur, offset, srcDur, piano, altroName, altroParts: lastAltroParts, created: Date.now(), updated: Date.now(), withGuira: withG,
-      bpm: bt.bpm, bpmDetected: bt.bpm, beats, beatsDetected: beats.slice(), confidence: bt.confidence, oneIdx, oneDetected: oneIdx,
+      bpm: bt.bpm, bpmDetected: bt.bpm, beats, beatsDetected: beats.slice(), confidence: bt.confidence, oneIdx, oneDetected: oneIdx, anchors, anchorsDetected: anchors.map(a => ({ ...a })), countAlgo: 1, tempoVaries: !!bt.tempoVaries,
       env: envelopes(stems, n), envRate: 20, mirror: kind === 'video', oneAlgo: 2 });
     try { await navigator.storage.persist(); } catch (e) {}
     await putProject(p);
@@ -879,6 +881,18 @@ async function openPlayer(id) {
     if (!ls.get('padTipSeen', false)) { ls.set('padTipSeen', true); setTimeout(() => toast(isVideo() ? 'Tocca uno strumento per spegnerlo, tienilo premuto per sentirlo da solo' : 'M spegne uno strumento, S lo fa sentire da solo, il nome regola il volume'), 600); }
     requestAnimationFrame(() => { drawTimelineStatic(); syncVideo(true); });
     raf = requestAnimationFrame(tick);
+    // projects made before the tempo/break tracking: redo beats and counts once, if the rhythm was never touched
+    if (cur.countAlgo !== 1 && cur.beatsDetected && cur.beatsDetected.length >= 16) { const proj = cur;
+      setTimeout(() => { try {
+        if (cur !== proj) return;
+        const untouched = proj.oneIdx === proj.oneDetected && proj.beats.length === proj.beatsDetected.length && proj.beats.every((t, k) => Math.abs(t - proj.beatsDetected[k]) < 1e-6);
+        if (!untouched) { proj.countAlgo = 1; persist(); return; }
+        const n2 = stems.vocals[0].length;
+        if (!(proj.notes || []).length) { const bt = BeatTracker.analyze(rhythmMono(stems, n2), SR); if (bt.beats.length >= 16) { proj.beats = Array.from(bt.beats); proj.beatsDetected = proj.beats.slice(); proj.bpm = proj.bpmDetected = bt.bpm; proj.tempoVaries = !!bt.tempoVaries; } }
+        const a = Counts.analyze(stems, proj.beats, n2, SR, Separator, 6); setAnchors(a); proj.oneDetected = proj.oneIdx; proj.anchorsDetected = a.map(x => ({ ...x })); proj.countAlgo = 1;
+        lastCount = -1; updateBeatInfo(); persist();
+        if (a.length > 1) toast('Ho trovato ' + (a.length - 1) + (a.length === 2 ? ' punto' : ' punti') + ' dove il conteggio riparte');
+      } catch (e) { console.warn('counts', e); } }, 800); }
     // projects saved before the compression: compress them now, in the background
     if (wasPcm) { const pid = cur.id; setTimeout(() => compressOld(pid, stems, nFrames).then(r => { if (r) toast(`Progetto compresso: da ${Math.round(r.before / 1e6)} a ${Math.round(r.after / 1e6)} MB`); }).catch(() => {}), 1500); }
     // projects made before the naming: listen to Altro once, in the background
@@ -894,7 +908,11 @@ async function openPlayer(id) {
 const hasBeats = () => !!cur && cur.beats.length >= 8 && cur.bpm > 0;
 function beatIdx(t) { const b = cur.beats; let lo = 0, hi = b.length - 1, r = -1; while (lo <= hi) { const m = (lo + hi) >> 1; if (b[m] <= t + 0.03) { r = m; lo = m + 1; } else hi = m - 1; } return r; }
 function nearestBeat(t) { const b = cur.beats; if (!b.length) return -1; let i = beatIdx(t); if (i < 0) return 0; if (i + 1 < b.length && Math.abs(b[i + 1] - t) < Math.abs(b[i] - t)) i++; return i; }
-const countOf = i => ((i - cur.oneIdx) % 8 + 8) % 8 + 1;
+// The count of beat i. Anchors: beat i has count c (0 = the 1) and the count goes on from there; a song
+// with a break that adds or skips beats has more than one. Old projects: one anchor from oneIdx.
+const anchorsOf = () => cur.anchors && cur.anchors.length ? cur.anchors : [{ i: 0, c: (((0 - cur.oneIdx) % 8) + 8) % 8 }];
+const countOf = i => Counts.countAt(anchorsOf(), i) + 1;
+function setAnchors(a) { cur.anchors = a.sort((x, y) => x.i - y.i); cur.oneIdx = (((a[0].i - a[0].c) % 8) + 8) % 8; }
 function beatTime(i) { const b = cur.beats; if (i >= 0 && i < b.length) return b[i]; const per = 60 / cur.bpm; return i < 0 ? b[0] + i * per : b[b.length - 1] + (i - b.length + 1) * per; }
 function phraseStartIdx(t) { const i = Math.max(0, beatIdx(t)); return i - (countOf(i) - 1); }
 function updateBeatInfo() {
@@ -1293,26 +1311,32 @@ document.querySelectorAll('[data-acc]').forEach(b => b.addEventListener('click',
 // Measured delay between a sound and the tap on it (speaker, headphones, reaction), or null if never calibrated.
 const tapOffset = () => ls.get('tapOffset', null);
 // The tap comes a little after the 1 is heard: take the beat nearest to (tap time − delay).
-function setOneHere() {
+// "L'1 è qui!": corrects the part of the song the tap is in (the whole song when there are no breaks).
+// "Da qui in poi": the count changes only from this beat on (a break the app did not notice).
+function setOneHere(fromHere) {
   if (!hasBeats() || !player) return;
   const lag = tapOffset() != null ? tapOffset() : TAP_LAG;
   const i = nearestBeat(player.position - (player.isPlaying ? lag : 0)); if (i < 0) return;
-  cur.oneIdx = ((i % 8) + 8) % 8; lastCount = -1; applyMet(); drawTimelineStatic(); computePhrases(); persist();
+  const anc = anchorsOf().map(a => ({ ...a }));
+  if (fromHere) setAnchors(anc.filter(a => a.i !== i).concat([{ i, c: 0 }]));
+  else { let k = 0; anc.forEach((a, j) => { if (a.i <= i) k = j; }); const a = anc[k]; a.c = (((a.c - Counts.countAt(anc, i)) % 8) + 8) % 8; setAnchors(anc); }
+  lastCount = -1; applyMet(); drawTimelineStatic(); computePhrases(); persist();
   if (loopMode === 4 || loopMode === 8) { const n = loopMode; loopMode = null; beatLoop(n); }
-  toast('Ok, l\'1 è qui'); vibrate(15);
+  toast(fromHere ? 'Ok, l\'1 è qui da questo punto in poi' : 'Ok, l\'1 è qui'); vibrate(15);
 }
-$('oneBtn').addEventListener('pointerdown', e => { e.preventDefault(); setOneHere(); });
-$('oneBtn').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOneHere(); } });
+$('oneBtn').addEventListener('pointerdown', e => { e.preventDefault(); setOneHere(false); });
+$('oneBtn').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOneHere(false); } });
+$('oneFromBtn').addEventListener('pointerdown', e => { e.preventDefault(); setOneHere(true); });
 function regrid(bpm) {
   const t = player.position, i = Math.max(0, nearestBeat(t)), anchor = beatTime(i - (countOf(i) - 1));
   const g = Array.from(BeatTracker.grid(bpm, anchor, player.duration));
   let k = 0, best = Infinity; g.forEach((v, j) => { const d = Math.abs(v - anchor); if (d < best) { best = d; k = j; } });
-  cur.bpm = bpm; cur.beats = g; cur.oneIdx = ((k % 8) + 8) % 8; lastCount = -1; if (loopRange) clearLoop(false); updateBeatInfo(); persist();
+  cur.bpm = bpm; cur.beats = g; setAnchors([{ i: k, c: 0 }]); lastCount = -1; if (loopRange) clearLoop(false); updateBeatInfo(); persist();
   cur.notes = cur.notes || [];
 }
 document.querySelectorAll('[data-bpm]').forEach(b => b.addEventListener('click', () => {
   if (!cur.bpmDetected) return toast('Ritmo non trovato'); const v = b.dataset.bpm;
-  if (v === 'reset') { cur.bpm = cur.bpmDetected; cur.beats = cur.beatsDetected.slice(); cur.oneIdx = cur.oneDetected; lastCount = -1; if (loopRange) clearLoop(false); updateBeatInfo(); persist(); toast('Ritmo ripristinato'); return; }
+  if (v === 'reset') { cur.bpm = cur.bpmDetected; cur.beats = cur.beatsDetected.slice(); cur.oneIdx = cur.oneDetected; cur.anchors = cur.anchorsDetected ? cur.anchorsDetected.map(a => ({ ...a })) : null; lastCount = -1; if (loopRange) clearLoop(false); updateBeatInfo(); persist(); toast('Ritmo ripristinato'); return; }
   regrid(v === 'half' ? cur.bpm / 2 : v === 'double' ? cur.bpm * 2 : Math.max(40, Math.min(240, Math.round(cur.bpm) + +v)));
 }));
 

@@ -139,6 +139,52 @@
     return { bpm: bestBpm, salience: salience, acRel: acAt(60 / bestBpm / hopSec) / ac0 };
   }
 
+  /* ---------- local tempo: the period window by window (8 s, every 1 s) ----------
+     Within ±25% of the global tempo (no octave jumps), autocorrelation + comb, light prior towards the
+     global value, median-smoothed. Returns one period (frames) per frame. */
+  function localPeriods(oenv, hopSec, P0) {
+    var n = oenv.length, win = Math.round(8 / hopSec), step = Math.round(1 / hopSec), i;
+    var x = new Float64Array(n); for (i = 0; i < n; i++) x[i] = oenv[i] > 0 ? oenv[i] : oenv[i] * 0.3;
+    var lo = Math.max(2, Math.floor(P0 * 0.78)), hi = Math.ceil(P0 * 1.28), cs = [], ps = [];
+    if (n < win + hi * 2) { var flat = new Float64Array(n).fill(P0); return flat; }
+    for (var c = (win >> 1); c + (win >> 1) <= n; c += step) {
+      var a = c - (win >> 1), b = c + (win >> 1), best = -1e9, bl = P0, sc = new Float64Array(hi + 2);
+      var ac = function (lag) { var s = 0; for (var j = a + lag; j < b; j++) s += x[j] * x[j - lag]; return s / (b - a - lag); };
+      for (var lag = lo; lag <= hi; lag++) {
+        var o = Math.log(lag / P0) / Math.LN2, v = (ac(lag) + 0.5 * (2 * lag < b - a ? ac(2 * lag) : 0)) * Math.exp(-0.5 * o * o / (0.12 * 0.12));
+        sc[lag] = v; if (v > best) { best = v; bl = lag; }
+      }
+      if (bl > lo && bl < hi) { var y0 = sc[bl - 1], y1 = sc[bl], y2 = sc[bl + 1], den = y0 - 2 * y1 + y2; if (den < 0) bl += 0.5 * (y0 - y2) / den; }
+      cs.push(c); ps.push(bl);
+    }
+    var sm = ps.map(function (_, k) { var w = ps.slice(Math.max(0, k - 2), k + 3).sort(function (u, v) { return u - v; }); return w[w.length >> 1]; });
+    var out = new Float64Array(n), k = 0;
+    for (i = 0; i < n; i++) {
+      while (k + 1 < cs.length && cs[k + 1] <= i) k++;
+      if (i <= cs[0]) out[i] = sm[0]; else if (k + 1 >= cs.length) out[i] = sm[sm.length - 1];
+      else { var f = (i - cs[k]) / (cs[k + 1] - cs[k]); out[i] = sm[k] * (1 - f) + sm[k + 1] * f; }
+    }
+    return out;
+  }
+
+  /* DP beat tracking with a period that changes along the song (tempo changes, rallentando) */
+  function dpBeatsVar(oenv, per, tightness) {
+    var n = oenv.length, i, j, mn = Infinity, mx = 0;
+    for (i = 0; i < n; i++) { if (per[i] < mn) mn = per[i]; if (per[i] > mx) mx = per[i]; }
+    var local = new Float64Array(n), kw = [0.06, 0.24, 0.4, 0.24, 0.06];
+    for (i = 0; i < n; i++) { var s = 0; for (j = -2; j <= 2; j++) { var k = i + j; if (k >= 0 && k < n) s += kw[j + 2] * oenv[k]; } local[i] = s; }
+    var score = new Float64Array(n), back = new Int32Array(n).fill(-1), lo = Math.round(mn / 2), hi = Math.round(mx * 2);
+    for (i = 0; i < n; i++) {
+      var bestV = 0, bestJ = -1, P = per[i];
+      for (var d = lo; d <= hi; d++) { j = i - d; if (j < 0) break; var lg = Math.log(d / P), v = score[j] - tightness * lg * lg; if (v > bestV) { bestV = v; bestJ = j; } }
+      score[i] = local[i] + bestV; back[i] = bestJ;
+    }
+    var endStart = Math.max(0, n - Math.round(per[n - 1] * 1.5)), end = endStart;
+    for (i = endStart; i < n; i++) if (score[i] > score[end]) end = i;
+    var seq = []; for (i = end; i >= 0; i = back[i]) { seq.push(i); if (back[i] < 0) break; }
+    return seq.reverse();
+  }
+
   /* ---------- DP beat tracking (Ellis 2007) ---------- */
   function dpBeats(oenv, periodFrames, tightness) {
     var n = oenv.length, i, j;
@@ -208,17 +254,27 @@
       times = seq.map(function (f) { return f * hopSec + shift; });
       var f2 = fitLine(times); if (f2.P > 0 && Math.abs(f2.P - P) / P < 0.03) { P = f2.P; fit = f2; } else fit.t0 = f2.t0 || fit.t0;
     }
-    var bpm = 60 / P;
-    // Output: DP beats (follow slight drift) extended with the regular grid before the first and after the last beat.
+    var bpm = 60 / P, Pfirst = P, Plast = P, tempoVaries = false;
+    // Tempo changes: if the local tempo moves by more than 4% somewhere, track with a moving period
+    var per = localPeriods(oenv, hopSec, P / hopSec), pmin = Infinity, pmax = 0;
+    for (var q = 0; q < per.length; q++) { if (per[q] < pmin) pmin = per[q]; if (per[q] > pmax) pmax = per[q]; }
+    if (pmax / pmin > 1.04) {
+      tempoVaries = true;
+      seq = dpBeatsVar(oenv, per, CFG.tightness);
+      times = seq.map(function (f) { return f * hopSec + shift; });
+      var dd = []; for (q = 1; q < times.length; q++) dd.push(times[q] - times[q - 1]);
+      bpm = 60 / median(dd); Pfirst = median(dd.slice(0, 8)); Plast = median(dd.slice(-8));
+    }
+    // Output: DP beats extended with the local beat period before the first and after the last beat.
     var beats = [], i;
     var first = times[0], last = times[times.length - 1];
-    var kBack = Math.floor(first / P + 1e-9); for (i = kBack; i >= 1; i--) beats.push(first - i * P);
+    var kBack = Math.floor(first / Pfirst + 1e-9); for (i = kBack; i >= 1; i--) beats.push(first - i * Pfirst);
     for (i = 0; i < times.length; i++) beats.push(times[i]);
-    var kFwd = Math.floor((duration - last) / P + 1e-9); for (i = 1; i <= kFwd; i++) beats.push(last + i * P);
+    var kFwd = Math.floor((duration - last) / Plast + 1e-9); for (i = 1; i <= kFwd; i++) beats.push(last + i * Plast);
     // confidence 0..1: normalised autocorrelation at the beat lag + comb-peak salience (noise ~0.0, clear groove ~1.0)
     var c01 = function (v) { return Math.max(0, Math.min(1, v)); };
     var confidence = 0.5 * c01((tempo.acRel - 0.15) / 0.4) + 0.5 * c01((tempo.salience - 0.2) / 0.6);
-    return { bpm: bpm, beats: Float64Array.from(beats), confidence: confidence };
+    return { bpm: bpm, beats: Float64Array.from(beats), confidence: confidence, tempoVaries: tempoVaries };
   };
 
   root.BeatTracker = BeatTracker;

@@ -47,7 +47,7 @@ Bachata Lab è un'app per studiare la **musicalità in bachata**. Carichi una ca
 - Tocco sulla riga: apre il player. I tre puntini: **Rinomina** o **Elimina** (chiede conferma e cancella tracce e video).
 - "Come funziona" (tre passi) compare finché hai al massimo 2 progetti.
 - **Playlist** (riga di chip sopra l'elenco):
-  - **Tutti**, una chip per playlist (con il numero di brani), **Senza playlist** e **＋ Playlist** per crearne una.
+  - **Tutti**, una chip per playlist (con il numero di brani) e **＋ Playlist** per crearne una.
   - Toccare una chip mostra solo i suoi brani; la scelta si ricorda.
   - Ogni brano sta in al massimo una playlist. **Sposta in playlist** si trova nel ⋯ del brano nella home e nel menu ⋯ del player (Ritmo del brano); da lì si può anche creare una playlist nuova o togliere il brano.
   - Con una playlist aperta, il ⋯ accanto al titolo permette: **Aggiungi brani** (elenco con caselle di tutti i progetti, con l'indicazione se un brano è già in un'altra playlist), **Rinomina**, **Elimina playlist** (i brani restano, senza playlist).
@@ -126,6 +126,7 @@ Il cerchio mostra la percentuale totale; sotto, i passaggi finiti, quello in cor
 
 **Cosa viene salvato**
 - Le tracce stereo (6 o 7), **compresse in Opus a 128 kb/s** con il codificatore del telefono (WebCodecs), in file Ogg: circa 10 volte meno spazio del PCM a 16 bit (3:20 di brano: da circa 250 MB a circa 25 MB). Prima di usarla, l'app fa una prova di codifica e decodifica e misura il piccolo ritardo del decodificatore, così tutte le tracce restano allineate al campione. Se la prova non riesce, salva a 16 bit come prima. Impostazioni → Memoria dice se la compressione è attiva.
+- Aprendo un progetto le tracce si decomprimono tutte insieme, in parallelo (sul computer 3:20 di brano: circa 6 s con 2 core; sui telefoni con più core va più veloce).
 - I progetti salvati prima vengono compressi da soli la prima volta che si aprono (dopo aver controllato la copia compressa), oppure tutti insieme da Impostazioni → Memoria → **Comprimi**.
 - Analisi (ritmo, 1, livelli, piano, "Altro") si fanno sulle tracce non compresse, prima di comprimerle.
 - Il video originale e una miniatura, se c'è un video e non hai scelto "Usa solo l'audio".
@@ -312,7 +313,12 @@ Il conteggio sparisce: si ascolta e si tocca.
   - Modelli a metà precisione: circa 60 MB l'uno, scaricati una volta e conservati nel browser.
   - In memoria i pesi sono a piena precisione. Il picco misurato durante la separazione è di circa 3,6 GB (consigliati telefoni da 6–8 GB).
 - **Ritmo**: i battiti si trovano dal flusso spettrale di basso, bongo e güira, con una preferenza per tempi intorno ai 128 BPM.
-- **L'1**: in bachata gli accordi cambiano sull'1 (e sul 5). L'app confronta l'armonia di chitarra, basso e altro prima e dopo ogni battito e prende come 1 il punto di cambio più forte. Tra 1 e 5 decide il cambio più forte più l'accento del basso. Si corregge con "L'1 è qui!".
+  - **Cambi di tempo**: l'app misura il tempo finestra per finestra (8 s ogni secondo, entro ±25% del tempo medio). Se varia più del 4% (intro lenta, rallentando, cambio di velocità) segue i battiti con un periodo che cambia lungo il brano. Su un test con la seconda metà rallentata del 10% ritrova tutti i battiti della parte lenta; sui brani a tempo costante i battiti restano identici a prima.
+  - I BPM mostrati sono la mediana.
+- **L'1, frase per frase**: in bachata gli accordi cambiano sull'1 (e sul 5). Per ogni battito l'app misura quanto cambia l'armonia (chitarra, basso, altro) e quanto è forte il basso; poi segue il conteggio 1–8 battito per battito (algoritmo di Viterbi). Il conteggio può **ripartire** (break di 2 o 4 tempi, battute aggiunte o saltate) solo quando più frasi di fila sono d'accordo, così non salta per sbaglio. Su un brano con 2 tempi tolti a metà ritrova il punto di ripartenza (con circa una frase di ritardo) e il conteggio giusto dopo; su "Frío" e "Pobre de Mí" non trova ripartenze.
+  - **L'1 è qui!** corregge il tratto in cui sei (tutto il brano se non ci sono ripartenze). **Da qui in poi** fa ripartire il conteggio solo da quel battito: per un break che l'app non ha visto.
+  - I progetti vecchi vengono rianalizzati una volta all'apertura (battiti con il tempo variabile e ripartenze), solo se il ritmo non è mai stato modificato a mano; se ci sono note sui tempi i battiti restano quelli e si ricalcola solo il conteggio.
+  - Cambiare i BPM a mano (±1, metà, doppio) rimette una griglia regolare con un solo 1.
 - **Riproduzione**: le tracce si mescolano in tempo reale con volume per strumento. Il cambio di velocità mantiene il tono (SoundTouch). Il loop è senza interruzioni e il metronomo è sincronizzato ai battiti trovati.
 - **Salvataggio**: IndexedDB `bachata-lab` (progetti, tracce, video). Modelli nella Cache `bachata-models-v1`. Preferenze in `localStorage`.
 
@@ -349,6 +355,8 @@ Il conteggio sparisce: si ascolta e si tocca.
 ---
 
 ## Registro modifiche
+
+- **26/11/2026**: cambi di tempo seguiti (tempo locale) e conteggio che riparte dopo i break, con "Da qui in poi"; tracce decompresse in parallelo all'apertura; tolta la chip "Senza playlist".
 
 - **26/11/2026**: playlist (crea, rinomina, elimina, sposta e aggiungi brani). Tracce compresse in Opus 128 kb/s: circa 10 volte meno spazio, anche per i progetti già fatti.
 
