@@ -35,8 +35,7 @@ function useHub(remote) {
   T.env.remotePathTemplate = remote ? '{model}/resolve/{revision}/' : '{model}/';
 }
 
-async function translator(src, tgt) {
-  const key = src + '-' + tgt;
+async function translator(key) {
   if (!tr[key]) {
     const t = await lib();
     useHub(true); t.env.useBrowserCache = true;
@@ -46,10 +45,25 @@ async function translator(src, tgt) {
   return tr[key];
 }
 
-async function translateAll(fn, lines, base, total) {
+// Opus-MT models that exist on Hugging Face (Xenova, with the quantized ONNX files), checked Nov 2026.
+// Portuguese has no pair of its own: ROMANCE-en reads it, en-ROMANCE writes it when the line starts with >>pt<<.
+const DIRECT = new Set(['es-en', 'es-it', 'es-fr', 'es-de', 'en-es', 'en-it', 'en-fr', 'en-de', 'it-es', 'it-en', 'it-fr',
+  'fr-es', 'fr-en', 'fr-de', 'de-es', 'de-en', 'de-fr']);
+// The models to chain for src -> tgt: the direct pair, otherwise through English.
+function route(src, tgt) {
+  if (DIRECT.has(src + '-' + tgt)) return [{ model: src + '-' + tgt }];
+  const legs = [];
+  if (src !== 'en') legs.push(src === 'pt' ? { model: 'ROMANCE-en' } : { model: src + '-en' });
+  if (tgt !== 'en') legs.push(tgt === 'pt' ? { model: 'en-ROMANCE', prefix: '>>pt<< ' } : { model: 'en-' + tgt });
+  for (const l of legs) if (!DIRECT.has(l.model) && !/ROMANCE/.test(l.model)) throw new Error('no model for ' + src + ' -> ' + tgt);
+  return legs;
+}
+
+// The ROMANCE models repeat themselves ("Não. Não. Não…") when given several lines together: one line at a time.
+async function translateAll(fn, lines, base, total, prefix, size = 6) {
   const out = [];
-  for (let i = 0; i < lines.length; i += 6) {
-    const r = await fn(lines.slice(i, i + 6));
+  for (let i = 0; i < lines.length; i += size) {
+    const r = await fn(lines.slice(i, i + size).map(x => (prefix || '') + x));
     out.push(...r.map(x => x.translation_text));
     postMessage({ type: 'trstep', done: base + out.length, total });
   }
@@ -84,15 +98,9 @@ onmessage = async ({ data: m }) => {
       const out = await asr(m.audio, { return_timestamps: true, chunk_length_s: 30, stride_length_s: 5, task: 'transcribe', language: lang });
       postMessage({ type: 'asr', id: m.id, chunks: out.chunks || [], text: out.text || '', lang });
     } else if (m.type === 'tr') {
-      let res;
-      try { // direct pair when it exists, otherwise through English
-        const f = await translator(m.src, m.tgt);
-        res = await translateAll(f, m.lines, 0, m.lines.length);
-      } catch (e) {
-        if (m.src === 'en' || m.tgt === 'en') throw e;
-        const a = await translator(m.src, 'en'); const n = m.lines.length, mid = await translateAll(a, m.lines, 0, 2 * n);
-        const b = await translator('en', m.tgt); res = await translateAll(b, mid, n, 2 * n);
-      }
+      // direct pair when it exists, otherwise through English (one leg after the other)
+      const legs = route(m.src, m.tgt), n = m.lines.length; let res = m.lines;
+      for (let k = 0; k < legs.length; k++) res = await translateAll(await translator(legs[k].model), res, k * n, legs.length * n, legs[k].prefix, /ROMANCE/.test(legs[k].model) ? 1 : 6);
       postMessage({ type: 'tr', id: m.id, out: res });
     }
   } catch (e) {

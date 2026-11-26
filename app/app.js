@@ -13,13 +13,24 @@ const ALL_STEMS = [
   { id: 'altro', n: 'Altro', d: 'synth, archi, fiati' },
 ];
 const STEMS = [];
+// "Requinto + altro" (as YAMNet named it, stored in Italian) -> the name in the app language
+const altroLabel = nm => { const m = String(nm || ''), mixed = / \+ altro$/.test(m); return T(m.replace(/ \+ altro$/, '')) + (mixed ? ' ' + T('+ altro') : ''); };
+// decimal numbers: comma in Italian and Spanish, point in English
+const dec = v => I18N.lang === 'en' ? String(v) : String(v).replace('.', ',');
+// "l'1", "il 2" in Italian; "the 1" / "el 1" in the other languages
+const countName = c => I18N.lang === 'it' ? (c === 1 || c === 8 ? "l'" : 'il ') + c : T('il {n}', { n: c });
+// card line for instruments turned off (Italian agrees the adjective with each name)
+function offText(names) {
+  if (I18N.lang !== 'it') return T(names.length === 1 ? '{x} spento' : '{x} spenti', { x: I18N.lang === 'es' ? names.join(', ').toLowerCase() : names.join(', ') });
+  return (names.length === 1 ? names[0] + ' spenta' : names.join(', ') + ' spenti').replace('Basso spenta', 'Basso spento').replace('Bongo spenta', 'Bongo spento');
+}
 // altroName: the instrument family recognised in Altro (e.g. "Requinto"), shown as the track's name
 function useStems(piano, altroName) {
   STEMS.length = 0;
   for (const s of ALL_STEMS) { if (s.id === 'piano' && !piano) continue;
     // "Requinto + altro": the name is the main instrument, "+ altro" says other things play there too
     const mixed = altroName && / \+ altro$/.test(altroName), main = altroName && altroName.replace(/ \+ altro$/, '');
-    STEMS.push(s.id === 'altro' && altroName ? Object.assign({}, s, { n: main, extra: mixed ? '+ altro' : '', d: 'riconosciuto in Altro' }) : s); }
+    STEMS.push(s.id === 'altro' && altroName ? Object.assign({}, s, { n: T(main), extra: mixed ? T('+ altro') : '', d: 'riconosciuto in Altro' }) : Object.assign({}, s, { n: T(s.n) })); }
 }
 useStems(false);
 const PRESETS = [
@@ -34,7 +45,7 @@ const PRESETS = [
 // Seconds of work per second of audio, measured in desktop Chromium (WebAssembly, 1 thread).
 // Before the first run on this phone the estimate assumes a phone is about twice as slow.
 const COST = { demucs: 2.4, guira: 2.4 };
-const MARK_NAMES = ['Intro', 'Derecho', 'Majao', 'Mambo', 'Break', 'Finale'];
+const MARK_NAMES = ['Intro', 'Derecho', 'Majao', 'Mambo', 'Break', T('Finale')];
 const PIANO_MIX = 0.03, PIANO_ALTRO = 0.35; // piano share of the whole song and of Altro to show it as a track
 const SR = 44100, MAX_FILE = 350e6, TAP_LAG = 0.15;
 const fmt = t => { t = Math.max(0, t || 0); const m = Math.floor(t / 60), s = Math.floor(t % 60); return m + ':' + String(s).padStart(2, '0'); };
@@ -59,7 +70,7 @@ function applyTheme() {
   root.style.setProperty('--acc', light ? a[2] : a[1]); // the light theme takes a darker shade of the same colour
   document.querySelector('meta[name=theme-color]').content = light ? '#F6F6F3' : '#0B0C10';
   for (const k in colorCache) delete colorCache[k];
-  $('themeBtn').innerHTML = ico(light ? 'moon' : 'sun'); $('themeBtn').setAttribute('aria-label', light ? 'Tema scuro' : 'Tema chiaro');
+  $('themeBtn').innerHTML = ico(light ? 'moon' : 'sun'); $('themeBtn').setAttribute('aria-label', light ? T('Tema scuro') : T('Tema chiaro'));
   if (window.__themeHook) window.__themeHook();
 }
 darkMQ.addEventListener('change', applyTheme);
@@ -189,15 +200,15 @@ async function stemsF32(st, ids) {
   return out;
 }
 async function packAllProjects() {
-  if (!(await opusOK())) return toast('Questo telefono non sa comprimere le tracce');
+  if (!(await opusOK())) return toast(T('Questo telefono non sa comprimere le tracce'));
   const list = await listProjects(); let done = 0, saved = 0;
   for (const p of list) {
     if (cur && cur.id === p.id) continue;
-    busy(`Comprimo i progetti: ${++done} di ${list.length}…`);
+    busy(T('Comprimo i progetti: {a} di {b}…', { a: ++done, b: list.length }));
     try { const st = await getStems(p.id); if (!st || st.codec === 'opus') continue;
       const r = await compressOld(p.id, await stemsF32(st), st.n); if (r) saved += r.before - r.after; } catch (e) {}
   }
-  busy(); toast(saved ? `Fatto: liberati ${Math.round(saved / 1e6)} MB` : 'Tutti i progetti erano già compressi'); renderSettings(); renderHome();
+  busy(); toast(saved ? T('Fatto: liberati {n} MB', { n: Math.round(saved / 1e6) }) : T('Tutti i progetti erano già compressi')); renderSettings(); renderHome();
 }
 async function packStems(stems, ids, n, onStep) {
   const data = {}, opus = await opusOK(); let k = 0;
@@ -236,7 +247,7 @@ window.addEventListener('hashchange', async () => {
   if (h !== 'mappa' && $('map').classList.contains('on')) { closeMap(true); return; }
   if (procRunning && h !== 'elabora') {
     history.pushState(null, '', '#elabora');
-    if (await dialog('Annullare la separazione?', textEl('Se esci adesso perdi il lavoro fatto finora.'), [['Continua', false, true], ['Esci', true]])) cancelProcessing();
+    if (await dialog(T('Annullare la separazione?'), textEl(T('Se esci adesso perdi il lavoro fatto finora.')), [[T('Continua'), false, true], [T('Esci'), true]])) cancelProcessing();
     return;
   }
   if (!h && !$('s-home').classList.contains('on')) go('home');
@@ -264,41 +275,41 @@ let homeFilter = 'all', homeSort = ls.get('homeSort', 'recent'), homeList = [];
 const SICON = { vocals: 'vocals', guitar: 'guitar', bass: 'bass', bongo: 'bongo', guira: 'guira', altro: 'altro', piano: 'altro' };
 const sico = (id, cls) => `<svg class="i${cls ? ' ' + cls : ''}"><use href="#s-${SICON[id]}"/></svg>`;
 function whenTxt(ts) {
-  const d = new Date(ts), now = new Date(), day = 864e5, hm = d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+  const d = new Date(ts), now = new Date(), day = 864e5, hm = d.toLocaleTimeString(I18N.locale, { hour: 'numeric', minute: '2-digit' });
   const d0 = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-  if (ts >= d0) return 'Oggi, ' + hm; if (ts >= d0 - day) return 'Ieri, ' + hm;
-  return d.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' });
+  if (ts >= d0) return T('Oggi, {t}', { t: hm }); if (ts >= d0 - day) return T('Ieri, {t}', { t: hm });
+  return d.toLocaleDateString(I18N.locale, { day: 'numeric', month: 'short' });
 }
 // One line on the card that says how the project was left: who is solo, who is off, which preset.
 function mixStatus(p) {
   const name = id => (STEMS.find(s => s.id === id) || {}).n;
   const solo = STEMS.filter(s => p.solo && p.solo[s.id]).map(s => s.n);
-  if (solo.length) return ['Solo ' + solo.join(' + '), 'var(--tap)'];
+  if (solo.length) return [T('Solo {x}', { x: solo.join(' + ') }), 'var(--tap)'];
   const off = STEMS.filter(s => (p.mute && p.mute[s.id]) || (p.gains && p.gains[s.id] === 0)).map(s => s.id);
-  if (off.length) return [(off.length === 1 ? name(off[0]) + ' spenta' : off.map(name).join(', ') + ' spenti').replace('Basso spenta', 'Basso spento').replace('Bongo spenta', 'Bongo spento'), 'var(--tap)'];
-  return ['Mix completo', 'var(--mute)'];
+  if (off.length) return [offText(off.map(name)), 'var(--tap)'];
+  return [T('Mix completo'), 'var(--mute)'];
 }
 async function renderHome() {
   let list = [];
-  try { list = await listProjects(); } catch (e) { $('projects').innerHTML = '<p class="warn" style="padding:0 8px">Questo browser non permette di salvare i progetti (forse è in modalità privata).</p>'; return; }
+  try { list = await listProjects(); } catch (e) { $('projects').innerHTML = '<p class="warn" style="padding:0 8px">' + T('Questo browser non permette di salvare i progetti (forse è in modalità privata).') + '</p>'; return; }
   homeList = list.slice().sort((a, b) => b.updated - a.updated);
-  if (homeSort === 'name') list.sort((a, b) => a.name.localeCompare(b.name, 'it')); else list.sort((a, b) => b.updated - a.updated);
-  $('sortBtn').textContent = homeSort === 'name' ? 'A–Z' : 'Recenti'; $('sortBtn').hidden = list.length < 2;
+  if (homeSort === 'name') list.sort((a, b) => a.name.localeCompare(b.name, I18N.lang)); else list.sort((a, b) => b.updated - a.updated);
+  $('sortBtn').textContent = homeSort === 'name' ? 'A–Z' : T('Recenti'); $('sortBtn').hidden = list.length < 2;
   $('searchBox').hidden = list.length < 3;
   const q = ($('q').value || '').trim().toLowerCase();
   const nA = list.filter(p => p.kind !== 'video').length, nV = list.length - nA;
-  $('filters').innerHTML = nA && nV ? [['all', 'Tutti'], ['audio', 'Audio'], ['video', 'Video']]
+  $('filters').innerHTML = nA && nV ? [['all', T('Tutti')], ['audio', T('Audio')], ['video', T('Video')]]
     .map(([k, l]) => `<button data-f="${k}" class="${homeFilter === k ? 'on' : ''}">${l}</button>`).join('') : '';
   $('guide').hidden = list.length > 2;
   $('projHead').hidden = !list.length;
   // playlists: a song sits in at most one; the chips filter the list
   const pls = getPlaylists(); if (homePl && homePl !== 'none' && !pls.some(x => x.id === homePl)) homePl = '';
   const inPl = p => !homePl || (homePl === 'none' ? !p.playlist || !pls.some(x => x.id === p.playlist) : p.playlist === homePl);
-  $('plChips').innerHTML = !list.length ? '' : [`<button data-pl="" class="${!homePl ? 'on' : ''}">Tutti <span>${list.length}</span></button>`]
+  $('plChips').innerHTML = !list.length ? '' : [`<button data-pl="" class="${!homePl ? 'on' : ''}">${T('Tutti')} <span>${list.length}</span></button>`]
     .concat(pls.map(x => `<button data-pl="${esc(x.id)}" class="${homePl === x.id ? 'on' : ''}">${esc(x.name)} <span>${list.filter(p => p.playlist === x.id).length}</span></button>`))
-    .concat([`<button data-pl="+" class="add">${ico('plus')} Playlist</button>`]).join('');
+    .concat([`<button data-pl="+" class="add">${ico('plus')} ${T('Playlist')}</button>`]).join('');
   const plName = homePl && homePl !== 'none' ? (pls.find(x => x.id === homePl) || {}).name : null;
-  $('projTitle').textContent = plName || (homePl === 'none' ? 'Senza playlist' : 'Progetti'); $('plMenu').hidden = !plName;
+  $('projTitle').textContent = plName || (homePl === 'none' ? T('Senza playlist') : T('Progetti')); $('plMenu').hidden = !plName;
   const shown = list.filter(p => inPl(p) && (homeFilter === 'all' || (homeFilter === 'video') === (p.kind === 'video')) && (!q || p.name.toLowerCase().includes(q)));
   const bars = [12, 24, 16, 28, 10];
   $('projects').innerHTML = !list.length ? '' : shown.map(p => {
@@ -306,54 +317,54 @@ async function renderHome() {
     const th = p.kind === 'video' ? `${p.thumb ? `<img src="${esc(p.thumb)}" alt="">` : ''}<span class="vt">VIDEO</span>` : bars.map(h => `<i style="height:${h}px"></i>`).join('');
     return `<div class="proj" data-id="${esc(p.id)}" role="button" tabindex="0">
       <div class="th">${th}</div>
-      <div class="tx"><b>${esc(p.name)}</b><div class="m1">${fmt(p.dur)} · ${p.bpm ? Math.round(p.bpm) + ' BPM' : 'ritmo ?'} · ${p.withGuira === false ? 5 : p.piano ? 7 : 6} tracce</div>
+      <div class="tx"><b>${esc(p.name)}</b><div class="m1">${fmt(p.dur)} · ${p.bpm ? Math.round(p.bpm) + ' BPM' : T('ritmo ?')} · ${T('{n} tracce', { n: p.withGuira === false ? 5 : p.piano ? 7 : 6 })}</div>
         <div class="m2" style="--sc:${sc}"><i></i>${esc(st)}${mk}</div></div>
-      <span class="when">${whenTxt(p.updated)}</span><button class="icon" data-menu="${esc(p.id)}" aria-label="Opzioni">${ico('more')}</button></div>`; }).join('');
-  if (list.length && !shown.length) $('projects').innerHTML = plName && !q ? '<p class="mute" style="padding:14px 8px">Playlist vuota: usa ⋯ → «Aggiungi brani», oppure ⋯ su un brano → «Sposta in playlist».</p>' : '<p class="mute" style="padding:14px 8px">Nessun progetto trovato.</p>';
-  try { const e = await navigator.storage.estimate(); $('homeMeta').textContent = list.length + (list.length === 1 ? ' progetto' : ' progetti') + ' · ' + Math.round((e.usage || 0) / 1e6) + ' MB'; }
-  catch (e) { $('homeMeta').textContent = list.length + ' progetti'; }
+      <span class="when">${whenTxt(p.updated)}</span><button class="icon" data-menu="${esc(p.id)}" aria-label="${T('Opzioni')}">${ico('more')}</button></div>`; }).join('');
+  if (list.length && !shown.length) $('projects').innerHTML = plName && !q ? '<p class="mute" style="padding:14px 8px">' + T('Playlist vuota: usa ⋯ → «Aggiungi brani», oppure ⋯ su un brano → «Sposta in playlist».') + '</p>' : '<p class="mute" style="padding:14px 8px">' + T('Nessun progetto trovato.') + '</p>';
+  try { const e = await navigator.storage.estimate(); $('homeMeta').textContent = T(list.length === 1 ? '{n} progetto' : '{n} progetti', { n: list.length }) + ' · ' + Math.round((e.usage || 0) / 1e6) + ' MB'; }
+  catch (e) { $('homeMeta').textContent = T(list.length === 1 ? '{n} progetto' : '{n} progetti', { n: list.length }); }
 }
 // ---------- playlists (stored on this phone, like the projects) ----------
 let homePl = ls.get('homePl', ''); if (homePl === 'none') homePl = '';
 const getPlaylists = () => ls.get('playlists', []);
 const setPlaylists = v => ls.set('playlists', v);
 async function newPlaylist() {
-  const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = 40; inp.placeholder = 'Es. Sensual, Da studiare, Corso giovedì';
-  if (!(await dialog('Nuova playlist', inp, [['Annulla', false], ['Crea', true, true]])) || !inp.value.trim()) return null;
+  const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = 40; inp.placeholder = T('Es. Sensual, Da studiare, Corso giovedì');
+  if (!(await dialog(T('Nuova playlist'), inp, [[T('Annulla'), false], [T('Crea'), true, true]])) || !inp.value.trim()) return null;
   const pl = { id: 'pl' + Date.now().toString(36), name: inp.value.trim() }; setPlaylists(getPlaylists().concat([pl])); return pl.id;
 }
 // a list of choices inside the dialog (one button per playlist)
 function pickList(title, items, extra) {
   const wrap = document.createElement('div'); wrap.className = 'plist';
   for (const [label, val, on] of items) { const b = document.createElement('button'); b.textContent = label; if (on) b.className = 'on'; b.onclick = () => closeDialog(val); wrap.append(b); }
-  return dialog(title, wrap, extra || [['Annulla', null, true]]);
+  return dialog(title, wrap, extra || [[T('Annulla'), null, true]]);
 }
 async function moveToPlaylist(ids) {
   ids = [].concat(ids); const pls = getPlaylists(), one = ids.length === 1 ? await getProject(ids[0]) : null;
-  let v = await pickList(ids.length === 1 ? 'Sposta in playlist' : `Sposta ${ids.length} brani`, pls.map(x => [x.name, x.id, one && one.playlist === x.id])
-    .concat([['Nessuna playlist', '', one && !one.playlist], ['＋ Nuova playlist…', '+']]));
+  let v = await pickList(ids.length === 1 ? T('Sposta in playlist') : T('Sposta {n} brani', { n: ids.length }), pls.map(x => [x.name, x.id, one && one.playlist === x.id])
+    .concat([[T('Nessuna playlist'), '', one && !one.playlist], ['＋ ' + T('Nuova playlist…'), '+']]));
   if (v == null) return;
   if (v === '+') { v = await newPlaylist(); if (!v) return; }
   for (const id of ids) {
     if (cur && cur.id === id) { cur.playlist = v || null; await putProject(cur); continue; }
     const p = await getProject(id); if (p) { p.playlist = v || null; await putProject(p); }
   }
-  const name = (getPlaylists().find(x => x.id === v) || {}).name; toast(v ? 'Spostato in «' + name + '»' : 'Tolto dalla playlist'); renderHome();
+  const name = (getPlaylists().find(x => x.id === v) || {}).name; toast(v ? T('Spostato in «{x}»', { x: name }) : T('Tolto dalla playlist')); renderHome();
 }
 async function playlistMenu() {
   const pls = getPlaylists(), pl = pls.find(x => x.id === homePl); if (!pl) return;
-  const v = await dialog(pl.name, null, [['Aggiungi brani', 'add'], ['Rinomina', 'ren'], ['Elimina playlist', 'del'], ['Chiudi', null, true]]);
+  const v = await dialog(pl.name, null, [[T('Aggiungi brani'), 'add'], [T('Rinomina'), 'ren'], [T('Elimina playlist'), 'del'], [T('Chiudi'), null, true]]);
   if (v === 'ren') { const inp = document.createElement('input'); inp.type = 'text'; inp.value = pl.name; inp.maxLength = 40;
-    if (await dialog('Rinomina playlist', inp, [['Annulla', false], ['Salva', true, true]]) && inp.value.trim()) { pl.name = inp.value.trim(); setPlaylists(pls); renderHome(); } }
-  if (v === 'del') { if (await dialog('Eliminare «' + pl.name + '»?', textEl('I brani restano: tornano senza playlist.'), [['Annulla', false], ['Elimina', true, true]])) {
+    if (await dialog(T('Rinomina playlist'), inp, [[T('Annulla'), false], [T('Salva'), true, true]]) && inp.value.trim()) { pl.name = inp.value.trim(); setPlaylists(pls); renderHome(); } }
+  if (v === 'del') { if (await dialog(T('Eliminare «{x}»?', { x: pl.name }), textEl(T('I brani restano: tornano senza playlist.')), [[T('Annulla'), false], [T('Elimina'), true, true]])) {
       setPlaylists(pls.filter(x => x !== pl)); for (const p of await listProjects()) if (p.playlist === pl.id) { p.playlist = null; await putProject(p); } homePl = ''; ls.set('homePl', ''); renderHome(); } }
   if (v === 'add') {
-    const all = (await listProjects()).sort((a, b) => a.name.localeCompare(b.name, 'it')), wrap = document.createElement('div'); wrap.className = 'plist checks';
+    const all = (await listProjects()).sort((a, b) => a.name.localeCompare(b.name, I18N.lang)), wrap = document.createElement('div'); wrap.className = 'plist checks';
     for (const p of all) { const l = document.createElement('label'); const c = document.createElement('input'); c.type = 'checkbox'; c.value = p.id; c.checked = p.playlist === pl.id;
       const t = document.createElement('span'); t.textContent = p.name; const o = document.createElement('small'); const opl = pls.find(x => x.id === p.playlist);
-      o.textContent = opl && opl !== pl ? 'in «' + opl.name + '»' : ''; l.append(c, t, o); wrap.append(l); }
-    if (!all.length) wrap.append(textEl('Ancora nessun progetto.'));
-    if (!(await dialog('Brani in «' + pl.name + '»', wrap, [['Annulla', false], ['Salva', true, true]]))) return;
+      o.textContent = opl && opl !== pl ? T('in «{x}»', { x: opl.name }) : ''; l.append(c, t, o); wrap.append(l); }
+    if (!all.length) wrap.append(textEl(T('Ancora nessun progetto.')));
+    if (!(await dialog(T('Brani in «{x}»', { x: pl.name }), wrap, [[T('Annulla'), false], [T('Salva'), true, true]]))) return;
     for (const c of wrap.querySelectorAll('input')) { const p = all.find(x => x.id === c.value); const want = c.checked ? pl.id : (p.playlist === pl.id ? null : p.playlist);
       if ((p.playlist || null) !== (want || null)) { if (cur && cur.id === p.id) { cur.playlist = want; await putProject(cur); } else { p.playlist = want; await putProject(p); } } }
     renderHome();
@@ -375,7 +386,7 @@ $('projects').addEventListener('keydown', e => { if (e.key === 'Enter' && e.targ
 async function renameProject(id) {
   const p = await getProject(id); if (!p) return;
   const inp = document.createElement('input'); inp.type = 'text'; inp.value = p.name; inp.maxLength = 60;
-  if (await dialog('Rinomina', inp, [['Annulla', false], ['Salva', true, true]]) && inp.value.trim()) {
+  if (await dialog(T('Rinomina'), inp, [[T('Annulla'), false], [T('Salva'), true, true]]) && inp.value.trim()) {
     if (cur && cur.id === id) { cur.name = inp.value.trim(); $('pTitle').textContent = cur.name; await putProject(cur); }
     else { p.name = inp.value.trim(); await putProject(p); }
   }
@@ -383,16 +394,15 @@ async function renameProject(id) {
 }
 async function removeProject(id) {
   const p = await getProject(id); if (!p) return;
-  const mb = p.kind === 'video' ? ' e il video salvato' : '';
-  if (!await dialog('Eliminare «' + p.name + '»?', textEl(`Le tracce separate${mb} verranno cancellate da questo telefono.`), [['Annulla', false], ['Elimina', true, true]])) return;
+  if (!await dialog(T('Eliminare «{x}»?', { x: p.name }), textEl(p.kind === 'video' ? T('Le tracce separate e il video salvato verranno cancellate da questo telefono.') : T('Le tracce separate verranno cancellate da questo telefono.')), [[T('Annulla'), false], [T('Elimina'), true, true]])) return;
   const open = cur && cur.id === id; if (open) closePlayer(true);
-  await deleteProject(id); toast('Progetto eliminato');
+  await deleteProject(id); toast(T('Progetto eliminato'));
   if (open) { if (location.hash) history.back(); else go('home'); return; }
   if ($('s-home').classList.contains('on')) renderHome();
 }
 async function projectMenu(id) {
   const p = await getProject(id); if (!p) return;
-  const v = await dialog(p.name, null, [['Sposta in playlist', 'pl'], ['Rinomina', 'ren'], ['Elimina', 'del'], ['Chiudi', null, true]]);
+  const v = await dialog(p.name, null, [[T('Sposta in playlist'), 'pl'], [T('Rinomina'), 'ren'], [T('Elimina'), 'del'], [T('Chiudi'), null, true]]);
   if (v === 'pl') moveToPlaylist(id);
   if (v === 'ren') renameProject(id);
   if (v === 'del') removeProject(id);
@@ -401,7 +411,7 @@ $('newBtn').addEventListener('click', () => $('file').click());
 // Training from the home bar: the last project, or the one chosen with "Cambia".
 async function trainFromHome(id) {
   if (!homeList.length) { try { homeList = (await listProjects()).sort((a, b) => b.updated - a.updated); } catch (e) {} }
-  if (!homeList.length) return toast('Prima crea un progetto');
+  if (!homeList.length) return toast(T('Prima crea un progetto'));
   await openPlayer(id || homeList[0].id); if (cur) openTraining();
 }
 // ---------- settings ----------
@@ -411,26 +421,28 @@ async function openSettings() {
 async function renderSettings() {
   const th = ls.get('theme', 'dark'), ai = ls.get('accent', 0);
   document.querySelectorAll('[data-theme]').forEach(b => b.classList.toggle('on', b.dataset.theme === th));
-  $('accentList').innerHTML = ACCENTS.map((a, i) => `<button data-acc-i="${i}" class="${i === ai ? 'on' : ''}" style="--c:${isLight() ? a[2] : a[1]}" aria-label="Colore ${a[0]}"></button>`).join('');
-  $('accentName').textContent = ACCENTS[ai][0] + (ai === 0 ? ' (predefinito)' : '');
-  $('accentHint').textContent = isLight() ? 'tonalità più scura sul chiaro' : '';
-  $('trLang').value = ls.get('trLang', 'it'); const o = tapOffset(); $('calTxt2').textContent = o == null ? 'Non calibrato' : Math.round(o * 1000) + ' ms tra suono e tocco';
+  $('accentList').innerHTML = ACCENTS.map((a, i) => `<button data-acc-i="${i}" class="${i === ai ? 'on' : ''}" style="--c:${isLight() ? a[2] : a[1]}" aria-label="${T('Colore {c}', { c: T(a[0]) })}"></button>`).join('');
+  $('accentName').textContent = T(ACCENTS[ai][0]) + (ai === 0 ? ' ' + T('(predefinito)') : '');
+  $('accentHint').textContent = isLight() ? T('tonalità più scura sul chiaro') : '';
+  $('trLang').value = trTarget(); $('uiLang').value = I18N.lang; const o = tapOffset(); $('calTxt2').textContent = o == null ? T('Non calibrato') : T('{n} ms tra suono e tocco', { n: Math.round(o * 1000) });
   const mb = v => v >= 1e9 ? (v / 1e9).toFixed(1) + ' GB' : Math.round(v / 1e6) + ' MB';
   let est = {}, models = [], n = homeList.length;
   try { est = await navigator.storage.estimate(); } catch (e) {}
   try { models = (await caches.keys()).filter(k => k.startsWith('bachata-models')); } catch (e) {}
   const row = (a, b) => `<div class="setrow"><span class="grow">${a}</span><b>${b}</b></div>`;
-  $('setInfo').innerHTML = row('Progetti', n + ' · ' + mb(est.usage || 0)) + row('Modelli di separazione', NATIVE ? "dentro l'app" : models.length ? 'scaricati' : 'non ancora') +
-    row('Versione', 'Bachata Lab 6' + (NATIVE ? ' · Android' : '')) + (!NATIVE && models.length ? '<div class="setrow"><span class="grow">Libera circa 160 MB (si riscaricano al prossimo progetto)</span><button class="pill" id="delModels">Elimina modelli</button></div>' : '');
+  $('setInfo').innerHTML = row(T('Progetti'), n + ' · ' + mb(est.usage || 0)) + row(T('Modelli di separazione'), NATIVE ? T("dentro l'app") : models.length ? T('scaricati') : T('non ancora')) +
+    row(T('Versione'), 'Bachata Lab 6' + (NATIVE ? ' · Android' : '')) + (!NATIVE && models.length ? '<div class="setrow"><span class="grow">' + T('Libera circa 160 MB (si riscaricano al prossimo progetto)') + '</span><button class="pill" id="delModels">' + T('Elimina modelli') + '</button></div>' : '');
   const ok = await opusOK();
-  $('setInfo').insertAdjacentHTML('beforeend', row('Compressione delle tracce', ok ? 'attiva (Opus 128 kb/s)' : 'non disponibile qui'));
-  if (ok) $('setInfo').insertAdjacentHTML('beforeend', '<div class="setrow"><span class="grow">I progetti nuovi sono già compressi (circa 10 volte meno spazio). Quelli fatti prima si comprimono quando li apri, oppure tutti qui.</span><button class="pill" id="packAll">Comprimi</button></div>');
+  $('setInfo').insertAdjacentHTML('beforeend', row(T('Compressione delle tracce'), ok ? T('attiva (Opus 128 kb/s)') : T('non disponibile qui')));
+  if (ok) $('setInfo').insertAdjacentHTML('beforeend', '<div class="setrow"><span class="grow">' + T('I progetti nuovi sono già compressi (circa 10 volte meno spazio). Quelli fatti prima si comprimono quando li apri, oppure tutti qui.') + '</span><button class="pill" id="packAll">' + T('Comprimi') + '</button></div>');
   if (ok) $('packAll').onclick = packAllProjects;
-  const dm = $('delModels'); if (dm) dm.onclick = async () => { for (const k of models) { try { await caches.delete(k); } catch (e) {} } ls.set('modelsCached', false); toast('Modelli eliminati'); renderSettings(); };
+  const dm = $('delModels'); if (dm) dm.onclick = async () => { for (const k of models) { try { await caches.delete(k); } catch (e) {} } ls.set('modelsCached', false); toast(T('Modelli eliminati')); renderSettings(); };
 }
 document.querySelectorAll('[data-theme]').forEach(b => b.addEventListener('click', () => { ls.set('theme', b.dataset.theme); applyTheme(); renderSettings(); }));
 $('accentList').addEventListener('click', e => { const b = e.target.closest('[data-acc-i]'); if (!b) return; ls.set('accent', +b.dataset.accI); applyTheme(); renderSettings(); });
 $('calBtn2').addEventListener('click', async () => { await calibrate(); renderSettings(); });
+// app language: saved, then the page reloads in the new language and comes back to Settings
+$('uiLang').addEventListener('change', e => { if (I18N.setLang(e.target.value)) { try { sessionStorage.setItem('reopen', 'set'); } catch (x) {} location.reload(); } });
 $('themeBtn').addEventListener('click', () => { ls.set('theme', isLight() ? 'dark' : 'light'); applyTheme(); });
 $('changeFile').addEventListener('click', () => $('file').click());
 $('clearName').addEventListener('click', () => { $('pname').value = ''; $('pname').focus(); });
@@ -445,19 +457,19 @@ function releaseSource() {
 $('file').addEventListener('change', async () => {
   const f = $('file').files[0]; $('file').value = ''; if (!f) return;
   const video = /^video\//.test(f.type) || /\.(mp4|mov|webm|m4v)$/i.test(f.name);
-  if (f.size > MAX_FILE) return dialog('File troppo grande', textEl(`Questo file supera i ${Math.round(MAX_FILE / 1e6)} MB e il telefono potrebbe non reggere. Prova con un video più corto o compresso.`), [['OK', 0, true]]);
+  if (f.size > MAX_FILE) return dialog(T('File troppo grande'), textEl(T('Questo file supera i {n} MB e il telefono potrebbe non reggere. Prova con un video più corto o compresso.', { n: Math.round(MAX_FILE / 1e6) })), [['OK', 0, true]]);
   releaseSource();
-  busy(video ? 'Leggo l\'audio del video…' : 'Leggo il brano…');
+  busy(video ? T('Leggo l\'audio del video…') : T('Leggo il brano…'));
   let buf;
   try { buf = await audioCtx().decodeAudioData(await f.arrayBuffer()); }
-  catch (e) { busy(); return dialog('File non leggibile', textEl(video ? 'Non riesco a leggere l\'audio di questo video. Prova con un MP4 registrato dal telefono.' : 'Questo file audio non si apre. Prova con un MP3 o un M4A.'), [['OK', 0, true]]); }
+  catch (e) { busy(); return dialog(T('File non leggibile'), textEl(video ? T('Non riesco a leggere l\'audio di questo video. Prova con un MP4 registrato dal telefono.') : T('Questo file audio non si apre. Prova con un MP3 o un M4A.')), [['OK', 0, true]]); }
   busy();
-  src = { buf, file: f, kind: video ? 'video' : 'audio', name: f.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim() || 'Nuovo brano' };
+  src = { buf, file: f, kind: video ? 'video' : 'audio', name: f.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim() || T('Nuovo brano') };
   region = { s: 0, e: Math.min(buf.duration, 60) };
-  $('pname').value = src.name; $('newTitle').textContent = video ? 'Nuovo progetto video' : 'Nuovo progetto';
+  $('pname').value = src.name; $('newTitle').textContent = video ? T('Nuovo progetto video') : T('Nuovo progetto');
   const vp = $('vprev');
   if (video) { vprevUrl = URL.createObjectURL(f); vp.src = vprevUrl; $('vcard').classList.add('on'); }
-  $('fileIc').innerHTML = ico(video ? 'video' : 'note'); $('vname').textContent = f.name; $('vdur').textContent = (video ? 'Video · ' : 'Audio · ') + fmt(buf.duration);
+  $('fileIc').innerHTML = ico(video ? 'video' : 'note'); $('vname').textContent = f.name; $('vdur').textContent = (video ? T('Video') : T('Audio')) + ' · ' + fmt(buf.duration);
   $('audioOnlyRow').hidden = !video; $('audioOnly').checked = false;
   $('createBtn').disabled = false;
   computePeaks(); show('new'); location.hash = 'nuovo'; drawRegion(); seekPreview(0);
@@ -487,7 +499,7 @@ function drawRegion() {
   const acc = cssColor('--acc'), cy = cssColor('--cy');
   g.globalAlpha = 0.16; g.fillStyle = acc; g.fillRect(xs, 0, xe - xs, H); g.globalAlpha = 1;
   g.font = '700 10px "JetBrains Mono",monospace';
-  [[xs, acc, 'INIZIO'], [xe, cy, 'FINE']].forEach(([x, c, t]) => {
+  [[xs, acc, T('INIZIO')], [xe, cy, T('FINE')]].forEach(([x, c, t]) => {
     g.fillStyle = c; g.shadowColor = c; g.shadowBlur = 8; g.fillRect(x - 1, 0, 2, H); g.shadowBlur = 0;
     const tw = g.measureText(t).width + 8, lx = Math.min(Math.max(x - tw / 2, 0), W - tw);
     g.fillRect(lx, 2, tw, 15); g.fillStyle = cssColor('--bg'); g.fillText(t, lx + 4, 13);
@@ -497,11 +509,11 @@ function drawRegion() {
   let tk = ''; for (let t = 0; t <= d + 0.01; t += step) tk += `<span>${fmt(t)}</span>`; $('ticks').innerHTML = tk;
   const dur = region.e - region.s, withG = true;
   $('rs').textContent = fmt(region.s); $('re').textContent = fmt(region.e); $('rd').textContent = fmt(dur);
-  $('rdS').textContent = dur < 30 ? 'Una frase · meglio 30–90 s' : dur <= 90 ? 'Durata ideale per studiare' : 'Parte lunga · meglio 30–90 s';
+  $('rdS').textContent = dur < 30 ? T('Una frase · meglio 30–90 s') : dur <= 90 ? T('Durata ideale per studiare') : T('Parte lunga · meglio 30–90 s');
   const first = !NATIVE && !ls.get('modelsCached', false);
-  $('est').textContent = `Circa ${estimateMinutes(dur, withG)} min · tutto sul telefono` + (first ? ' · la prima volta scarica anche i modelli (160 MB)' : '');
-  $('regionWarn').innerHTML = dur > 180 ? '<div class="alert"><b>Parte lunga:</b> serve molta memoria. Sui telefoni con meno di 8 GB potrebbe non riuscire.</div>'
-    : dur > 120 ? '<div class="alert">Le parti oltre i 2 minuti richiedono più memoria e più tempo sul telefono.</div>' : '';
+  $('est').textContent = T('Circa {n} min · tutto sul telefono', { n: estimateMinutes(dur, withG) }) + (first ? ' · ' + T('la prima volta scarica anche i modelli (160 MB)') : '');
+  $('regionWarn').innerHTML = dur > 180 ? '<div class="alert"><b>' + T('Parte lunga:') + '</b> ' + T('serve molta memoria. Sui telefoni con meno di 8 GB potrebbe non riuscire.') + '</div>'
+    : dur > 120 ? '<div class="alert">' + T('Le parti oltre i 2 minuti richiedono più memoria e più tempo sul telefono.') + '</div>' : '';
   $('createBtn').disabled = dur < 8;
 }
 
@@ -523,7 +535,7 @@ document.querySelectorAll('[data-nudge]').forEach(b => b.addEventListener('click
 }));
 function stopPreview() {
   if (preview) { const p = preview; preview = null; try { p.node.stop(); } catch (e) {} cancelAnimationFrame(p.raf); }
-  $('preview').innerHTML = ico('play') + 'Ascolta'; $('rph').style.display = 'none'; $('startHere').disabled = $('endHere').disabled = true;
+  $('preview').innerHTML = ico('play') + T('Ascolta'); $('rph').style.display = 'none'; $('startHere').disabled = $('endHere').disabled = true;
   try { $('vprev').pause(); } catch (e) {}
 }
 async function startPreview() {
@@ -534,16 +546,16 @@ async function startPreview() {
   preview = { node, t0, from, raf: 0 };
   node.onended = () => { if (preview && preview.node === node) stopPreview(); };
   if (src.kind === 'video') { const v = $('vprev'); v.currentTime = from; v.play().catch(() => {}); }
-  $('preview').innerHTML = ico('pause') + 'Stop'; $('startHere').disabled = $('endHere').disabled = false;
+  $('preview').innerHTML = ico('pause') + T('Stop'); $('startHere').disabled = $('endHere').disabled = false;
   const ph = $('rph'); ph.style.display = 'block';
   const loop = () => { if (!preview) return; const t = previewPos(); ph.style.left = (t / src.buf.duration * 100) + '%'; preview.raf = requestAnimationFrame(loop); };
   loop();
 }
 const previewPos = () => preview ? preview.from + (audioCtx().currentTime - preview.t0) : region.s;
 $('preview').addEventListener('click', () => (preview ? stopPreview() : startPreview()));
-$('startHere').addEventListener('click', () => { const t = previewPos(); region.s = Math.max(0, Math.min(t, region.e - 8)); drawRegion(); toast('Inizio a ' + fmt(region.s)); startPreview(); });
+$('startHere').addEventListener('click', () => { const t = previewPos(); region.s = Math.max(0, Math.min(t, region.e - 8)); drawRegion(); toast(T('Inizio a {t}', { t: fmt(region.s) })); startPreview(); });
 $('allSong').addEventListener('click', () => { if (!src) return; stopPreview(); region = { s: 0, e: src.buf.duration }; drawRegion(); });
-$('endHere').addEventListener('click', () => { const t = previewPos(); region.e = Math.min(src.buf.duration, Math.max(t, region.s + 8)); drawRegion(); toast('Fine a ' + fmt(region.e)); stopPreview(); });
+$('endHere').addEventListener('click', () => { const t = previewPos(); region.e = Math.min(src.buf.duration, Math.max(t, region.s + 8)); drawRegion(); toast(T('Fine a {t}', { t: fmt(region.e) })); stopPreview(); });
 window.addEventListener('resize', () => { if ($('s-new').classList.contains('on')) drawRegion(); if (cur) drawTimelineStatic(); });
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { for (const k in colorCache) delete colorCache[k]; drawTimelineStatic(); });
 
@@ -593,7 +605,7 @@ document.addEventListener('visibilitychange', () => {
 });
 window.addEventListener('pagehide', () => { if (cur && player) { cur.pos = player.position; putProject(cur).catch(() => {}); } });
 function setSteps(list, now) { $('procSteps').innerHTML = list.map((s, i) => { const st = i < now ? 'done' : i === now ? 'now' : 'todo';
-  return `<li class="${st}"><span class="st">${st === 'done' ? '✓' : i + 1}</span><span class="t">${s}</span><span class="tag">${st === 'done' ? 'fatto' : ''}</span>${st === 'now' ? '<span class="sbar"><b></b></span>' : ''}</li>`; }).join(''); }
+  return `<li class="${st}"><span class="st">${st === 'done' ? '✓' : i + 1}</span><span class="t">${s}</span><span class="tag">${st === 'done' ? T('fatto') : ''}</span>${st === 'now' ? '<span class="sbar"><b></b></span>' : ''}</li>`; }).join(''); }
 const stepInfo = txt => { const t = document.querySelector('#procSteps li.now .tag'); if (t) t.textContent = txt; };
 // frac: share of the whole job; part: share of the current step (for its own bar)
 function setProgress(frac, part) {
@@ -601,73 +613,73 @@ function setProgress(frac, part) {
   const sb = document.querySelector('#procSteps li.now .sbar b'); if (sb) sb.style.width = ((part == null ? frac : part) * 100).toFixed(1) + '%';
 }
 let procClock = 0;
-function cancelProcessing() { if (worker) { worker.terminate(); worker = null; } procRunning = false; clearInterval(procClock); releaseWake(); toast('Separazione annullata'); go('home'); }
+function cancelProcessing() { if (worker) { worker.terminate(); worker = null; } procRunning = false; clearInterval(procClock); releaseWake(); toast(T('Separazione annullata')); go('home'); }
 $('createBtn').addEventListener('click', async () => {
   if (procRunning || !src) return;
   $('createBtn').disabled = true; procRunning = true; stopPreview();
   const name = $('pname').value.trim() || src.name, withG = true;
   const audioOnly = src.kind === 'video' && $('audioOnly').checked; // a video kept only for its sound: no video stored
   const dur = region.e - region.s, offset = region.s, kind = audioOnly ? 'audio' : src.kind, file = src.file;
-  const steps = [NATIVE ? 'Preparo i modelli' : 'Scarico i modelli', 'Separo voce, chitarra, basso, percussioni', ...(withG ? ['Isolo la güira'] : []), 'Trovo il ritmo e salvo'];
+  const steps = [NATIVE ? T('Preparo i modelli') : T('Scarico i modelli'), T('Separo voce, chitarra, basso, percussioni'), ...(withG ? [T('Isolo la güira')] : []), T('Trovo il ritmo e salvo')];
   history.replaceState(null, '', '#elabora'); show('proc'); keepAwake();
   $('procThumb').innerHTML = ico(kind === 'video' ? 'video' : 'note');
   $('procTitle').textContent = name; setProgress(0); setSteps(steps, 0);
-  $('procKind').textContent = kind === 'video' ? 'Video' : 'Audio'; $('procSub').textContent = fmt(dur) + ' selezionato · 6 tracce';
-  $('procStage').textContent = 'Preparazione…'; $('procWhat').textContent = 'Modelli'; $('procEl').textContent = '0:00'; $('procLeft').textContent = 'preparazione…'; $('procPart').textContent = '–';
+  $('procKind').textContent = kind === 'video' ? T('Video') : T('Audio'); $('procSub').textContent = T('{t} selezionato · 6 tracce', { t: fmt(dur) });
+  $('procStage').textContent = T('Preparazione…'); $('procWhat').textContent = T('Modelli'); $('procEl').textContent = '0:00'; $('procLeft').textContent = T('preparazione…'); $('procPart').textContent = '–';
   const t0 = Date.now(); clearInterval(procClock); procClock = setInterval(() => { $('procEl').textContent = fmt((Date.now() - t0) / 1000); $('wakeChip').hidden = !wakeLock; }, 1000);
   let left, right, thumb = null;
   try { thumb = audioOnly ? null : await videoThumb(offset); if (thumb) $('procThumb').innerHTML = `<img src="${thumb}" alt="">`; [left, right] = await regionAt44k(src.buf, region.s, region.e); }
-  catch (e) { procRunning = false; await dialog('File non leggibile', textEl('Non riesco a preparare l\'audio di questa parte.'), [['OK', 0, true]]); return go('home'); }
+  catch (e) { procRunning = false; await dialog(T('File non leggibile'), textEl(T('Non riesco a preparare l\'audio di questa parte.')), [['OK', 0, true]]); return go('home'); }
   const srcDur = src.buf.duration; releaseSource();
   const wD = COST.demucs, wG = withG ? COST.guira : 0; let tWork = Date.now(); const est = estimateMinutes(dur, withG);
   worker = NATIVE ? nativeWorker() : new Worker('worker.js?v=23');
   worker.onmessage = async ev => {
     const m = ev.data;
     if (m.type === 'download') {
-      $('procStage').textContent = m.network ? `Scarico i modelli: ${m.loaded} di ${m.total} MB (solo la prima volta)` : 'Carico i modelli';
+      $('procStage').textContent = m.network ? T('Scarico i modelli: {a} di {b} MB (solo la prima volta)', { a: m.loaded, b: m.total }) : T('Carico i modelli');
       setProgress(0, m.frac);
     }
-    if (m.type === 'loading') $('procStage').textContent = 'Preparo i modelli…';
-    if (m.type === 'ready') { ls.set('modelsCached', true); ls.set('lastThreads', m.threads || 1); setSteps(steps, 1); tWork = Date.now(); setProgress(0); $('procWhat').textContent = 'Separazione'; $('procStage').textContent = 'Separo gli strumenti…'; }
+    if (m.type === 'loading') $('procStage').textContent = T('Preparo i modelli…');
+    if (m.type === 'ready') { ls.set('modelsCached', true); ls.set('lastThreads', m.threads || 1); setSteps(steps, 1); tWork = Date.now(); setProgress(0); $('procWhat').textContent = T('Separazione'); $('procStage').textContent = T('Separo gli strumenti…'); }
     if (m.type === 'progress') {
       let frac = null, part = null;
-      if (m.stage === 'demucs') { frac = wD / (wD + wG) * m.i / m.n; part = m.i / m.n; $('procStage').textContent = `Separo gli strumenti: parte ${m.i} di ${m.n}`; $('procPart').textContent = m.i + '/' + m.n; }
+      if (m.stage === 'demucs') { frac = wD / (wD + wG) * m.i / m.n; part = m.i / m.n; $('procStage').textContent = T('Separo gli strumenti: parte {i} di {n}', { i: m.i, n: m.n }); $('procPart').textContent = m.i + '/' + m.n; }
       if (m.stage === 'guira') { if (!document.querySelector('#procSteps li.now .sbar') || $('procWhat').textContent !== 'Güira') { setSteps(steps, 2); $('procWhat').textContent = 'Güira'; }
-        frac = (wD + wG * m.i / m.n) / (wD + wG); part = m.i / m.n; $('procStage').textContent = `Isolo la güira: parte ${m.i} di ${m.n}`; $('procPart').textContent = m.i + '/' + m.n; }
-      if (m.stage === 'resample') $('procStage').textContent = 'Preparo la güira';
-      if (m.stage === 'split') $('procStage').textContent = 'Divido bongo e güira';
+        frac = (wD + wG * m.i / m.n) / (wD + wG); part = m.i / m.n; $('procStage').textContent = T('Isolo la güira: parte {i} di {n}', { i: m.i, n: m.n }); $('procPart').textContent = m.i + '/' + m.n; }
+      if (m.stage === 'resample') $('procStage').textContent = T('Preparo la güira');
+      if (m.stage === 'split') $('procStage').textContent = T('Divido bongo e güira');
       if (frac != null) {
         setProgress(frac, part);
         const el = (Date.now() - tWork) / 1000;
-        const lf = el / frac - el; $('procLeft').textContent = frac > 0.04 ? 'ancora circa ' + (lf < 60 ? Math.max(5, Math.round(lf / 5) * 5) + ' s' : Math.round(lf / 60) + ' min') : 'circa ' + est + ' min';
-        if (m.n) stepInfo('parte ' + m.i + ' di ' + m.n);
+        const lf = el / frac - el; $('procLeft').textContent = frac > 0.04 ? T('ancora circa {x}', { x: lf < 60 ? Math.max(5, Math.round(lf / 5) * 5) + ' s' : Math.round(lf / 60) + ' min' }) : T('circa {n} min', { n: est });
+        if (m.n) stepInfo(T('parte {i} di {n}', { i: m.i, n: m.n }));
       }
     }
     if (m.type === 'error') {
       if (worker) { worker.terminate(); worker = null; } procRunning = false; releaseWake(); clearInterval(procClock);
       const net = /download|fetch|network|Failed/i.test(m.message);
-      await dialog('Qualcosa è andato storto', textEl(net ? 'Non riesco a scaricare i modelli: controlla la connessione e riprova.' : 'La separazione si è fermata (' + m.message + '). Prova con una parte più corta.'), [['OK', 0, true]]);
+      await dialog(T('Qualcosa è andato storto'), textEl(net ? T('Non riesco a scaricare i modelli: controlla la connessione e riprova.') : T('La separazione si è fermata ({x}). Prova con una parte più corta.', { x: m.message })), [['OK', 0, true]]);
       go('home');
     }
     if (m.type === 'done') try {
       if (worker) { worker.terminate(); worker = null; }
       const workS = (Date.now() - tWork) / 1000; ls.set(SPEED_KEY(), Math.max(0.05, Math.min(10, workS / (dur * (wD + wG)))));
-      clearInterval(procClock); setSteps(steps, steps.length - 1); $('procStage').textContent = 'Trovo il ritmo e salvo…'; $('procWhat').textContent = 'Ritmo'; $('procLeft').textContent = 'quasi fatto'; setProgress(1, 0.5);
+      clearInterval(procClock); setSteps(steps, steps.length - 1); $('procStage').textContent = T('Trovo il ritmo e salvo…'); $('procWhat').textContent = T('Ritmo'); $('procLeft').textContent = T('quasi fatto'); setProgress(1, 0.5);
       const args = { name, stems: m.stems, dur, offset, srcDur, withG, kind, file, thumb };
       for (;;) {
         try { const id = await saveNew(args); procRunning = false; history.replaceState(null, '', '#player'); await openPlayer(id); return; }
         catch (e) {
           const quota = e && (e.name === 'QuotaExceededError' || /quota/i.test(e.message || ''));
-          const again = await dialog(quota ? 'Spazio insufficiente' : 'Salvataggio non riuscito', textEl(quota ? 'Il telefono non ha spazio per salvare questo progetto. Libera spazio (o elimina un progetto) e riprova.' : 'Non riesco a salvare il progetto: ' + (e && e.message || e)), [['Rinuncia', false], ['Riprova', true, true]]);
+          const again = await dialog(quota ? T('Spazio insufficiente') : T('Salvataggio non riuscito'), textEl(quota ? T('Il telefono non ha spazio per salvare questo progetto. Libera spazio (o elimina un progetto) e riprova.') : T('Non riesco a salvare il progetto: {x}', { x: e && e.message || e })), [[T('Rinuncia'), false], [T('Riprova'), true, true]]);
           if (!again) { procRunning = false; releaseWake(); return go('home'); }
         }
       }
     } catch (e) {
       procRunning = false; releaseWake();
-      await dialog('Salvataggio non riuscito', textEl('Errore alla fine della separazione: ' + (e && e.message || e)), [['OK', 0, true]]); go('home');
+      await dialog(T('Salvataggio non riuscito'), textEl(T('Errore alla fine della separazione: {x}', { x: e && e.message || e })), [['OK', 0, true]]); go('home');
     }
   };
-  worker.onerror = e => { if (worker) worker.onmessage({ data: { type: 'error', message: e.message || 'errore interno' } }); };
+  worker.onerror = e => { if (worker) worker.onmessage({ data: { type: 'error', message: e.message || T('errore interno') } }); };
   worker.postMessage({ type: 'separate', left, right, guira: withG, noCache: NATIVE }, [left.buffer, right.buffer]);
 });
 // In the Android app the separation runs natively (SeparatorPlugin, ONNX Runtime on several cores).
@@ -709,9 +721,9 @@ function nativeWorker() {
       } catch (e) { fallback(String(e && e.message || e)); }
       // If the native separator is missing or fails, the slower WebAssembly worker does the job.
       function fallback(why) {
-        if (w.stopped) return; console.warn('native separation failed:', why); toast('Uso la separazione nel browser (più lenta)');
+        if (w.stopped) return; console.warn('native separation failed:', why); toast(T('Uso la separazione nel browser (più lenta)'));
         const real = w.real = new Worker('worker.js?v=23');
-        real.onmessage = ev => emit(ev.data); real.onerror = e => emit({ type: 'error', message: e.message || 'errore interno' });
+        real.onmessage = ev => emit(ev.data); real.onerror = e => emit({ type: 'error', message: e.message || T('errore interno') });
         real.postMessage(msg);
       }
     } };
@@ -719,7 +731,7 @@ function nativeWorker() {
 }
 $('cancelBtn').addEventListener('click', async () => {
   if (!procRunning) return;
-  if (await dialog('Annullare?', textEl('Perdi il lavoro fatto finora.'), [['Continua', false], ['Annulla separazione', true, true]])) cancelProcessing();
+  if (await dialog(T('Annullare?'), textEl(T('Perdi il lavoro fatto finora.')), [[T('Continua'), false], [T('Annulla separazione'), true, true]])) cancelProcessing();
 });
 function envelopes(stems, n) {
   const hop = Math.floor(SR / 20), env = {};
@@ -800,8 +812,8 @@ async function saveNew({ name, stems, dur, offset, srcDur, withG, kind, file, th
   // where the 1 falls, phrase by phrase (follows breaks that add or skip beats)
   let anchors; try { anchors = Counts.analyze(stems, beats, n, SR, Separator, 6); } catch (e) { const g = guessOne(stems, beats, n); anchors = [{ i: 0, c: (8 - g) % 8 }]; }
   const oneIdx = (((anchors[0].i - anchors[0].c) % 8) + 8) % 8;
-  $('procStage').textContent = 'Comprimo le tracce per occupare meno spazio…';
-  const { data, codec } = await packStems(stems, STEMS.map(s => s.id), n, (k, m) => { $('procStage').textContent = `Comprimo le tracce: ${k} di ${m}`; });
+  $('procStage').textContent = T('Comprimo le tracce per occupare meno spazio…');
+  const { data, codec } = await packStems(stems, STEMS.map(s => s.id), n, (k, m) => { $('procStage').textContent = T('Comprimo le tracce: {a} di {b}', { a: k, b: m }); });
   try {
     await tx('stems', 'readwrite', s => s.put({ id, n, sr: SR, codec, data }));
     if (kind === 'video') await tx('media', 'readwrite', s => s.put({ id, blob: file, type: file.type || 'video/mp4' }));
@@ -844,12 +856,12 @@ function closePlayer(skipSave) {
 async function openPlayer(id) {
   const my = ++opening;
   closePlayer();
-  busy('Apro il progetto…');
+  busy(T('Apro il progetto…'));
   let p, st, m;
   try { p = await getProject(id); st = await getStems(id); if (p && p.kind === 'video') m = await getMedia(id); }
   catch (e) { p = null; }
   if (my !== opening) return;
-  if (!p || !st) { busy(); toast('Progetto non leggibile'); return go('home'); }
+  if (!p || !st) { busy(); toast(T('Progetto non leggibile')); return go('home'); }
   try {
     useStems(!!st.data.piano, p.altroName);
     cur = normalize(p);
@@ -867,7 +879,7 @@ async function openPlayer(id) {
     $('s-player').classList.toggle('video', isVideo());
     if (isVideo()) {
       if (m && m.blob) { vidUrl = URL.createObjectURL(m.blob); const v = $('vid'); v.src = vidUrl; v.addEventListener('loadedmetadata', () => syncVideo(true), { once: true }); }
-      else toast('Video non trovato: resta solo l\'audio');
+      else toast(T('Video non trovato: resta solo l\'audio'));
       setMirror(!!cur.mirror, true);
     }
     $('pTitle').textContent = cur.name; $('tDur').textContent = fmt(player.duration); $('pSub').textContent = fmt(player.duration) + (cur.bpm ? ' · ' + Math.round(cur.bpm) + ' BPM' : '') + (isVideo() ? ' · video' : '');
@@ -878,7 +890,7 @@ async function openPlayer(id) {
     player.seek(Math.min(cur.pos || 0, Math.max(0, player.duration - 0.1)));
     show('player'); if (location.hash !== '#player') location.hash = 'player';
     renderDots(); renderStyle(); setView(cur.view, true); updateBeatInfo(); setPlayIcon(); lastCount = -1; busy(); keepAwake();
-    if (!ls.get('padTipSeen', false)) { ls.set('padTipSeen', true); setTimeout(() => toast(isVideo() ? 'Tocca uno strumento per spegnerlo, tienilo premuto per sentirlo da solo' : 'M spegne uno strumento, S lo fa sentire da solo, il nome regola il volume'), 600); }
+    if (!ls.get('padTipSeen', false)) { ls.set('padTipSeen', true); setTimeout(() => toast(isVideo() ? T('Tocca uno strumento per spegnerlo, tienilo premuto per sentirlo da solo') : T('M spegne uno strumento, S lo fa sentire da solo, il nome regola il volume')), 600); }
     requestAnimationFrame(() => { drawTimelineStatic(); syncVideo(true); });
     raf = requestAnimationFrame(tick);
     // projects made before the tempo/break tracking: redo beats and counts once, if the rhythm was never touched
@@ -891,16 +903,16 @@ async function openPlayer(id) {
         if (!(proj.notes || []).length) { const bt = BeatTracker.analyze(rhythmMono(stems, n2), SR); if (bt.beats.length >= 16) { proj.beats = Array.from(bt.beats); proj.beatsDetected = proj.beats.slice(); proj.bpm = proj.bpmDetected = bt.bpm; proj.tempoVaries = !!bt.tempoVaries; } }
         const a = Counts.analyze(stems, proj.beats, n2, SR, Separator, 6); setAnchors(a); proj.oneDetected = proj.oneIdx; proj.anchorsDetected = a.map(x => ({ ...x })); proj.countAlgo = 1;
         lastCount = -1; updateBeatInfo(); persist();
-        if (a.length > 1) toast('Ho trovato ' + (a.length - 1) + (a.length === 2 ? ' punto' : ' punti') + ' dove il conteggio riparte');
+        if (a.length > 1) toast(T(a.length === 2 ? 'Ho trovato {n} punto dove il conteggio riparte' : 'Ho trovato {n} punti dove il conteggio riparte', { n: a.length - 1 }));
       } catch (e) { console.warn('counts', e); } }, 800); }
     // projects saved before the compression: compress them now, in the background
-    if (wasPcm) { const pid = cur.id; setTimeout(() => compressOld(pid, stems, nFrames).then(r => { if (r) toast(`Progetto compresso: da ${Math.round(r.before / 1e6)} a ${Math.round(r.after / 1e6)} MB`); }).catch(() => {}), 1500); }
+    if (wasPcm) { const pid = cur.id; setTimeout(() => compressOld(pid, stems, nFrames).then(r => { if (r) toast(T('Progetto compresso: da {a} a {b} MB', { a: Math.round(r.before / 1e6), b: Math.round(r.after / 1e6) })); }).catch(() => {}), 1500); }
     // projects made before the naming: listen to Altro once, in the background
     if (cur.altroName === undefined || cur.altroParts === undefined) { const proj = cur; nameAltro(stems.altro, stems.altro[0].length).then(nm => {
       proj.altroName = nm || null; proj.altroParts = lastAltroParts; if (cur !== proj) return putProject(proj).catch(() => {});
-      persist(); if (nm) { useStems(!!stems.piano, nm); renderPads(); if (mapOpen()) renderMapHeads(true); toast('In Altro c\'è soprattutto: ' + nm); } }); }
+      persist(); if (nm) { useStems(!!stems.piano, nm); renderPads(); if (mapOpen()) renderMapHeads(true); toast(T('In Altro c\'è soprattutto: {x}', { x: altroLabel(nm) })); } }); }
   } catch (e) {
-    busy(); closePlayer(true); await dialog('Progetto non leggibile', textEl('Non riesco ad aprire questo progetto (' + (e && e.message || e) + ').'), [['OK', 0, true]]); go('home');
+    busy(); closePlayer(true); await dialog(T('Progetto non leggibile'), textEl(T('Non riesco ad aprire questo progetto ({x}).', { x: e && e.message || e })), [['OK', 0, true]]); go('home');
   }
 }
 
@@ -917,10 +929,10 @@ function beatTime(i) { const b = cur.beats; if (i >= 0 && i < b.length) return b
 function phraseStartIdx(t) { const i = Math.max(0, beatIdx(t)); return i - (countOf(i) - 1); }
 function updateBeatInfo() {
   const ok = hasBeats();
-  $('bpmVal').innerHTML = (ok ? String(Math.round(cur.bpm * 10) / 10).replace('.', ',') : '–') + '<small> BPM</small>';
-  $('bpmOrig').textContent = cur.bpmDetected ? 'Trovati dall\'app: ' + String(Math.round(cur.bpmDetected * 10) / 10).replace('.', ',') + ' BPM' : '';
+  $('bpmVal').innerHTML = (ok ? dec(Math.round(cur.bpm * 10) / 10) : '–') + '<small> BPM</small>';
+  $('bpmOrig').textContent = cur.bpmDetected ? T('Trovati dall\'app: {n} BPM', { n: dec(Math.round(cur.bpmDetected * 10) / 10) }) : '';
   if (player) $('pSub').textContent = fmt(player.duration) + (ok ? ' · ' + Math.round(cur.bpm) + ' BPM' : '') + (isVideo() ? ' · video' : '');
-  $('beatWarn').textContent = !ok ? 'Ritmo non trovato: i salti vanno a mezzi secondi, usa il Loop A–B.' : cur.confidence < 0.4 ? 'Non sono sicuro del ritmo: controlla l\'1 e i BPM dal menu ⋮.' : '';
+  $('beatWarn').textContent = !ok ? T('Ritmo non trovato: i salti vanno a mezzi secondi, usa il Loop A–B.') : cur.confidence < 0.4 ? T('Non sono sicuro del ritmo: controlla l\'1 e i BPM dal menu ⋮.') : '';
   ['loop4', 'loop8'].forEach(id => { $(id).disabled = !ok; });
   applyMet(); drawTimelineStatic(); computePhrases(); renderGrid();
 }
@@ -951,10 +963,10 @@ function tick() {
       for (const id of ['bigNum', 'mapNum']) { const el = $(id); el.textContent = c || '–'; el.classList.toggle('tap', cls === 'tap'); el.classList.toggle('one', cls === 'one'); }
       $('ovNum').textContent = c || ''; $('ovNum').className = 'ov ov-num ' + cls;
       const { pn, total } = phraseInfo(t), warn = c >= 5 && phraseChangeAhead(pn - 1), sec = sectionAt(t);
-      $('phraseLbl').textContent = `Frase ${pn} di ${total}`;
-      $('secLbl').textContent = warn ? 'Cambio tra ' + (9 - c) : sec >= 0 ? cur.marks[sec].name : ''; $('secLbl').classList.toggle('warn', warn);
-      $('ovPhrase').textContent = warn ? 'Cambio tra ' + (9 - c) : (sec >= 0 ? cur.marks[sec].name + ' · ' : '') + `Frase ${pn} di ${total}`; $('ovPhrase').classList.toggle('warn', warn);
-      $('mapSub').textContent = `Frase ${pn} di ${total} · ${fmt(t)}`;
+      $('phraseLbl').textContent = T('Frase {a} di {b}', { a: pn, b: total });
+      $('secLbl').textContent = warn ? T('Cambio tra {n}', { n: 9 - c }) : sec >= 0 ? cur.marks[sec].name : ''; $('secLbl').classList.toggle('warn', warn);
+      $('ovPhrase').textContent = warn ? T('Cambio tra {n}', { n: 9 - c }) : (sec >= 0 ? cur.marks[sec].name + ' · ' : '') + T('Frase {a} di {b}', { a: pn, b: total }); $('ovPhrase').classList.toggle('warn', warn);
+      $('mapSub').textContent = T('Frase {a} di {b}', { a: pn, b: total }) + ' · ' + fmt(t);
       if (sec !== lastSec) { lastSec = sec; [...$('marks').children].forEach((b, k) => b.classList.toggle('on', k === sec)); }
     }
   } else { $('bigNum').textContent = '–'; $('ovNum').textContent = ''; }
@@ -984,7 +996,7 @@ function syncVideo(force) {
     if (Math.abs(diff) > 0.04 && (force || now - lastHardSeek > 150)) { v.currentTime = target; lastHardSeek = now; }
   }
 }
-function setMirror(on, quiet) { if (!cur) return; cur.mirror = on; $('stage').classList.toggle('mirror', on); $('mirrorBtn').classList.toggle('on', on); $('mirrorBtn').setAttribute('aria-pressed', String(on)); if (!quiet) { persist(); toast(on ? 'Specchio: il video è ribaltato come in sala' : 'Video normale'); } }
+function setMirror(on, quiet) { if (!cur) return; cur.mirror = on; $('stage').classList.toggle('mirror', on); $('mirrorBtn').classList.toggle('on', on); $('mirrorBtn').setAttribute('aria-pressed', String(on)); if (!quiet) { persist(); toast(on ? T('Specchio: il video è ribaltato come in sala') : T('Video normale')); } }
 $('mirrorBtn').addEventListener('click', () => setMirror(!cur.mirror));
 async function enterFs() {
   const st = $('stage'); st.classList.add('fs'); location.hash = 'schermo';
@@ -1006,8 +1018,8 @@ $('stage').querySelector('.fsbar').addEventListener('click', e => { const b = e.
 // ---- instruments: one row each (audio) or a compact pad (video); the waveform fills in as the song plays ----
 function renderPads() {
   $('stems').innerHTML = STEMS.map(s => `<div class="stem" data-id="${s.id}" style="--c:var(--c-${s.id})"><i class="bar"></i>
-    <button class="nm" data-vol aria-label="Volume ${s.n}"><b>${s.n}</b><span></span></button><input type="range" class="vr" min="0" max="200" step="5" style="--tc:var(--c-${s.id})" aria-label="Volume ${s.n}">
-    <button class="ms m" aria-label="Spegni ${s.n}">M</button><button class="ms s" aria-label="Solo ${s.n}">S</button></div>`).join('');
+    <button class="nm" data-vol aria-label="${T('Volume {x}', { x: s.n })}"><b>${s.n}</b><span></span></button><input type="range" class="vr" min="0" max="200" step="5" style="--tc:var(--c-${s.id})" aria-label="${T('Volume {x}', { x: s.n })}">
+    <button class="ms m" aria-label="${T('Spegni {x}', { x: s.n })}">M</button><button class="ms s" aria-label="${T('Solo {x}', { x: s.n })}">S</button></div>`).join('');
   $('minipads').innerHTML = STEMS.map(s => `<button class="mpad" data-id="${s.id}" style="--c:var(--c-${s.id})"><i></i>${s.n}</button>`).join('');
   refreshPadStates(); requestAnimationFrame(drawStemWaves);
 }
@@ -1017,7 +1029,7 @@ function refreshPadStates() {
     row.classList.toggle('off', off);
     const vr = row.querySelector('.vr'); if (vr && document.activeElement !== vr) { vr.value = cur.mute[id] ? 0 : g; fillRange(vr); }
     const ex = (STEMS.find(s => s.id === id) || {}).extra;
-    row.querySelector('.nm span').textContent = (cur.mute[id] || g === 0 ? 'Spento' : anySolo() && !cur.solo[id] ? 'Escluso' : g + '%') + (ex ? ' · ' + ex : '');
+    row.querySelector('.nm span').textContent = (cur.mute[id] || g === 0 ? T('Spento') : anySolo() && !cur.solo[id] ? T('Escluso') : g + '%') + (ex ? ' · ' + ex : '');
     row.querySelector('.m').classList.toggle('on', !!cur.mute[id]); row.querySelector('.s').classList.toggle('on', !!cur.solo[id]);
     row.querySelector('.m').setAttribute('aria-pressed', String(!!cur.mute[id])); row.querySelector('.s').setAttribute('aria-pressed', String(!!cur.solo[id]));
   }
@@ -1085,7 +1097,7 @@ function padPress(container) {
   let timer = 0, fired = false;
   container.addEventListener('pointerdown', e => { const target = e.target.closest('.mpad'); if (!target) return; fired = false; clearTimeout(timer);
     timer = setTimeout(() => { fired = true; const id = target.dataset.id; toggleSolo(id); mixerChanged();
-      toast(cur.solo[id] ? STEMS.find(s => s.id === id).n + ' da solo' : 'Solo tolto'); vibrate(20); }, 450); });
+      toast(cur.solo[id] ? T('{x} da solo', { x: STEMS.find(s => s.id === id).n }) : T('Solo tolto')); vibrate(20); }, 450); });
   const cancel = () => clearTimeout(timer);
   container.addEventListener('pointerup', cancel); container.addEventListener('pointercancel', cancel); container.addEventListener('pointerleave', cancel);
   container.addEventListener('contextmenu', e => e.preventDefault());
@@ -1096,19 +1108,19 @@ function padPress(container) {
     mixerChanged(); });
 }
 padPress($('minipads'));
-$('allOn').addEventListener('click', () => { if (!cur) return; cur.mute = {}; cur.solo = {}; STEMS.forEach(s => { if (cur.gains[s.id] === 0) cur.gains[s.id] = 1; }); mixerChanged(); toast('Tutti gli strumenti accesi'); });
+$('allOn').addEventListener('click', () => { if (!cur) return; cur.mute = {}; cur.solo = {}; STEMS.forEach(s => { if (cur.gains[s.id] === 0) cur.gains[s.id] = 1; }); mixerChanged(); toast(T('Tutti gli strumenti accesi')); });
 // volume popup for one instrument
 let volId = null;
 function openVol(id) {
   volId = id; const s = STEMS.find(x => x.id === id);
   $('volName').textContent = s.n + (s.extra ? ' ' + s.extra : '');
   const ap = id === 'altro' && cur.altroParts; $('volInfo').hidden = !ap;
-  if (ap) $('volInfo').textContent = 'Dentro, momento per momento: ' + ap.parts.map(([n, v]) => n + ' ' + v + '%').join(', ') + (ap.unsure ? ', non riconosciuto ' + ap.unsure + '%' : '') + '.';
+  if (ap) $('volInfo').textContent = T('Dentro, momento per momento: {x}.', { x: ap.parts.map(([n, v]) => T(n) + ' ' + v + '%').join(', ') + (ap.unsure ? ', ' + T('non riconosciuto {n}%', { n: ap.unsure }) : '') });
   $('popVol').style.setProperty('--c', `var(--c-${id})`); $('volRange').style.setProperty('--tc', `var(--c-${id})`);
   renderVol(); openPop('popVol');
 }
-function renderVol() { if (!volId) return; const g = Math.round(cur.gains[volId] * 100); $('volRange').value = g; fillRange($('volRange')); $('volVal').textContent = cur.mute[volId] ? 'Spento' : g + '%';
-  $('volM').textContent = cur.mute[volId] ? 'Riaccendi' : 'Spegni'; $('volS').textContent = cur.solo[volId] ? 'Togli solo' : 'Solo'; }
+function renderVol() { if (!volId) return; const g = Math.round(cur.gains[volId] * 100); $('volRange').value = g; fillRange($('volRange')); $('volVal').textContent = cur.mute[volId] ? T('Spento') : g + '%';
+  $('volM').textContent = cur.mute[volId] ? T('Riaccendi') : T('Spegni'); $('volS').textContent = cur.solo[volId] ? T('Togli solo') : T('Solo'); }
 $('volRange').addEventListener('input', e => { cur.gains[volId] = e.target.value / 100; if (cur.gains[volId] > 0) cur.mute[volId] = false; applyGains(); refreshPadStates(); renderVol(); persist(); });
 $('volRange').addEventListener('change', () => drawStemWaves());
 $('volM').addEventListener('click', () => { toggleMute(volId); mixerChanged(); renderVol(); });
@@ -1148,7 +1160,7 @@ function seekTo(t, snap) {
 }
 
 // ---- transport ----
-function setPlayIcon() { const p = !!player && player.isPlaying; for (const id of ['playBtn', 'fsPlay', 'mPlay']) { $(id).innerHTML = ico(p ? 'pause' : 'play'); $(id).setAttribute('aria-label', p ? 'Pausa' : 'Play'); } }
+function setPlayIcon() { const p = !!player && player.isPlaying; for (const id of ['playBtn', 'fsPlay', 'mPlay']) { $(id).innerHTML = ico(p ? 'pause' : 'play'); $(id).setAttribute('aria-label', p ? T('Pausa') : T('Play')); } }
 function pausePlayer() { if (!player) return; player.pause(); if (cur) { cur.pos = player.position; persist(); } setPlayIcon(); syncVideo(true); }
 async function togglePlay() {
   if (!player) return;
@@ -1173,14 +1185,14 @@ function jumpBy(n) {
     let a, b;
     if (hasBeats()) { const ia = nearestBeat(loopRange[0]), ib = nearestBeat(loopRange[1]); a = beatTime(ia + n); b = beatTime(ib + n); }
     else { a = loopRange[0] + n * per; b = loopRange[1] + n * per; }
-    if (a < -0.05 || b > player.duration + 0.05) return toast(n < 0 ? 'Sei all\'inizio' : 'Sei alla fine');
+    if (a < -0.05 || b > player.duration + 0.05) return toast(n < 0 ? T('Sei all\'inizio') : T('Sei alla fine'));
     setLoop(Math.max(0, a), Math.min(player.duration, b)); userSeekAt = performance.now(); player.seek(Math.max(0, a)); syncVideo(true);
-    toast(`Loop spostato di ${n > 0 ? '+' : ''}${n} tempi`); return;
+    toast(T('Loop spostato di {n} tempi', { n: (n > 0 ? '+' : '') + n })); return;
   }
   if (!hasBeats()) return seekTo(t + n * per, false);
   const k = nearestBeat(t), target = beatTime(k + n);
   if (target < -0.05) return seekTo(0, false);
-  if (target > player.duration - 0.05) return toast('Sei alla fine');
+  if (target > player.duration - 0.05) return toast(T('Sei alla fine'));
   seekTo(Math.max(0, target), false);
 }
 document.querySelectorAll('[data-jump]').forEach(b => b.addEventListener('click', () => jumpBy(+b.dataset.jump)));
@@ -1204,10 +1216,10 @@ let swipedRecently = false;
 function setLoop(a, b) { loopRange = [a, b]; player.setLoop(a, b); wraps = 0; drawTimeline(player.position); renderLoopInfo(); }
 function renderLoopInfo() {
   let txt = '';
-  if (abA != null) txt = 'A a ' + fmt(abA) + ' · tocca A–B per la fine';
+  if (abA != null) txt = T('A a {t} · tocca A–B per la fine', { t: fmt(abA) });
   else if (loopRange && cur) {
     const [a, b] = loopRange;
-    if ((loopMode === 4 || loopMode === 8) && hasBeats()) { const c = countOf(nearestBeat(a)); txt = `Loop ${loopMode} · frase ${phraseInfo(a + 0.01).pn}${c !== 1 ? ' dal ' + c : ''}`; }
+    if ((loopMode === 4 || loopMode === 8) && hasBeats()) { const c = countOf(nearestBeat(a)); txt = 'Loop ' + loopMode + ' · ' + T(c !== 1 ? 'frase {p} dal {c}' : 'frase {p}', { p: phraseInfo(a + 0.01).pn, c }); }
     else { const sec = cur.marks.findIndex(m => Math.abs(m.t - a) < 0.05); txt = (sec >= 0 ? 'Loop ' + cur.marks[sec].name : 'Loop A–B') + ` · ${fmt(a)}–${fmt(b)}`; }
   }
   $('loopTxt').textContent = txt;
@@ -1217,12 +1229,12 @@ function clearLoop(silent) {
   const had = !!loopRange || abA != null; loopRange = null; loopMode = null; abA = null; if (player) player.clearLoop(); updateLoopBtns();
   if (player) drawTimeline(player.position);
   if (liveTempo !== cur.tempo) setLiveTempo(cur.tempo);
-  if (!silent && had) toast('Loop spento');
+  if (!silent && had) toast(T('Loop spento'));
 }
 function updateLoopBtns() {
   $('loop4').classList.toggle('on', loopMode === 4); $('loop8').classList.toggle('on', loopMode === 8);
   $('loopAB').classList.toggle('on', loopMode === 'ab' || abA != null);
-  $('loopAB').textContent = abA != null ? 'B: fine' : 'A–B';
+  $('loopAB').textContent = abA != null ? T('B: fine') : 'A–B';
   ['loop4', 'loop8'].forEach(id => $(id).setAttribute('aria-pressed', String(loopMode === (id === 'loop4' ? 4 : 8))));
   renderLoopInfo();
 }
@@ -1232,7 +1244,7 @@ function beatLoop(n) {
   let start = i - (c - 1); if (n === 4 && c > 4) start += 4;
   if (beatTime(start) < -0.05) start += n; // a first phrase cut by the region start: use the next whole one
   const a = beatTime(start), b = beatTime(start + n);
-  if (b > player.duration + 0.01) { toast('Non c\'è una frase intera qui'); return; }
+  if (b > player.duration + 0.01) { toast(T('Non c\'è una frase intera qui')); return; }
   abA = null; loopMode = n; setLoop(Math.max(0, a), Math.min(player.duration, b)); updateLoopBtns();
   if (t < a - 0.05 || t > b) { userSeekAt = performance.now(); player.seek(Math.max(0, a)); syncVideo(true); }
 }
@@ -1241,9 +1253,9 @@ $('loop8').addEventListener('click', () => beatLoop(8));
 $('loopAB').addEventListener('click', () => {
   if (loopMode === 'ab') return clearLoop();
   let t = player.position; if (hasBeats()) { const i = nearestBeat(t); if (Math.abs(beatTime(i) - t) < 0.2) t = Math.max(0, beatTime(i)); }
-  if (abA == null) { if (loopRange) clearLoop(true); abA = t; updateLoopBtns(); drawTimeline(player.position); toast('A segnato: tocca di nuovo alla fine (B)'); return; }
+  if (abA == null) { if (loopRange) clearLoop(true); abA = t; updateLoopBtns(); drawTimeline(player.position); toast(T('A segnato: tocca di nuovo alla fine (B)')); return; }
   const a = Math.min(abA, t), b = Math.max(abA, t);
-  if (b - a < 0.5) { toast('Loop troppo corto'); return; }
+  if (b - a < 0.5) { toast(T('Loop troppo corto')); return; }
   abA = null; loopMode = 'ab'; setLoop(a, b); updateLoopBtns(); userSeekAt = performance.now(); player.seek(a); syncVideo(true);
 });
 
@@ -1295,7 +1307,7 @@ function renderAcc() {
   document.querySelectorAll('[data-acc]').forEach(b => b.classList.toggle('on', b.dataset.acc === cur.met.acc));
   const want = cur.met.acc === '48' ? [4, 8] : cur.met.acc === '15' ? [1, 5] : [1];
   $('accDots').innerHTML = [1, 2, 3, 4, 5, 6, 7, 8].map(n => `<i class="${want.includes(n) ? 'on' : ''}">${n}</i>`).join('');
-  $('metState').textContent = cur.met.on ? 'Acceso' : 'Spento'; $('metBtn').classList.toggle('on', !!cur.met.on);
+  $('metState').textContent = cur.met.on ? T('Acceso') : T('Spento'); $('metBtn').classList.toggle('on', !!cur.met.on);
   $('metVolV').textContent = cur.met.vol + '%'; $('metOn').checked = !!cur.met.on;
 }
 function applyMet() {
@@ -1305,7 +1317,7 @@ function applyMet() {
   player.setMetronome({ enabled: cur.met.on && hasBeats() && !training, beats: Float64Array.from(cur.beats), accents: acc, volume: cur.met.vol / 100 });
 }
 function setMet(on) { cur.met.on = on; renderAcc(); applyMet(); persist(); }
-$('metOn').addEventListener('change', e => { if (!hasBeats()) { e.target.checked = false; return toast('Ritmo non trovato'); } setMet(e.target.checked); });
+$('metOn').addEventListener('change', e => { if (!hasBeats()) { e.target.checked = false; return toast(T('Ritmo non trovato')); } setMet(e.target.checked); });
 $('metVol').addEventListener('input', e => { cur.met.vol = +e.target.value; renderAcc(); applyMet(); persist(); });
 document.querySelectorAll('[data-acc]').forEach(b => b.addEventListener('click', () => { cur.met.acc = b.dataset.acc; renderAcc(); applyMet(); persist(); }));
 // Measured delay between a sound and the tap on it (speaker, headphones, reaction), or null if never calibrated.
@@ -1333,8 +1345,8 @@ function regrid(bpm) {
   cur.notes = cur.notes || [];
 }
 document.querySelectorAll('[data-bpm]').forEach(b => b.addEventListener('click', () => {
-  if (!cur.bpmDetected) return toast('Ritmo non trovato'); const v = b.dataset.bpm;
-  if (v === 'reset') { cur.bpm = cur.bpmDetected; cur.beats = cur.beatsDetected.slice(); cur.oneIdx = cur.oneDetected; cur.anchors = cur.anchorsDetected ? cur.anchorsDetected.map(a => ({ ...a })) : null; lastCount = -1; if (loopRange) clearLoop(false); updateBeatInfo(); persist(); toast('Ritmo ripristinato'); return; }
+  if (!cur.bpmDetected) return toast(T('Ritmo non trovato')); const v = b.dataset.bpm;
+  if (v === 'reset') { cur.bpm = cur.bpmDetected; cur.beats = cur.beatsDetected.slice(); cur.oneIdx = cur.oneDetected; cur.anchors = cur.anchorsDetected ? cur.anchorsDetected.map(a => ({ ...a })) : null; lastCount = -1; if (loopRange) clearLoop(false); updateBeatInfo(); persist(); toast(T('Ritmo ripristinato')); return; }
   regrid(v === 'half' ? cur.bpm / 2 : v === 'double' ? cur.bpm * 2 : Math.max(40, Math.min(240, Math.round(cur.bpm) + +v)));
 }));
 
@@ -1346,15 +1358,15 @@ function renderMarks() {
 }
 async function addMark(t) {
   if (!cur) return;
-  if (cur.marks.length >= 12) return toast('Massimo 12 sezioni');
+  if (cur.marks.length >= 12) return toast(T('Massimo 12 sezioni'));
   if (hasBeats()) t = Math.max(0, beatTime(phraseStartIdx(t)));
-  const wrap = document.createElement('div'), inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = 24; inp.placeholder = 'Nome';
+  const wrap = document.createElement('div'), inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = 24; inp.placeholder = T('Nome');
   const chips = document.createElement('div'); chips.className = 'chips';
   MARK_NAMES.forEach(n => { const b = document.createElement('button'); b.textContent = n; b.onclick = () => { inp.value = n; }; chips.append(b); });
-  const p = document.createElement('p'); p.className = 'mute small'; p.textContent = 'All\'inizio della frase, a ' + fmt(t);
+  const p = document.createElement('p'); p.className = 'mute small'; p.textContent = T('All\'inizio della frase, a {t}', { t: fmt(t) });
   wrap.append(p, chips, inp);
-  const ok = await dialog('Nuova sezione', wrap, [['Annulla', false], ['Salva', true, true]]);
-  if (ok && cur) { cur.marks.push({ t, name: inp.value.trim() || 'Sezione ' + (cur.marks.length + 1) }); renderMarks(); persist(); }
+  const ok = await dialog(T('Nuova sezione'), wrap, [[T('Annulla'), false], [T('Salva'), true, true]]);
+  if (ok && cur) { cur.marks.push({ t, name: inp.value.trim() || T('Sezione {n}', { n: cur.marks.length + 1 }) }); renderMarks(); persist(); }
 }
 $('markBtn').addEventListener('click', () => player && addMark(player.position));
 (function markInput() {
@@ -1369,12 +1381,12 @@ $('markBtn').addEventListener('click', () => player && addMark(player.position))
 function sectionOf(idx) { const m = cur.marks[idx], next = cur.marks[idx + 1]; return [m.t, next ? next.t : player.duration]; }
 async function markMenu(idx) {
   const m = cur.marks[idx]; if (!m) return;
-  const v = await dialog(m.name + ' · ' + fmt(m.t), null, [['Loop sezione', 'loop', true], ['Rinomina', 'ren'], ['Elimina', 'del'], ['Chiudi', null]]);
+  const v = await dialog(m.name + ' · ' + fmt(m.t), null, [[T('Loop sezione'), 'loop', true], [T('Rinomina'), 'ren'], [T('Elimina'), 'del'], [T('Chiudi'), null]]);
   if (!cur) return;
-  if (v === 'loop') { const [a, b] = sectionOf(idx); if (b - a < 0.5) return toast('Sezione troppo corta'); abA = null; loopMode = 'ab'; setLoop(a, b); updateLoopBtns(); userSeekAt = performance.now(); player.seek(a); syncVideo(true); toast('Loop: ' + m.name); closePop(); }
+  if (v === 'loop') { const [a, b] = sectionOf(idx); if (b - a < 0.5) return toast(T('Sezione troppo corta')); abA = null; loopMode = 'ab'; setLoop(a, b); updateLoopBtns(); userSeekAt = performance.now(); player.seek(a); syncVideo(true); toast('Loop: ' + m.name); closePop(); }
   if (v === 'ren') { const inp = document.createElement('input'); inp.type = 'text'; inp.value = m.name; inp.maxLength = 24;
-    if (await dialog('Rinomina sezione', inp, [['Annulla', false], ['Salva', true, true]]) && cur && inp.value.trim()) { m.name = inp.value.trim(); renderMarks(); persist(); } }
-  if (v === 'del' && await dialog('Eliminare "' + m.name + '"?', null, [['No', false], ['Elimina', true, true]]) && cur) { cur.marks.splice(idx, 1); renderMarks(); persist(); }
+    if (await dialog(T('Rinomina sezione'), inp, [[T('Annulla'), false], [T('Salva'), true, true]]) && cur && inp.value.trim()) { m.name = inp.value.trim(); renderMarks(); persist(); } }
+  if (v === 'del' && await dialog(T('Eliminare "{x}"?', { x: m.name }), null, [[T('No'), false], [T('Elimina'), true, true]]) && cur) { cur.marks.splice(idx, 1); renderMarks(); persist(); }
 }
 
 // ---- phrases: which instruments play in each 8, so changes can be announced ----
@@ -1400,13 +1412,13 @@ function phraseChangeAhead(k) {
 function notesAt(i) { const t = beatTime(i), per = 60 / cur.bpm; return (cur.notes || []).filter(n => Math.abs(n.t - t) < per / 2); }
 const renderGrid = () => {}, setView = () => {};
 async function editNote(i) {
-  const ex = notesAt(i)[0], inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = 60; inp.placeholder = 'Es. giro, dip, body roll'; inp.value = ex ? ex.text : '';
+  const ex = notesAt(i)[0], inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = 60; inp.placeholder = T('Es. giro, dip, body roll'); inp.value = ex ? ex.text : '';
   const { pn } = phraseInfo(beatTime(i) + 0.01);
-  const wrap = document.createElement('div'); const p = document.createElement('p'); p.className = 'mute small'; p.textContent = `Frase ${pn}, tempo ${countOf(i)}`; wrap.append(p, inp);
-  const v = await dialog('Nota sul tempo', wrap, ex ? [['Elimina', 'del'], ['Annulla', false], ['Salva', true, true]] : [['Annulla', false], ['Salva', true, true]]);
+  const wrap = document.createElement('div'); const p = document.createElement('p'); p.className = 'mute small'; p.textContent = T('Frase {p}, tempo {c}', { p: pn, c: countOf(i) }); wrap.append(p, inp);
+  const v = await dialog(T('Nota sul tempo'), wrap, ex ? [[T('Elimina'), 'del'], [T('Annulla'), false], [T('Salva'), true, true]] : [[T('Annulla'), false], [T('Salva'), true, true]]);
   if (!cur || !v) return;
   cur.notes = (cur.notes || []).filter(n => n !== ex);
-  if (v === true && inp.value.trim()) { cur.notes.push({ t: beatTime(i), text: inp.value.trim() }); toast('Nota salvata'); }
+  if (v === true && inp.value.trim()) { cur.notes.push({ t: beatTime(i), text: inp.value.trim() }); toast(T('Nota salvata')); }
   persist(); mapStatic = null;
 }
 function renderStyle() { if (cur) cur.style = 'bachata'; }
@@ -1420,8 +1432,8 @@ $('tapBtn').addEventListener('pointerdown', e => {
   if (taps.length >= 4) {
     const d = []; for (let k = 1; k < taps.length; k++) d.push(taps[k] - taps[k - 1]); d.sort((a, b) => a - b);
     const bpm = Math.round(60000 / d[Math.floor(d.length / 2)] * 10) / 10;
-    $('tapLbl').innerHTML = ico('hand') + 'Tap · ' + String(bpm).replace('.', ',') + ' BPM';
-    clearTimeout(taps.t); taps.t = setTimeout(() => { if (bpm >= 60 && bpm <= 220) { regrid(bpm); toast('Tempo impostato a ' + Math.round(bpm) + ' BPM'); } taps = []; $('tapLbl').innerHTML = ico('hand') + 'Tap tempo'; }, 1600);
+    $('tapLbl').innerHTML = ico('hand') + 'Tap · ' + dec(bpm) + ' BPM';
+    clearTimeout(taps.t); taps.t = setTimeout(() => { if (bpm >= 60 && bpm <= 220) { regrid(bpm); toast(T('Tempo impostato a {n} BPM', { n: Math.round(bpm) })); } taps = []; $('tapLbl').innerHTML = ico('hand') + T('Tap tempo'); }, 1600);
   } else $('tapLbl').innerHTML = ico('hand') + 'Tap ' + taps.length + '/4';
 });
 
@@ -1456,7 +1468,7 @@ function renderMapHeads(full) {
   for (const b of $('mapHeads').children) {
     const id = b.dataset.id, off = mapMute[id], lv = levelAt(id, t), lit = !off && lv > 0.15;
     b.classList.toggle('lit', lit); b.classList.toggle('off', off);
-    b.querySelector('span').textContent = off ? 'spento · tocca' : lv > 0.7 ? 'forte' : lit ? 'suona' : 'pausa';
+    b.querySelector('span').textContent = off ? T('spento · tocca') : lv > 0.7 ? T('forte') : lit ? T('suona') : T('pausa');
   }
 }
 $('mapHeads').addEventListener('click', e => { const b = e.target.closest('.mhd'); if (!b || !mapMute) return; const id = b.dataset.id;
@@ -1466,7 +1478,7 @@ const ZOOMS = [1, 2, 4, 8, 16, 0]; // phrases per screen, 0 = the whole song
 let mapZoom = Math.min(ZOOMS.length - 1, Math.max(0, ls.get('mapZoom', 2)));
 function setMapZoom(k) {
   mapZoom = Math.min(ZOOMS.length - 1, Math.max(0, k)); ls.set('mapZoom', mapZoom); mapView = null; mapStatic = null;
-  const z = ZOOMS[mapZoom]; $('zLbl').textContent = z ? z + (z === 1 ? ' frase' : ' frasi') : 'tutta';
+  const z = ZOOMS[mapZoom]; $('zLbl').textContent = z ? T(z === 1 ? '{n} frase' : '{n} frasi', { n: z }) : T('tutta');
   $('zIn').disabled = mapZoom === 0; $('zOut').disabled = mapZoom === ZOOMS.length - 1;
   if (player && mapOpen()) drawMap(player.position);
 }
@@ -1517,7 +1529,7 @@ function drawMap(t) {
   if (loopRange) { const lx = (loopRange[0] - a) / span * W, lw = (loopRange[1] - loopRange[0]) / span * W; g.strokeStyle = cc('--acc'); g.lineWidth = 2; g.beginPath(); g.roundRect ? g.roundRect(lx + 1, 22, lw - 2, H - 26, 8) : g.rect(lx + 1, 22, lw - 2, H - 26); g.stroke(); }
   if (x >= 0 && x <= W) { g.fillStyle = cc('--ink'); g.fillRect(x - 1.5, 0, 3, H); }
   const dur = player.duration; $('mapOvWin').style.left = (a / dur * 100) + '%'; $('mapOvWin').style.width = Math.min(100, span / dur * 100) + '%'; $('mapOvPos').style.left = (t / dur * 100) + '%';
-  $('mapInfo').textContent = `${liveTempo}% · metronomo ${cur.met.on ? 'acceso' : 'spento'}`;
+  $('mapInfo').textContent = liveTempo + '% · ' + (cur.met.on ? T('metronomo acceso') : T('metronomo spento'));
 }
 (function mapInput() {
   const el = $('mapBox'); let sx = 0, moved = false, down = false, lp = 0;
@@ -1546,7 +1558,7 @@ window.__themeHook = () => { if (cur && player) { drawStemWaves(); mapStatic = n
 function loadScript(src) { return new Promise((res, rej) => { if (window.lamejs) return res(); const sc = document.createElement('script'); sc.src = src; sc.onload = res; sc.onerror = () => rej(new Error('script')); document.head.append(sc); }); }
 async function exportMp3() {
   if (!cur || !player) return;
-  closePop(); busy('Preparo l\'MP3…');
+  closePop(); busy(T('Preparo l\'MP3…'));
   try {
     await loadScript('lame.min.js');
     const st = await getStems(cur.id), n = st.n, L = new Int16Array(n), R = new Int16Array(n);
@@ -1557,15 +1569,15 @@ async function exportMp3() {
     for (let i = 0; i < n; i += 1152) { const b = enc.encodeBuffer(L.subarray(i, i + 1152), R.subarray(i, i + 1152)); if (b.length) parts.push(new Uint8Array(b)); if ((i & 0xfffff) === 0) await new Promise(r => setTimeout(r)); }
     const end = enc.flush(); if (end.length) parts.push(new Uint8Array(end));
     const blob = new Blob(parts, { type: 'audio/mpeg' }), off = STEMS.filter(s => isOff(s.id)).map(s => s.n.toLowerCase());
-    const name = (cur.name + (off.length ? ' - senza ' + off.join(' ') : '')).replace(/[^\w\- àèéìòùáíóúñü]+/gi, '').trim() + '.mp3';
+    const name = (cur.name + (off.length ? ' - ' + T('senza {x}', { x: off.join(' ') }) : '')).replace(/[^\w\- àèéìòùáíóúñü]+/gi, '').trim() + '.mp3';
     busy();
     if (NATIVE) { // the Android app saves it and opens the share sheet (Drive, Files, WhatsApp…)
       const b64 = await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(String(fr.result).split(',')[1]); fr.readAsDataURL(blob); });
       const w = await window.Capacitor.nativePromise('Filesystem', 'writeFile', { path: name, data: b64, directory: 'CACHE' });
       try { await window.Capacitor.nativePromise('Share', 'share', { title: name, files: [w.uri] }); } catch (e) { if (!/cancel/i.test(e && e.message || '')) throw e; }
     } else { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); }
-    toast('MP3 pronto: ' + name);
-  } catch (e) { busy(); toast('MP3 non riuscito: ' + (e && e.message || e)); }
+    toast(T('MP3 pronto: {x}', { x: name }));
+  } catch (e) { busy(); toast(T('MP3 non riuscito: {x}', { x: e && e.message || e })); }
 }
 $('mp3Btn').addEventListener('click', exportMp3);
 
@@ -1573,33 +1585,33 @@ $('mp3Btn').addEventListener('click', exportMp3);
 let training = null;
 const PERFECT = 0.03; // a tap within 30 ms of the beat counts as perfect
 const GAMES = {
-  one: { n: "Trova l'1", target: 'Primo tempo', desc: "Ascolta e tocca solo sull'1 di ogni frase (ogni 8 tempi). Allena il riconoscimento del cambio di frase.", want: c => c === 1,
-    pad: "Tap sull'1", help: "Tocca esattamente sull'1", help2: 'Segui il basso e i cambi di accordo',
-    tipT: 'Segui basso e accordi', tip: "Il basso e la chitarra cambiano accordo proprio sull'1: aspetta il cambio invece di anticiparlo con il corpo." },
-  beat: { n: 'A tempo', target: '1-2-3-4-5-6-7-8', desc: 'Tocca su ogni tempo, come un passo. Ideale per sentire la pulsazione continua del brano.', want: () => true,
-    pad: 'Tocca ogni tempo', help: 'Tocca su ogni tempo', help2: 'Segui la güira: scandisce ogni tempo',
-    tipT: 'Segui la güira', tip: 'La güira raspa su ogni tempo in modo regolare: se ti perdi, ascolta lei e lascia stare la voce.' },
-  tap: { n: 'Il tap', target: '4 e 8', desc: "La firma della bachata: tocca solo sul 4 e sull'8, il momento del tap. Allena a non anticipare il piede.", want: c => c === 4 || c === 8,
-    pad: 'Tap sul 4 e sull\'8', help: "Tocca sul 4 e sull'8", help2: 'Senti il bongo che chiude la mezza frase',
-    tipT: 'Ascolta il bongo', tip: "Il tap cade sul 4 e sull'8: il bongo chiude ogni mezza frase con un colpo più marcato. Aspettalo, non anticiparlo." } };
+  one: { n: T("Trova l'1"), target: T('Primo tempo'), desc: T("Ascolta e tocca solo sull'1 di ogni frase (ogni 8 tempi). Allena il riconoscimento del cambio di frase."), want: c => c === 1,
+    pad: T("Tap sull'1"), help: T("Tocca esattamente sull'1"), help2: T('Segui il basso e i cambi di accordo'),
+    tipT: T('Segui basso e accordi'), tip: T("Il basso e la chitarra cambiano accordo proprio sull'1: aspetta il cambio invece di anticiparlo con il corpo.") },
+  beat: { n: T('A tempo'), target: '1-2-3-4-5-6-7-8', desc: T('Tocca su ogni tempo, come un passo. Ideale per sentire la pulsazione continua del brano.'), want: () => true,
+    pad: T('Tocca ogni tempo'), help: T('Tocca su ogni tempo'), help2: T('Segui la güira: scandisce ogni tempo'),
+    tipT: T('Segui la güira'), tip: T('La güira raspa su ogni tempo in modo regolare: se ti perdi, ascolta lei e lascia stare la voce.') },
+  tap: { n: T('Il tap'), target: T('4 e 8'), desc: T("La firma della bachata: tocca solo sul 4 e sull'8, il momento del tap. Allena a non anticipare il piede."), want: c => c === 4 || c === 8,
+    pad: T('Tap sul 4 e sull\'8'), help: T("Tocca sul 4 e sull'8"), help2: T('Senti il bongo che chiude la mezza frase'),
+    tipT: T('Ascolta il bongo'), tip: T("Il tap cade sul 4 e sull'8: il bongo chiude ogni mezza frase con un colpo più marcato. Aspettalo, non anticiparlo.") } };
 function trainStats() { const st = ls.get('trainStats', { best: {}, days: [] }); st.bestMs = st.bestMs || {}; return st; }
 function trainOpts() { return Object.assign({ guide: 'bg', len: 4 }, ls.get('trainOpts', {})); }
 function streakDays(st) { let n = 0; const d = new Date(); for (;;) { const k = d.toISOString().slice(0, 10); if (!st.days.includes(k)) break; n++; d.setDate(d.getDate() - 1); } return n; }
 function showTrain(which) { ['trainMenu', 'trainPlay', 'trainDone'].forEach(id => { $(id).hidden = id !== which; }); $('train').scrollTop = 0; }
 function renderTrainMenu() {
   const st = trainStats(), sd = streakDays(st), o = trainOpts();
-  $('trainTitle').textContent = 'Allenati';
+  $('trainTitle').textContent = T('Allenati');
   $('trainTrack').textContent = cur.name; $('trainBpm').textContent = Math.round(cur.bpm) + ' BPM';
-  $('streakBox').hidden = !sd; $('trainStreak').textContent = sd === 1 ? 'Ti sei allenato oggi' : sd + ' giorni di fila';
+  $('streakBox').hidden = !sd; $('trainStreak').textContent = sd === 1 ? T('Ti sei allenato oggi') : T('{n} giorni di fila', { n: sd });
   $('games').innerHTML = Object.entries(GAMES).map(([k, g]) => `<button class="game" data-game="${k}">
-    <span class="gh"><b>${g.n}</b><span class="rec">Record ${st.best[k] != null ? st.best[k] + '%' : '–'}</span></span>
+    <span class="gh"><b>${g.n}</b><span class="rec">${T('Record')} ${st.best[k] != null ? st.best[k] + '%' : '–'}</span></span>
     <p>${g.desc}</p>
     <span class="c8">${[1, 2, 3, 4, 5, 6, 7, 8].map(c => `<i class="${g.want(c) ? 'on' : ''}">${c}</i>`).join('')}</span></button>`).join('');
   document.querySelectorAll('[data-guide]').forEach(b => b.classList.toggle('on', b.dataset.guide === o.guide));
   document.querySelectorAll('[data-len]').forEach(b => b.classList.toggle('on', +b.dataset.len === o.len));
 }
 function renderCal() { const o = tapOffset();
-  $('calTxt').textContent = o == null ? 'Non calibrato: fallo anche con l\'altoparlante del telefono' : `${Math.round(o * 1000)} ms · rifallo se cambi cuffie o casse`; }
+  $('calTxt').textContent = o == null ? T('Non calibrato: fallo anche con l\'altoparlante del telefono') : T('{n} ms · rifallo se cambi cuffie o casse', { n: Math.round(o * 1000) }); }
 // Plays 16 clicks and measures how late the dancer's taps land on them: that delay is then
 // taken off every tap in the exercises and in "L'1 è qui!".
 async function calibrate() {
@@ -1610,29 +1622,29 @@ async function calibrate() {
     o.frequency.value = k % 4 === 0 ? 1600 : 1100; g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.7, t + 0.002); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.06);
     o.connect(g); g.connect(c.destination); o.start(t); o.stop(t + 0.08); clicks.push(t);
   }
-  const wrap = document.createElement('div'), p = textEl('Tocca il riquadro esattamente su ogni click, come se fosse il tempo. I primi 4 servono per prendere il ritmo.'); p.className = 'mute small';
-  const pad = document.createElement('div'); pad.className = 'calpad'; pad.textContent = 'Tocca sul click';
+  const wrap = document.createElement('div'), p = textEl(T('Tocca il riquadro esattamente su ogni click, come se fosse il tempo. I primi 4 servono per prendere il ritmo.')); p.className = 'mute small';
+  const pad = document.createElement('div'); pad.className = 'calpad'; pad.textContent = T('Tocca sul click');
   pad.addEventListener('pointerdown', e => { e.preventDefault(); taps.push(c.currentTime); pad.classList.add('flash'); setTimeout(() => pad.classList.remove('flash'), 90); vibrate(8); });
   wrap.append(p, pad);
   const timer = setTimeout(() => closeDialog('done'), (t0 - c.currentTime + N * per + 0.6) * 1000);
-  const v = await dialog('Calibra il ritardo', wrap, [['Annulla', false]]); clearTimeout(timer);
+  const v = await dialog(T('Calibra il ritardo'), wrap, [[T('Annulla'), false]]); clearTimeout(timer);
   if (v !== 'done') return;
   const d = []; for (const t of taps) { let best = null; for (let k = 4; k < N; k++) { const x = t - clicks[k]; if (best == null || Math.abs(x) < Math.abs(best)) best = x; } if (best != null && Math.abs(best) < 0.35) d.push(best); }
-  if (d.length < 6) return dialog('Calibrazione non riuscita', textEl('Servono almeno 6 tocchi vicini ai click. Riprova con calma.'), [['OK', 0, true]]);
+  if (d.length < 6) return dialog(T('Calibrazione non riuscita'), textEl(T('Servono almeno 6 tocchi vicini ai click. Riprova con calma.')), [['OK', 0, true]]);
   d.sort((x, y) => x - y); const lat = c.outputLatency > 0 ? c.outputLatency : (c.baseLatency || 0);
   const off = Math.max(-0.1, Math.min(0.5, d[Math.floor(d.length / 2)] - lat));
-  ls.set('tapOffset', off); renderCal(); toast('Ritardo misurato: ' + Math.round(off * 1000) + ' ms');
+  ls.set('tapOffset', off); renderCal(); toast(T('Ritardo misurato: {n} ms', { n: Math.round(off * 1000) }));
 }
 function openTraining() {
-  if (!hasBeats()) return toast('Serve il ritmo: questo brano non ce l\'ha');
+  if (!hasBeats()) return toast(T('Serve il ritmo: questo brano non ce l\'ha'));
   renderTrainMenu(); renderCal(); showTrain('trainMenu'); $('train').classList.add('on'); if (location.hash !== '#allenamento') location.hash = 'allenamento';
 }
 function closeTraining(fromNav) { stopTraining(); $('train').classList.remove('on'); if (!fromNav && location.hash === '#allenamento') history.back(); }
 $('trainChange').addEventListener('click', async () => {
-  const list = (await listProjects()).sort((a, b) => b.updated - a.updated); if (list.length < 2) return toast('Hai un solo progetto');
+  const list = (await listProjects()).sort((a, b) => b.updated - a.updated); if (list.length < 2) return toast(T('Hai un solo progetto'));
   const box = document.createElement('div'); box.className = 'marklist';
   const v = await new Promise(res => { list.forEach(p => { const b = document.createElement('button'); b.innerHTML = `<span>${esc(p.name)}</span><span class="mute small">${fmt(p.dur)}</span>`; b.onclick = () => { closeDialog(p.id); }; box.append(b); });
-    dialog('Scegli il brano', box, [['Annulla', null]]).then(res); });
+    dialog(T('Scegli il brano'), box, [[T('Annulla'), null]]).then(res); });
   if (v && (!cur || v !== cur.id)) { closeTraining(); setTimeout(() => trainFromHome(v), 50); }
 });
 $('trainClose').addEventListener('click', () => (training || !$('trainMenu').hidden ? closeTraining() : (stopTraining(), renderTrainMenu(), showTrain('trainMenu'))));
@@ -1648,7 +1660,7 @@ $('tRestart').addEventListener('click', () => training && startTraining(training
 $('tExit').addEventListener('click', () => { stopTraining(); renderTrainMenu(); showTrain('trainMenu'); });
 $('tPause').addEventListener('click', async () => { const tr = training; if (!tr || tr.done) return;
   if (player.isPlaying) { player.pause(); tr.paused = true; } else { await audioCtx().resume(); player.play(); tr.paused = false; }
-  $('tPause').textContent = tr.paused ? 'Riprendi' : 'Pausa'; setPlayIcon(); });
+  $('tPause').textContent = tr.paused ? T('Riprendi') : T('Pausa'); setPlayIcon(); });
 // During an exercise the guide mix goes straight to the player (the project keeps its own mix) and the click is off.
 function trainingSound(on) {
   if (!player) return;
@@ -1670,12 +1682,12 @@ async function startTraining(game) {
   training = { game, targets, nPh, startT: beatTime(startIdx), endT: Math.min(player.duration, beatTime(endIdx)), taps: 0, wrong: 0, errs: [], wasLoop: loopRange ? loopRange.slice() : null, ph: -1 };
   if (loopRange) { player.clearLoop(); loopRange = null; loopMode = null; updateLoopBtns(); }
   $('trainTitle').textContent = g.n;
-  $('tGame').textContent = 'Gioco: ' + g.n; $('tLeft').textContent = 'Preparati'; $('tHits').textContent = '0/' + targets.length; $('tErr').textContent = '–';
+  $('tGame').textContent = T('Gioco: {x}', { x: g.n }); $('tLeft').textContent = T('Preparati'); $('tHits').textContent = '0/' + targets.length; $('tErr').textContent = '–';
   $('tSegs').className = 'tsegs' + (nPh > 4 ? ' n8' : ''); $('tSegs').innerHTML = '<i></i>'.repeat(nPh);
-  $('tPrep').textContent = '4 tempi di preparazione: 5, 6, 7, 8…'; $('tWhat').textContent = g.pad; $('tMsg').textContent = 'Ascolta…';
-  $('tHelp').textContent = g.help; $('tHelp2').textContent = 'Nessun numero sullo schermo · ' + g.help2;
-  $('tLateTxt').textContent = 'Aspetta il primo tocco'; $('tLast').textContent = ''; $('tMark').style.display = 'none';
-  $('tPause').textContent = 'Pausa';
+  $('tPrep').textContent = T('4 tempi di preparazione: 5, 6, 7, 8…'); $('tWhat').textContent = g.pad; $('tMsg').textContent = T('Ascolta…');
+  $('tHelp').textContent = g.help; $('tHelp2').textContent = T('Nessun numero sullo schermo') + ' · ' + g.help2;
+  $('tLateTxt').textContent = T('Aspetta il primo tocco'); $('tLast').textContent = ''; $('tMark').style.display = 'none';
+  $('tPause').textContent = T('Pausa');
   showTrain('trainPlay');
   await audioCtx().resume(); trainingSound(true); userSeekAt = performance.now(); player.seek(pre); if (!player.isPlaying) player.play(); setPlayIcon(); keepAwake();
 }
@@ -1683,8 +1695,8 @@ function trainTick(t) {
   const tr = training; if (!tr || tr.done) return;
   if (t >= tr.startT - 0.05) {
     const k = Math.min(tr.nPh - 1, Math.floor((t - tr.startT) / ((tr.endT - tr.startT) / tr.nPh)));
-    if (k !== tr.ph) { tr.ph = k; $('tLeft').textContent = `Frase ${k + 1} di ${tr.nPh}`; [...$('tSegs').children].forEach((x, j) => { x.className = j < k ? 'done' : j === k ? 'now' : ''; });
-      if (k === 0) $('tPrep').textContent = 'Preparazione finita · registrazione dei tocchi attiva'; }
+    if (k !== tr.ph) { tr.ph = k; $('tLeft').textContent = T('Frase {a} di {b}', { a: k + 1, b: tr.nPh }); [...$('tSegs').children].forEach((x, j) => { x.className = j < k ? 'done' : j === k ? 'now' : ''; });
+      if (k === 0) $('tPrep').textContent = T('Preparazione finita · registrazione dei tocchi attiva'); }
   }
   if (t >= tr.endT + 0.3 || !player.isPlaying && !tr.paused && t >= tr.endT - 0.1) finishTraining();
 }
@@ -1697,18 +1709,18 @@ $('tpad').addEventListener('pointerdown', e => {
   if (target && !target.hit && Math.abs(dt) < per * 0.3) {
     target.hit = dt; tr.errs.push(dt * 1000); pad.classList.add('hit');
     const ms = Math.round(dt * 1000), ok = Math.abs(dt) <= PERFECT;
-    $('tMsg').textContent = ok ? 'Perfetto!' : dt < 0 ? 'In anticipo' : 'In ritardo';
-    $('tLateTxt').textContent = ok ? 'A tempo' : dt < 0 ? 'In anticipo di ' + -ms + ' ms' : 'In ritardo di ' + ms + ' ms';
+    $('tMsg').textContent = ok ? T('Perfetto!') : dt < 0 ? T('In anticipo') : T('In ritardo');
+    $('tLateTxt').textContent = ok ? T('A tempo') : dt < 0 ? T('In anticipo di {n} ms', { n: -ms }) : T('In ritardo di {n} ms', { n: ms });
     $('tMark').style.display = 'block'; $('tMark').style.left = (50 + Math.max(-150, Math.min(150, ms)) / 3) + '%';
-    $('tLast').textContent = 'Ultimo tocco sul ' + countOf(i);
+    $('tLast').textContent = T('Ultimo tocco sul {c}', { c: countOf(i) });
   } else {
     tr.wrong++; pad.classList.add('miss'); const ms = Math.round(dt * 1000);
-    if (target && target.hit) $('tMsg').textContent = 'Già preso';
+    if (target && target.hit) $('tMsg').textContent = T('Già preso');
     else if (target) { // right count, too far from it: say how far, so a late tap on the 1 is not reported as "not the 1"
-      const ci = countOf(i); $('tMsg').textContent = `Era ${ci === 1 || ci === 8 ? "l'" : 'il '}${ci}, ma troppo ${dt < 0 ? 'presto' : 'tardi'}`;
-      $('tLateTxt').textContent = dt < 0 ? 'In anticipo di ' + -ms + ' ms' : 'In ritardo di ' + ms + ' ms';
+      const ci = countOf(i); $('tMsg').textContent = T(dt < 0 ? 'Era {n}, ma troppo presto' : 'Era {n}, ma troppo tardi', { n: countName(ci) });
+      $('tLateTxt').textContent = dt < 0 ? T('In anticipo di {n} ms', { n: -ms }) : T('In ritardo di {n} ms', { n: ms });
       $('tMark').style.display = 'block'; $('tMark').style.left = (50 + Math.max(-150, Math.min(150, ms)) / 3) + '%';
-    } else { const ci = countOf(i); $('tMsg').textContent = 'Quello era ' + (ci === 1 || ci === 8 ? "l'" : 'il ') + ci; }
+    } else { const ci = countOf(i); $('tMsg').textContent = T('Quello era {n}', { n: countName(ci) }); }
   }
   const h = tr.targets.filter(x => x.hit != null).length; $('tHits').textContent = h + '/' + tr.targets.length;
   if (tr.errs.length) $('tErr').textContent = Math.round(tr.errs.reduce((a, b) => a + Math.abs(b), 0) / tr.errs.length);
@@ -1725,19 +1737,19 @@ function finishTraining() {
   const best = st.best[tr.game] == null || score > st.best[tr.game]; if (best) st.best[tr.game] = score;
   if (E.length && (st.bestMs[tr.game] == null || Math.round(meanAbs) < st.bestMs[tr.game])) st.bestMs[tr.game] = Math.round(meanAbs);
   ls.set('trainStats', st);
-  $('trainTitle').textContent = 'Risultato';
+  $('trainTitle').textContent = T('Risultato');
   $('tRecord').hidden = !(best && score > 0);
   $('tRing').style.strokeDashoffset = (452.4 * (1 - score / 100)).toFixed(1); $('tScore').textContent = score + '%';
-  $('tResTitle').textContent = score >= 85 ? 'Ritmo eccellente' : score >= 60 ? 'Bene, ci sei quasi' : 'Riproviamo, ascolta ancora';
+  $('tResTitle').textContent = score >= 85 ? T('Ritmo eccellente') : score >= 60 ? T('Bene, ci sei quasi') : T('Riproviamo, ascolta ancora');
   $('tHitsR').innerHTML = `${h}/${n} <small>(${Math.round(100 * h / Math.max(1, n))}%)</small>`; $('tHitsBar').style.width = (100 * h / Math.max(1, n)) + '%';
   $('tPrec').innerHTML = E.length ? `±${Math.round(meanAbs)} <small>ms</small>` : '–'; $('tPrecBar').style.width = (E.length ? Math.max(4, 100 - meanAbs / 1.5) : 0) + '%';
   const early = E.filter(x => x < -PERFECT * 1000).length, late = E.filter(x => x > PERFECT * 1000).length, ok = E.length - early - late;
   const pc = v => E.length ? Math.round(100 * v / E.length) : 0;
-  $('tDist').innerHTML = `<span class="small mute">Distribuzione dei tocchi · ${E.length} a segno</span>` + [['Anticipo', early, 'var(--tap)'], ['Perfetto (±30 ms)', ok, 'var(--acc)'], ['Ritardo', late, 'var(--c-vocals)']]
+  $('tDist').innerHTML = `<span class="small mute">${T('Distribuzione dei tocchi · {n} a segno', { n: E.length })}</span>` + [[T('Anticipo'), early, 'var(--tap)'], [T('Perfetto (±30 ms)'), ok, 'var(--acc)'], [T('Ritardo'), late, 'var(--c-vocals)']]
     .map(([l, v, c]) => `<div class="row"><span>${l}</span><span>${pc(v)}% (${v})</span></div><div class="db" style="--dc:${c}"><i style="width:${pc(v)}%"></i></div>`).join('');
-  $('tTrend').innerHTML = E.length >= 3 && Math.abs(bias) > 25 ? `<b>Tendi ad arrivare ${bias < 0 ? 'in anticipo' : 'in ritardo'}</b><p class="small" style="margin-top:4px">Nel ${pc(bias < 0 ? early : late)}% dei tocchi, in media di ${Math.round(Math.abs(bias))} ms. ${bias < 0 ? 'Aspetta un attimo di più.' : 'Anticipa leggermente.'}${bias > 60 && tapOffset() == null ? ' Prova "Calibra": parte del ritardo può essere dell\'audio del telefono.' : ''}</p>`
-    : E.length >= 3 ? `<b>Sei centrato</b><p class="small" style="margin-top:4px">Né in anticipo né in ritardo.${tr.wrong ? ' Tocchi fuori bersaglio: ' + tr.wrong + '.' : ''}</p>` : '';
-  $('tTipT').textContent = GAMES[tr.game].tipT; $('tResTip').textContent = GAMES[tr.game].tip + (tr.wrong && !(E.length >= 3 && Math.abs(bias) <= 25) ? ` Tocchi fuori bersaglio: ${tr.wrong}.` : '');
+  $('tTrend').innerHTML = E.length >= 3 && Math.abs(bias) > 25 ? `<b>${bias < 0 ? T('Tendi ad arrivare in anticipo') : T('Tendi ad arrivare in ritardo')}</b><p class="small" style="margin-top:4px">${T('Nel {p}% dei tocchi, in media di {n} ms.', { p: pc(bias < 0 ? early : late), n: Math.round(Math.abs(bias)) })} ${bias < 0 ? T('Aspetta un attimo di più.') : T('Anticipa leggermente.')}${bias > 60 && tapOffset() == null ? ' ' + T('Prova "Calibra": parte del ritardo può essere dell\'audio del telefono.') : ''}</p>`
+    : E.length >= 3 ? `<b>${T('Sei centrato')}</b><p class="small" style="margin-top:4px">${T('Né in anticipo né in ritardo.')}${tr.wrong ? ' ' + T('Tocchi fuori bersaglio: {n}.', { n: tr.wrong }) : ''}</p>` : '';
+  $('tTipT').textContent = GAMES[tr.game].tipT; $('tResTip').textContent = GAMES[tr.game].tip + (tr.wrong && !(E.length >= 3 && Math.abs(bias) <= 25) ? ' ' + T('Tocchi fuori bersaglio: {n}.', { n: tr.wrong }) : '');
   showTrain('trainDone');
 }
 function stopTraining(keepOpen) {
@@ -1749,7 +1761,9 @@ function stopTraining(keepOpen) {
 
 
 // ---------- lyrics: LRCLIB first, Whisper on the vocal stem as a fallback, Opus-MT for the translation ----------
-const LANGS = { it: 'italiano', en: 'inglese', es: 'spagnolo', fr: 'francese', de: 'tedesco', pt: 'portoghese' };
+const LANGS = { it: T('italiano'), en: T('inglese'), es: T('spagnolo'), fr: T('francese'), de: T('tedesco'), pt: T('portoghese') };
+// target language of the lyrics translation: the user's choice if saved, otherwise the app language
+const trTarget = () => ls.get('trLang', I18N.lang);
 const STOP = {
   es: 'de la que el en y los se del las un por con no una su para es al lo como más pero sus le ya me mi tu te yo amor quiero corazón eres estoy sin cuando porque todo',
   en: 'the and to of in is you that it i me my your love be on with for don\'t can just baby what know when all',
@@ -1793,17 +1807,17 @@ async function hasLocalAsr() {
 }
 function lyrWorker() {
   if (lyrW) return lyrW;
-  lyrW = new Worker('lyricsworker.js?v=4', { type: 'module' });
+  lyrW = new Worker('lyricsworker.js?v=5', { type: 'module' });
   lyrW.onmessage = e => { const m = e.data;
-    if (m.type === 'progress') lyrStatus((m.stage === 'asr' ? (asrLocal ? 'Carico Whisper' : 'Scarico Whisper') : 'Scarico il traduttore') + ` · ${mbs(m.loaded)} di ${mbs(m.total)}`, m.loaded / m.total);
-    else if (m.type === 'stage') lyrStatus('Riconosco la lingua e trascrivo la voce…', null);
-    else if (m.type === 'trstep') lyrStatus(`Traduco… ${m.done} di ${m.total} righe`, m.done / m.total);
+    if (m.type === 'progress') lyrStatus((m.stage === 'asr' ? (asrLocal ? T('Carico Whisper') : T('Scarico Whisper')) : T('Scarico il traduttore')) + ' · ' + T('{a} di {b}', { a: mbs(m.loaded), b: mbs(m.total) }), m.loaded / m.total);
+    else if (m.type === 'stage') lyrStatus(T('Riconosco la lingua e trascrivo la voce…'), null);
+    else if (m.type === 'trstep') lyrStatus(T('Traduco… {a} di {b} righe', { a: m.done, b: m.total }), m.done / m.total);
     else { const cb = lyrCb[m.id]; delete lyrCb[m.id]; if (cb) m.type === 'error' ? cb.rej(new Error(m.msg)) : cb.res(m); } };
-  lyrW.onerror = e => { for (const k in lyrCb) lyrCb[k].rej(new Error(e.message || 'errore del modello')); lyrCb = {}; lyrW = null; };
+  lyrW.onerror = e => { for (const k in lyrCb) lyrCb[k].rej(new Error(e.message || T('errore del modello'))); lyrCb = {}; lyrW = null; };
   return lyrW;
 }
 function lyrCall(msg, transfer) { const id = ++lyrJob; return new Promise((res, rej) => { lyrCb[id] = { res, rej }; lyrWorker().postMessage(Object.assign({ id }, msg), transfer || []); }); }
-const netMsg = e => /fetch|network|load|import|Failed/i.test(e && e.message || '') ? 'serve Internet la prima volta' + (NATIVE ? '' : ' (nella versione web dentro Claude è bloccato: usa l\'app Android)') : (e && e.message || String(e));
+const netMsg = e => /fetch|network|load|import|Failed/i.test(e && e.message || '') ? T('serve Internet la prima volta') + (NATIVE ? '' : ' ' + T('(nella versione web dentro Claude è bloccato: usa l\'app Android)')) : (e && e.message || String(e));
 
 // "JENSEN FRIO (Official Video)" -> "JENSEN FRIO": video and file names carry words that spoil the search
 function cleanTitle(n) {
@@ -1823,15 +1837,15 @@ function parseLrc(s) {
 let lyrResults = [];
 async function lyrSearch() {
   const q = $('lyrQ').value.trim(); if (!q || !cur) return;
-  $('lyrRes').innerHTML = '<p class="small mute">Cerco…</p>';
+  $('lyrRes').innerHTML = '<p class="small mute">' + T('Cerco…') + '</p>';
   let list;
   try { const r = await fetch('https://lrclib.net/api/search?q=' + encodeURIComponent(q)); if (!r.ok) throw new Error('HTTP ' + r.status); list = await r.json(); }
-  catch (e) { $('lyrRes').innerHTML = `<p class="small mute">Ricerca non riuscita: ${esc(netMsg(e))}.</p>`; return; }
+  catch (e) { $('lyrRes').innerHTML = `<p class="small mute">${esc(T('Ricerca non riuscita: {x}.', { x: netMsg(e) }))}</p>`; return; }
   const sd = cur.srcDur || 0;
   lyrResults = list.filter(x => !x.instrumental && (x.syncedLyrics || x.plainLyrics))
     .sort((a, b) => (!!b.syncedLyrics - !!a.syncedLyrics) || (sd ? Math.abs(a.duration - sd) - Math.abs(b.duration - sd) : 0)).slice(0, 6);
-  if (!lyrResults.length) { $('lyrRes').innerHTML = '<p class="small mute">Nessun testo trovato. Prova con titolo e artista, oppure trascrivi la voce.</p>'; return; }
-  $('lyrRes').innerHTML = lyrResults.map((x, i) => `<button data-li="${i}"${x.syncedLyrics ? '' : ' disabled'}><span class="rn"><b>${esc(x.trackName)}</b><span class="small mute">${esc(x.artistName)} · ${fmt(x.duration)}</span></span><span class="small ${x.syncedLyrics ? '' : 'mute'}">${x.syncedLyrics ? 'con i tempi' : 'senza tempi'}</span></button>`).join('');
+  if (!lyrResults.length) { $('lyrRes').innerHTML = '<p class="small mute">' + T('Nessun testo trovato. Prova con titolo e artista, oppure trascrivi la voce.') + '</p>'; return; }
+  $('lyrRes').innerHTML = lyrResults.map((x, i) => `<button data-li="${i}"${x.syncedLyrics ? '' : ' disabled'}><span class="rn"><b>${esc(x.trackName)}</b><span class="small mute">${esc(x.artistName)} · ${fmt(x.duration)}</span></span><span class="small ${x.syncedLyrics ? '' : 'mute'}">${x.syncedLyrics ? T('con i tempi') : T('senza tempi')}</span></button>`).join('');
 }
 // Stops a running Whisper or translation job: its result would overwrite the text just chosen.
 let lyrCancelled = false;
@@ -1864,31 +1878,31 @@ function alignShift(env, rate, times, dur, range = 40) {
 function autoAlign(L, quiet) {
   const env = cur.env && cur.env.vocals; if (!env || !env.length) return false;
   const times = L.lines.filter(l => l.text).map(l => l.t), r = alignShift(env, cur.envRate || 10, times, cur.dur);
-  if (r.lines < 4 || r.margin < 0.04) { if (!quiet) toast('Non riesco ad allinearlo da solo: usa «Questa riga inizia adesso»'); return false; }
+  if (r.lines < 4 || r.margin < 0.04) { if (!quiet) toast(T('Non riesco ad allinearlo da solo: usa «{x}»', { x: T('Questa riga inizia adesso') })); return false; }
   const sh = Math.abs(r.shift) > 0.5 ? r.shift : 0;
-  if (sh !== (L.shift || 0)) { L.shift = sh; toast(sh ? `Testo allineato alla voce (${sh > 0 ? '+' : ''}${sh.toFixed(1).replace('.', ',')} s)` : 'Testo allineato alla voce'); }
-  else if (!quiet) toast('Il testo era già allineato');
+  if (sh !== (L.shift || 0)) { L.shift = sh; toast(sh ? T('Testo allineato alla voce ({n} s)', { n: (sh > 0 ? '+' : '') + dec(sh.toFixed(1)) }) : T('Testo allineato alla voce')); }
+  else if (!quiet) toast(T('Il testo era già allineato'));
   return true;
 }
 function pickLyrics(x) {
   lyrCancel();
   const off = cur.offset || 0, dur = cur.dur;
   const lines = parseLrc(x.syncedLyrics).map(l => ({ t: +(l.t - off).toFixed(2), text: l.text })).filter(l => l.t > -1.5 && l.t < dur + 0.5);
-  if (!lines.some(l => l.text)) { toast('Nella parte che hai ritagliato questo testo non ha righe cantate'); return; }
+  if (!lines.some(l => l.text)) { toast(T('Nella parte che hai ritagliato questo testo non ha righe cantate')); return; }
   setLyrics({ src: 'LRCLIB', title: x.trackName + ' · ' + x.artistName, lines, lang: detectLang(lines.map(l => l.text).join(' ')) });
   if (autoAlign(cur.lyrics, true)) { persist(); renderLyrics(); }
 }
 async function lyrTranscribe(pid, auto) {
   pid = pid || (cur && cur.id); if (!pid || lyrBusy) return; lyrBusy = true; lyrFor = pid; lyrCancelled = false;
   try {
-    lyrStatus('Preparo la voce…', null);
+    lyrStatus(T('Preparo la voce…'), null);
     const st = await getStems(pid), [L, R] = (await stemsF32(st, ['vocals'])).vocals, n = L.length;
     const buf = new AudioBuffer({ length: n, numberOfChannels: 1, sampleRate: SR }), ch = buf.getChannelData(0);
     for (let i = 0; i < n; i++) ch[i] = (L[i] + R[i]) * 0.5;
     const oc = new OfflineAudioContext(1, Math.ceil(n * 16000 / SR), 16000), bs = oc.createBufferSource();
     bs.buffer = buf; bs.connect(oc.destination); bs.start();
     const audio = (await oc.startRendering()).getChannelData(0).slice();
-    lyrStatus(asrLocal ? 'Carico Whisper…' : 'Preparo Whisper…', null);
+    lyrStatus(asrLocal ? T('Carico Whisper…') : T('Preparo Whisper…'), null);
     const r = await lyrCall({ type: 'asr', audio }, [audio.buffer]);
     const bad = /subt[ií]tul|amara\.org|gracias por ver|suscr[ií]b|thanks for watching|^[\s♪.…-]*$/i;
     let lines = [];
@@ -1912,14 +1926,14 @@ async function lyrTranscribe(pid, auto) {
       let acc = 0;
       return parts.map((x, k) => { const t0 = l.t + (end - l.t) * acc / total; acc += x.length; return { t: +t0.toFixed(2), e: k === parts.length - 1 ? l.e : null, text: x }; });
     });
-    if (!lines.length) throw new Error('nella voce separata non ho sentito parole');
+    if (!lines.length) throw new Error(T('nella voce separata non ho sentito parole'));
     const withGaps = []; // an empty line ends a sung line when a long pause follows
     lines.forEach((l, i) => { withGaps.push({ t: l.t, text: l.text }); const nx = lines[i + 1]; if (l.e != null && (!nx || nx.t - l.e > 2)) withGaps.push({ t: +l.e.toFixed(2), text: '' }); });
     lyrBusy = false; lyrStatus();
     const lang = r.lang || detectLang(r.text || lines.map(l => l.text).join(' '));
     if (lyrCancelled) return;
     await updateProject(pid, p => { p.lyrics = { src: 'Whisper', title: 'Trascrizione della voce', lang, shift: 0, trLang: null, lines: withGaps }; });
-  } catch (e) { if (lyrCancelled) return; lyrStatus(); toast('Trascrizione non riuscita: ' + netMsg(e)); console.warn('asr', e); }
+  } catch (e) { if (lyrCancelled) return; lyrStatus(); toast(T('Trascrizione non riuscita: {x}', { x: netMsg(e) })); console.warn('asr', e); }
   finally { if (!lyrCancelled) { lyrBusy = false; lyrFor = null; } paintLyrStatus(); }
 }
 // The translation is never automatic: the "Traduci" button starts it.
@@ -1928,18 +1942,18 @@ function setLyrics(L) {
   persist(); renderLyrics();
 }
 async function lyrTranslate() {
-  const L = cur && cur.lyrics, tgt = ls.get('trLang', 'it'); if (!L || lyrBusy) return;
-  if (!tgt) return toast('Traduzione spenta nelle Impostazioni');
-  if (!L.lang) return toast('Non riesco a capire la lingua del testo');
-  if (L.lang === tgt) return toast('Il testo è già in ' + LANGS[tgt]);
+  const L = cur && cur.lyrics, tgt = trTarget(); if (!L || lyrBusy) return;
+  if (!tgt) return toast(T('Traduzione spenta nelle Impostazioni'));
+  if (!L.lang) return toast(T('Non riesco a capire la lingua del testo'));
+  if (L.lang === tgt) return toast(T('Il testo è già in {x}', { x: LANGS[tgt] }));
   lyrBusy = true; const pid = cur.id; lyrFor = pid; lyrCancelled = false;
   try {
-    lyrStatus('Preparo il traduttore…', null);
+    lyrStatus(T('Preparo il traduttore…'), null);
     const idx = L.lines.map((l, i) => l.text ? i : -1).filter(i => i >= 0);
     const r = await lyrCall({ type: 'tr', src: L.lang, tgt, lines: idx.map(i => L.lines[i].text) });
     ls.set('lyrShowTr', true); lyrBusy = false; lyrStatus();
     await updateProject(pid, p => { const P = p.lyrics; if (!P || P.lines.length !== L.lines.length) return; idx.forEach((i, k) => { P.lines[i].tr = r.out[k]; }); P.trLang = tgt; });
-  } catch (e) { if (lyrCancelled) return; lyrStatus(); toast('Traduzione non riuscita: ' + netMsg(e)); }
+  } catch (e) { if (lyrCancelled) return; lyrStatus(); toast(T('Traduzione non riuscita: {x}', { x: netMsg(e) })); }
   finally { lyrBusy = false; lyrFor = null; paintLyrStatus(); }
 }
 function renderLyrics() {
@@ -1948,11 +1962,11 @@ function renderLyrics() {
   $('lyrFind').hidden = has; $('lyrTools').hidden = !has; $('lyrHint').hidden = !has;
   lyrIdx = -2; lyrEls = []; paintLyrStatus();
   if (!has) { $('lyr').innerHTML = ''; if (!$('lyrQ').value) $('lyrQ').value = cleanTitle(cur.name); return; }
-  const tgt = ls.get('trLang', 'it'), showTr = ls.get('lyrShowTr', true) && L.trLang === tgt;
-  $('lyrSrc').textContent = L.src + (L.lang ? ' · ' + LANGS[L.lang] : '') + (L.shift ? ` · spostato ${L.shift > 0 ? '+' : ''}${L.shift.toFixed(1).replace('.', ',')} s` : '');
+  const tgt = trTarget(), showTr = ls.get('lyrShowTr', true) && L.trLang === tgt;
+  $('lyrSrc').textContent = L.src + (L.lang ? ' · ' + LANGS[L.lang] : '') + (L.shift ? ' · ' + T('spostato {n} s', { n: (L.shift > 0 ? '+' : '') + dec(L.shift.toFixed(1)) }) : '');
   const can = tgt && L.lang && L.lang !== tgt;
   $('lyrTr').hidden = !can; $('lyrTr').classList.toggle('on', showTr);
-  $('lyrTr').textContent = L.trLang === tgt ? 'Traduzione' : 'Traduci in ' + LANGS[tgt];
+  $('lyrTr').textContent = L.trLang === tgt ? T('Traduzione') : T('Traduci in {x}', { x: LANGS[tgt] });
   $('lyr').innerHTML = L.lines.map((l, i) => l.text ? `<p data-i="${i}">${esc(l.text)}${showTr && l.tr ? `<span class="tr">${esc(l.tr)}</span>` : ''}</p>` : '').join('');
   for (const p of $('lyr').children) lyrEls[+p.dataset.i] = p;
   if (player) lyricsTick(player.position, true);
@@ -1970,13 +1984,13 @@ lyricsTick = (t, force) => {
 window.openLyrics = renderLyrics;
 async function lyrLineMenu(i) {
   const L = cur.lyrics, l = L.lines[i]; if (!l || !player) return;
-  const v = await dialog(l.text, null, [['Questa riga inizia adesso', 'all'], ['Sposta solo questa riga qui', 'one'], ['Correggi il testo', 'edit'], ['Elimina la riga', 'del'], ['Chiudi', null, true]]);
+  const v = await dialog(l.text, null, [[T('Questa riga inizia adesso'), 'all'], [T('Sposta solo questa riga qui'), 'one'], [T('Correggi il testo'), 'edit'], [T('Elimina la riga'), 'del'], [T('Chiudi'), null, true]]);
   const now = player.position;
-  if (v === 'all') { L.shift = +(now - l.t).toFixed(2); toast('Testo allineato'); }
+  if (v === 'all') { L.shift = +(now - l.t).toFixed(2); toast(T('Testo allineato')); }
   else if (v === 'one') { l.t = +(now - (L.shift || 0)).toFixed(2); L.lines.sort((a, b) => a.t - b.t); }
   else if (v === 'edit') {
     const inp = document.createElement('input'); inp.type = 'text'; inp.value = l.text; inp.maxLength = 160;
-    const ok = await dialog('Correggi la riga', inp, [['Annulla', false], ['Salva', true, true]]);
+    const ok = await dialog(T('Correggi la riga'), inp, [[T('Annulla'), false], [T('Salva'), true, true]]);
     if (!ok || !inp.value.trim()) return; if (inp.value.trim() !== l.text) { l.text = inp.value.trim(); delete l.tr; }
   } else if (v === 'del') L.lines.splice(i, 1);
   else return;
@@ -1984,12 +1998,12 @@ async function lyrLineMenu(i) {
 }
 async function lyrMoreMenu() {
   const L = cur && cur.lyrics; if (!L) return;
-  const v = await dialog(L.title || 'Testo', null, [['Allinea alla voce', 'align'], ['Anticipa il testo di 0,5 s', -0.5], ['Ritarda il testo di 0,5 s', 0.5], ['Traduci di nuovo', 'tr'], ['Cerca un altro testo', 'new'], ['Genera con Whisper', 'asr'], ['Chiudi', null, true]]);
+  const v = await dialog(T(L.title || 'Testo'), null, [[T('Allinea alla voce'), 'align'], [T('Anticipa il testo di 0,5 s'), -0.5], [T('Ritarda il testo di 0,5 s'), 0.5], [T('Traduci di nuovo'), 'tr'], [T('Cerca un altro testo'), 'new'], [T('Genera con Whisper'), 'asr'], [T('Chiudi'), null, true]]);
   if (typeof v === 'number') { L.shift = +((L.shift || 0) + v).toFixed(2); persist(); renderLyrics(); }
   else if (v === 'tr') { L.trLang = null; lyrTranslate(); }
   else if (v === 'align') { if (autoAlign(L, false)) { persist(); renderLyrics(); } }
-  else if (v === 'asr') { if (await dialog('Generare il testo con Whisper?', textEl('Whisper ascolta la voce separata e scrive il testo con i tempi. Sostituisce il testo attuale.'), [['Annulla', false], ['Genera', true, true]])) lyrTranscribe(); }
-  else if (v === 'new') { if (await dialog('Cercare un altro testo?', textEl('Il testo attuale e le tue correzioni vengono tolti.'), [['Annulla', false], ['Cerca', true, true]])) { cur.lyrics = null; persist(); $('lyrRes').innerHTML = ''; renderLyrics(); } }
+  else if (v === 'asr') { if (await dialog(T('Generare il testo con Whisper?'), textEl(T('Whisper ascolta la voce separata e scrive il testo con i tempi. Sostituisce il testo attuale.')), [[T('Annulla'), false], [T('Genera'), true, true]])) lyrTranscribe(); }
+  else if (v === 'new') { if (await dialog(T('Cercare un altro testo?'), textEl(T('Il testo attuale e le tue correzioni vengono tolti.')), [[T('Annulla'), false], [T('Cerca'), true, true]])) { cur.lyrics = null; persist(); $('lyrRes').innerHTML = ''; renderLyrics(); } }
 }
 (function lyricsInput() {
   $('lyrSearch').addEventListener('click', lyrSearch);
@@ -1997,7 +2011,7 @@ async function lyrMoreMenu() {
   $('lyrRes').addEventListener('click', e => { const b = e.target.closest('[data-li]'); if (b && !b.disabled) pickLyrics(lyrResults[+b.dataset.li]); });
   $('lyrAsr').addEventListener('click', () => lyrTranscribe());
   $('lyrTr').addEventListener('click', () => { const L = cur && cur.lyrics; if (!L) return;
-    if (L.trLang !== ls.get('trLang', 'it')) return lyrTranslate();
+    if (L.trLang !== trTarget()) return lyrTranslate();
     ls.set('lyrShowTr', !ls.get('lyrShowTr', true)); renderLyrics(); });
   $('lyrMore').addEventListener('click', lyrMoreMenu);
   const pane = $('mapPaneT'), mark = () => { lyrUser = performance.now(); };
@@ -2011,7 +2025,7 @@ async function lyrMoreMenu() {
   $('lyr').addEventListener('contextmenu', e => e.preventDefault());
   $('lyr').addEventListener('click', e => { const p = e.target.closest('[data-i]'); if (!p || fired) { fired = false; return; }
     const L = cur.lyrics, l = L.lines[+p.dataset.i]; lyrUser = 0; seekTo(Math.max(0, l.t + (L.shift || 0)), false); });
-  $('trLang').addEventListener('change', e => { ls.set('trLang', e.target.value); toast(e.target.value ? 'Traduzione in ' + LANGS[e.target.value] : 'Traduzione spenta'); });
+  $('trLang').addEventListener('change', e => { ls.set('trLang', e.target.value); toast(e.target.value ? T('Traduzione in {x}', { x: LANGS[e.target.value] }) : T('Traduzione spenta')); });
 })();
 
 // ---------- Android back (button and edge swipe) ----------
@@ -2032,5 +2046,6 @@ if (NATIVE && window.Capacitor.addListener) {
 // ---------- start ----------
 if (location.hash) history.replaceState(null, '', location.pathname);
 applyTheme();
-renderHome().then(() => show('home'));
+let reopen = null; try { reopen = sessionStorage.getItem('reopen'); sessionStorage.removeItem('reopen'); } catch (e) {}
+renderHome().then(() => { show('home'); if (reopen === 'set') openSettings(); });
 }

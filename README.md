@@ -10,6 +10,7 @@ Tutte le funzionalità e il comportamento dell'app sono in **[FUNZIONALITA.md](F
 app/        l'app pronta da servire (HTML + JS, nessuna build necessaria)
   index.html        interfaccia (design "Stage Studio Pulse")
   app.js            logica dell'interfaccia
+  i18n.js           lingue dell'interfaccia: italiano, inglese, spagnolo
   player.js         riproduzione multitraccia, time-stretch, loop, metronomo
   beats.js          battiti e BPM
   separate.js       STFT/ISTFT e pipeline di separazione (Demucs + güira)

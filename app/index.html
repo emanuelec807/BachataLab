@@ -53,7 +53,7 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
 .grow{flex:1}
 .card{background:var(--s1);border-radius:18px;padding:14px 16px}
 .seg{display:flex;gap:4px;padding:4px;border-radius:14px;background:var(--s1)}
-.seg button{flex:1;min-height:38px;border-radius:10px;background:transparent;color:var(--ink2);font-size:13px;padding:0 6px}
+.seg button{flex:1;min-height:38px;border-radius:10px;background:transparent;color:var(--ink2);font-size:13px;padding:0 6px;white-space:normal;line-height:1.15;text-align:center}
 .seg button.on{background:var(--ink);color:var(--bg)}
 .lbl{font:600 13px var(--body);color:var(--ink3);margin:20px 4px 8px}
 .chips{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none}.chips::-webkit-scrollbar{display:none}
@@ -235,7 +235,7 @@ select{font:600 14px var(--body);min-height:40px;border:0;border-radius:10px;bac
 .times{display:flex;justify-content:space-between;font:500 12px var(--body);color:var(--ink3)}
 #loopTxt{color:var(--ink2)}
 .loops{display:flex;gap:8px;padding:10px 16px 0}
-.loops button{flex:1;min-height:40px;font-size:13px}
+.loops button{flex:1;min-height:40px;font-size:13px;padding:0 6px;gap:4px}
 .loops button.on{background:var(--acc);color:var(--on-acc);font-weight:700}
 .transport{display:flex;align-items:center;justify-content:space-between;padding:14px 20px 0}
 .transport button{width:54px;height:54px;min-height:0;border-radius:27px;padding:0;background:var(--s1);font:700 16px var(--body)}
@@ -272,6 +272,8 @@ select{font:600 14px var(--body);min-height:40px;border:0;border-radius:10px;bac
 #s-player.video .count{padding:8px;margin-top:8px}
 #s-player.video .minipads{display:grid}
 #s-player.video .scrub{flex:1 1 0!important}
+:root[lang=es] .loops button svg.i{display:none} /* «Secciones» needs the room */
+@media(max-width:350px){.loops button svg.i{display:none}.loops button{font-size:12px;padding:0 3px}}
 @media(max-height:720px){.bignum{width:64px;height:64px;font-size:40px}.stem{height:42px}.transport button{width:50px;height:50px}.transport .play{width:66px;height:66px}.tools{padding-top:10px}}
 
 /* ---------- Bottom popups ---------- */
@@ -299,7 +301,7 @@ select{font:600 14px var(--body);min-height:40px;border:0;border-radius:10px;bac
 .marklist{display:flex;flex-direction:column;gap:6px}
 .marklist button{justify-content:space-between;background:var(--s2);min-height:48px}
 .marklist button.on{box-shadow:inset 0 0 0 2px var(--acc)}
-.marklist:empty::before{content:"Nessuna sezione: segnane una con il tasto qui sotto.";color:var(--ink3);font-size:13px}
+.marklist:empty::before{content:attr(data-empty);color:var(--ink3);font-size:13px}
 .volrow{display:flex;align-items:center;gap:12px}
 
 /* ---------- Map ---------- */
@@ -477,6 +479,10 @@ select{font:600 14px var(--body);min-height:40px;border:0;border-radius:10px;bac
 <section class="screen" id="s-set">
   <div class="set">
     <h1>Impostazioni</h1>
+    <p class="lbl">Lingua</p>
+    <div class="card" style="padding:0">
+      <div class="setrow"><div class="tx"><b>Lingua dell'app</b><span>Al primo avvio è quella del telefono</span></div><select id="uiLang" aria-label="Lingua dell'app"><option value="it">Italiano</option><option value="en">English</option><option value="es">Español</option></select></div>
+    </div>
     <p class="lbl">Aspetto</p>
     <div class="card">
       <b style="font-weight:600">Tema</b>
@@ -608,7 +614,7 @@ select{font:600 14px var(--body);min-height:40px;border:0;border-radius:10px;bac
 <div class="pop" id="popSec" role="dialog" aria-label="Sezioni">
   <i class="grab"></i>
   <div><h2>Sezioni</h2><p class="sub">Tocca per andare lì · tieni premuto per loop, rinomina o elimina.</p></div>
-  <div class="marklist" id="marks"></div>
+  <div class="marklist" id="marks" data-empty="Nessuna sezione: segnane una con il tasto qui sotto."></div>
   <button id="markBtn" style="background:var(--s2)"><svg class="i"><use href="#i-bookmark"/></svg>Segna l'inizio della frase qui</button>
   <button class="done" data-close>Fatto</button>
 </div>
@@ -701,10 +707,12 @@ select{font:600 14px var(--body);min-height:40px;border:0;border-radius:10px;bac
 <div class="toast" id="toast" role="status"></div>
 <div class="busy" id="busy"><span id="busyT">Leggo il file…</span></div>
 
+<script src="i18n.js?v=1"></script>
+<script>I18N.applyStatic(document)</script>
 <script src="player.js"></script>
 <script src="beats.js"></script>
 <script src="separate.js"></script>
 <script src="counts.js"></script>
-<script src="app.js?v=75"></script>
+<script src="app.js?v=76"></script>
 </body>
 </html>

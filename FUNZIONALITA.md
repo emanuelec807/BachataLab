@@ -56,10 +56,11 @@ Bachata Lab è un'app per studiare la **musicalità in bachata**. Carichi una ca
 - **Barra in basso**: Progetti, Allenati (sull'ultimo brano usato, disattivato senza progetti), Impostazioni.
 
 **Impostazioni**
+- **Lingua dell'app**: Italiano, English o Español. Al primo avvio l'app usa la lingua del telefono; se il telefono è in un'altra lingua (per esempio francese o tedesco) usa l'inglese. La scelta si salva e cambia tutta l'interfaccia (schermate, pulsanti, messaggi, errori, guide); l'app si ricarica e torna alle Impostazioni.
 - **Tema**: Scuro (predefinito), Chiaro o Come il telefono.
 - **Colore** principale da una lista: Corallo (predefinito), Lime, Azzurro, Viola, Menta, Rosa. Nel tema chiaro si usa una tonalità più scura dello stesso colore, così si legge bene.
 - **Ritardo dell'audio**: mostra il ritardo misurato e il tasto **Calibra** (vedi §9).
-- **Traduci il testo in**: Italiano (predefinito), English, Español, Français, Deutsch, Português, oppure Non tradurre.
+- **Traduci il testo in**: Italiano, English, Español, Français, Deutsch, Português, oppure Non tradurre. Finché non scegli tu, segue la lingua dell'app (app in spagnolo: traduce in spagnolo); una scelta che hai già salvato resta anche se cambi lingua all'app.
 - **Memoria**: progetti e spazio usato, dove stanno i modelli ("dentro l'app" nell'APK), versione. Nel browser c'è anche "Elimina modelli" (circa 160 MB, si riscaricano al prossimo progetto).
 
 ---
@@ -223,11 +224,12 @@ Si apre a tutto schermo da "Mappa"; la freccia in giù o Indietro la chiude. In 
   - **Correggi il testo**, **Elimina la riga**.
   - Dal tasto ⋯: **Allinea alla voce**, anticipa o ritarda tutto di 0,5 s, traduci di nuovo, cerca un altro testo, **Genera con Whisper** (sostituisce il testo attuale).
 - **Traduzione**:
-  - l'app riconosce la lingua del testo e lo traduce sul telefono con Opus-MT (circa 110 MB da scaricare la prima volta, serve Internet), in **italiano** di default;
-  - **non parte da sola**: si avvia con il tasto "Traduci in italiano"; la traduzione compare piccola sotto ogni riga;
+  - l'app riconosce la lingua del testo e lo traduce sul telefono con Opus-MT (circa 110 MB da scaricare la prima volta, serve Internet), di default **nella lingua dell'app**;
+  - **non parte da sola**: si avvia con il tasto "Traduci in …"; la traduzione compare piccola sotto ogni riga;
+  - se il testo è già nella lingua scelta il tasto non compare e non si traduce;
   - il tasto **Traduzione** la mostra o la nasconde;
   - se nelle Impostazioni scegli un'altra lingua, il tasto diventa "Traduci in …";
-  - se non esiste un modello diretto per la coppia di lingue, traduce passando dall'inglese.
+  - se non esiste un modello diretto per la coppia di lingue, traduce passando dall'inglese. Coppie dirette: spagnolo, inglese, italiano, francese e tedesco tra loro (tranne italiano–tedesco e francese–italiano, che passano dall'inglese). Il portoghese non ha modelli propri: si legge con il modello ROMANCE→inglese e si scrive con inglese→ROMANCE, una riga alla volta (insieme ripeteva parole a vuoto). Tutte le combinazioni offerte sono state provate, spagnolo–inglese compreso.
 - Testo, correzioni e traduzione si salvano nel progetto e restano anche senza Internet.
 
 ### 5.9 Comportamenti automatici
@@ -343,6 +345,7 @@ Il conteggio sparisce: si ascolta e si tocca.
 
 - **Ritardo nel conteggio degli esercizi**: l'utente l'ha notato con l'altoparlante del telefono. Sui telefoni Android anche l'altoparlante può avere 100–250 ms di ritardo che il browser non dichiara: va calibrato con l'altoparlante. Se invece è l'1 a essere nel posto sbagliato, si corregge con "L'1 è qui".
 - Testo e traduzione non sono ancora stati provati su un telefono vero (velocità di Whisper e memoria).
+- Cambiando lingua all'app, i nomi già salvati nei progetti (sezioni come "Sezione 1", playlist, nomi dei brani) restano come li avevi scritti: sono dati tuoi, non testi dell'interfaccia.
 
 ## 13. Limiti noti
 
@@ -354,6 +357,8 @@ Il conteggio sparisce: si ascolta e si tocca.
 ---
 
 ## Registro modifiche
+
+- **26/11/2026**: interfaccia in inglese e spagnolo oltre all'italiano: al primo avvio la lingua del telefono (inglese per le altre lingue), scelta nelle Impostazioni, tutti i testi tradotti (anche messaggi, errori, guide ed esercizi). La traduzione dei testi delle canzoni segue la lingua dell'app finché non ne scegli una tu. Corretta la traduzione verso e dal portoghese (prima non funzionava: non esistono modelli diretti). Tema e tasto «Sezioni» non tagliano più le scritte lunghe.
 
 - **26/11/2026**: tolti i pulsanti "L'1 è qui!" e "Da qui in poi": il conteggio viene solo dall'analisi.
 
