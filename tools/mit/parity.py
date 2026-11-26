@@ -12,7 +12,7 @@ else:
     run_ref.MEGA_SEL = os.environ.get('MEGA_SEL', 'guitar,piano').split(',')
     m, *_ = run_ref.get('mega'); core = export.MegaCore(m).eval(); x = torch.randn(1, 2050, frames, 2) * 0.5
     with torch.no_grad(): ref0 = core(x).numpy()
-    export.simple_attention()
+    (export.fast_attention if os.environ.get('FAST', '1') == '1' else export.simple_attention)()
 with torch.no_grad(): ref = core(x).numpy()
 print('matmul vs fft snr', 10*np.log10((ref0**2).sum()/((ref-ref0)**2).sum())); ref = ref0
 t = time.time(); out = s.run(None, {'spec': x.numpy()})[0]; dt = time.time() - t

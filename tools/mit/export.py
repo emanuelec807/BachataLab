@@ -84,6 +84,35 @@ def simple_attention(max_elems=48_000_000):
         return self.to_out(out.permute(0, 2, 1, 3).reshape(b, n, -1))
     B.Attention.forward = fwd
 
+def fast_attention():
+    """Faster attention graph for the phone, same math: the rotary rotation of q and k is folded into the
+    q/k/v projection (rotate_half is a fixed linear map, so x@Wq@P = x@(Wq P)) and its cos/sin are constant
+    tables; the 1/sqrt(d) scale goes into the q tables; the whole attention matrix at once (5 s chunks: ~0.4 GB)."""
+    from models.bs_roformer import bs_roformer as B
+    def fwd(self, x):
+        x = self.norm(x); b, n, _ = x.shape; h = self.heads
+        if not hasattr(self, '_wq'):
+            W = self.to_qkv.weight.detach(); inner = W.shape[0] // 3; d = inner // h
+            Pm = torch.zeros(d, d)
+            for i in range(d // 2): Pm[2 * i + 1, 2 * i] = -1.0; Pm[2 * i, 2 * i + 1] = 1.0   # rotate_half (interleaved) = x @ Pm
+            rot = lambda Wx: torch.einsum('ij,hid->hjd', Pm, Wx.reshape(h, d, -1)).reshape(inner, -1)
+            # five separate projections, weights stored [in, out]: each is one MatMul that int8 quantization can take
+            for nm, w in (('_wq', W[:inner]), ('_wk', W[inner:2 * inner]), ('_wv', W[2 * inner:]), ('_wqp', rot(W[:inner])), ('_wkp', rot(W[inner:2 * inner]))):
+                self.register_buffer(nm, w.T.contiguous(), persistent=False)
+        sp = lambda t: t.reshape(b, n, h, -1).transpose(1, 2)
+        q, k, v, qp, kp = sp(x @ self._wq), sp(x @ self._wk), sp(x @ self._wv), sp(x @ self._wqp), sp(x @ self._wkp)
+        if self.rotary_embed is not None:
+            with torch.no_grad():
+                fr = self.rotary_embed.forward(torch.arange(n, dtype=torch.float32), seq_len=n).float()
+            cos, sin = fr.cos(), fr.sin()
+            q = q * (cos * self.scale) + qp * (sin * self.scale); k = k * cos + kp * sin
+        else:
+            q = q * self.scale
+        a = torch.softmax(q @ k.transpose(-1, -2), dim=-1)
+        out = (a @ v) * self.to_gates(x).transpose(1, 2).unsqueeze(-1).sigmoid()
+        return self.to_out(out.transpose(1, 2).reshape(b, n, -1))
+    B.Attention.forward = fwd
+
 def split_attention(max_elems=48_000_000):
     """The attention matrix b*h*n*n is computed a few sequences at a time: on the phone the whole
     matrix of a 20 s chunk would take several GB. Same result (each sequence is independent)."""
@@ -106,10 +135,10 @@ if __name__ == '__main__':
     else:
         os.environ['MEGA_SEL'] = sys.argv[3] if len(sys.argv) > 3 else 'guitar,piano'
         run_ref.MEGA_SEL = os.environ['MEGA_SEL'].split(',')
-        simple_attention()
+        (fast_attention if os.environ.get('FAST', '1') == '1' else simple_attention)()
         model, *_ = run_ref.get('mega'); core = MegaCore(model).eval().requires_grad_(False)
         x = torch.randn(1, 2050, frames, 2)
-        name = 'mega_' + run_ref.MEGA_SEL[0] if len(run_ref.MEGA_SEL) == 1 else 'mega_' + '_'.join(run_ref.MEGA_SEL)
+        name = os.environ.get('NAME') or ('mega_' + '_'.join(run_ref.MEGA_SEL))
         torch.onnx.export(core, (x,), f'{out}/{name}_{frames}.onnx', input_names=['spec'], output_names=['out'], opset_version=17, dynamo=False)
         import resource; print('peak RSS MB', resource.getrusage(resource.RUSAGE_SELF).ru_maxrss // 1024)
     print('exported')

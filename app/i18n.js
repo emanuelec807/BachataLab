@@ -188,7 +188,7 @@
     'Traduzione in {x}': 'Translation into {x}', 'Traduzione spenta': 'Translation off', 'Trascrizione della voce': 'Vocals transcription',
     'Separo voce, basso, batteria e altro': 'Separating vocals, bass, drums and other', 'Separo chitarra e piano': 'Separating guitar and piano',
     'Separo voce, basso, batteria e altro: parte {i} di {n}': 'Separating vocals, bass, drums and other: part {i} of {n}',
-    'Separo chitarra e piano: parte {i} di {n}': 'Separating guitar and piano: part {i} of {n}', 'modelli MIT': 'MIT models',
+    'Separo chitarra e piano: parte {i} di {n}': 'Separating guitar and piano: part {i} of {n}', 'modelli MIT': 'MIT models', 'Separato in {t} ({x} per minuto di brano)': 'Separated in {t} ({x} per minute of song)',
   };
 
   const ES = {
@@ -363,7 +363,7 @@
     'Traduzione in {x}': 'Traducción al {x}', 'Traduzione spenta': 'Traducción desactivada', 'Trascrizione della voce': 'Transcripción de la voz',
     'Separo voce, basso, batteria e altro': 'Separando voz, bajo, batería y otros', 'Separo chitarra e piano': 'Separando guitarra y piano',
     'Separo voce, basso, batteria e altro: parte {i} di {n}': 'Separando voz, bajo, batería y otros: parte {i} de {n}',
-    'Separo chitarra e piano: parte {i} di {n}': 'Separando guitarra y piano: parte {i} de {n}', 'modelli MIT': 'modelos MIT',
+    'Separo chitarra e piano: parte {i} di {n}': 'Separando guitarra y piano: parte {i} de {n}', 'modelli MIT': 'modelos MIT', 'Separato in {t} ({x} per minuto di brano)': 'Separado en {t} ({x} por minuto de canción)',
   };
   const DICT = { en: EN, es: ES };
 

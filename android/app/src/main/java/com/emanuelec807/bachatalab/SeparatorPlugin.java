@@ -109,7 +109,9 @@ public class SeparatorPlugin extends Plugin {
             File gm = withGuira ? modelFile(ctx, "guira") : null; pi = pn;
             OrtEnvironment env = OrtEnvironment.getEnvironment();
             OrtSession.SessionOptions o = new OrtSession.SessionOptions();
-            threads = Math.max(1, Math.min(4, Runtime.getRuntime().availableProcessors() / 2));
+            // MIT models are heavier: phones with 8 cores (all fast on recent chips) use 6 threads, the others half the cores
+            int cores = Runtime.getRuntime().availableProcessors();
+            threads = cores >= 8 ? 6 : Math.max(1, Math.min(4, cores / 2));
             o.setIntraOpNumThreads(threads);
             o.setOptimizationLevel(OrtSession.SessionOptions.OptLevel.ALL_OPT);
             o.setCPUArenaAllocator(false);

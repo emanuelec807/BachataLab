@@ -26,7 +26,10 @@ public final class MitSeparator {
     static final int MG_NFFT = 2048, MG_HOP = 512;
     static final String[] MG_HEADS = {"guitar", "piano"};
 
-    public static int scOverlap = 2, mgOverlap = 2, mgChunk = 220500;   // 5 s: the Mega model is exported for 431 STFT frames
+    // Mega's chunks follow each other with only the fade (a tenth of a chunk) in common instead of half a chunk:
+    // about 1.8 times less work. SCNet keeps half a chunk: its drums feed the güira, which changed audibly otherwise.
+    public static int mgChunk = 220500;   // 5 s: the Mega model is exported for 431 STFT frames
+    public static int scStep = SC_CH / 2, mgStep = mgChunk - mgChunk / 10;
     // Mega 53 listens to SCNet's "other" (where guitar and piano are) rather than to the whole mix: on the test
     // songs the subtraction other - guitar then leaves no negative copy of the guitar in "altro".
     public static boolean megaOnOther = true;
@@ -42,9 +45,9 @@ public final class MitSeparator {
 
     /** ZFTurbo's generic demix: chunks every chunk/overlap samples, linear fades of chunk/10 (none at the
      *  song edges), the borders reflect-padded, the last chunk reflect- or zero-padded. */
-    static FloatBuffer[][] demix(FloatBuffer[] mix, int n, int chunk, int overlap, int stems, ChunkModel model,
+    static FloatBuffer[][] demix(FloatBuffer[] mix, int n, int chunk, int step, int stems, ChunkModel model,
                                  String stage, Separator.Progress pr, Separator.Cancel cc) throws Exception {
-        int fade = chunk / 10, step = chunk / overlap, border = chunk - step;
+        int fade = chunk / 10, border = chunk - step;
         boolean pad = n > 2 * border && border > 0;
         int off = pad ? border : 0, Lp = n + 2 * off;
         float[] win = new float[chunk]; java.util.Arrays.fill(win, 1f);
@@ -106,8 +109,14 @@ public final class MitSeparator {
     }
 
     // ---------- Mega 53 (guitar, piano) ----------
+    // Mega works only where there is something to separate: a chunk of "altro" much quieter than the song
+    // (intro without guitar, breaks with only percussion) gives silent guitar and piano without running the model.
+    double megaGate = 0;
+    int megaSkipped = 0;
     float[][][] megaChunk(float[][] ch) throws Exception {
         int L = ch[0].length;
+        double e = 0; for (float[] c : ch) for (float v : c) e += v * v;
+        if (Math.sqrt(e / (2.0 * L)) < megaGate) { megaSkipped++; return new float[MG_HEADS.length][2][L]; }
         Separator.Spec[] z = { Separator.stft(ch[0], MG_NFFT, MG_HOP, false), Separator.stft(ch[1], MG_NFFT, MG_HOP, false) };
         int F = z[0].F, T = z[0].T;
         float[] in = new float[F * 2 * T * 2];   // [1, F*2 (freq-major, stereo interleaved), T, 2 (re, im)]
@@ -141,14 +150,16 @@ public final class MitSeparator {
         in[0] = null; in[1] = null;
         final float mean = (float) (sum / n), std = (float) Math.max(1e-8, Math.sqrt(Math.max(0, sq / n - (sum / n) * (sum / n))));
         // SCNet: input normalized (inference.normalize in its config), output brought back to the original scale
-        FloatBuffer[][] sc = demix(mix, n, SC_CH, scOverlap, 4, ch -> {
+        FloatBuffer[][] sc = demix(mix, n, SC_CH, scStep, 4, ch -> {
             for (float[] x : ch) for (int i = 0; i < x.length; i++) x[i] = (x[i] - mean) / std;
             float[][][] y = scnetChunk(ch);
             for (float[][] s : y) for (float[] x : s) for (int i = 0; i < x.length; i++) x[i] = x[i] * std + mean;
             return y;
         }, "scnet", pr, cc);
         FloatBuffer[] drums = sc[0], bass = sc[1], other = sc[2], vocals = sc[3];
-        FloatBuffer[][] mg = demix(megaOnOther ? other : mix, n, mgChunk, mgOverlap, MG_HEADS.length, this::megaChunk, "mega", pr, cc);
+        { FloatBuffer[] src = megaOnOther ? other : mix; double e = 0; for (FloatBuffer c : src) for (int i = 0; i < n; i++) { float v = c.get(i); e += v * v; }
+          megaGate = 0.03 * Math.sqrt(e / (2.0 * n)); }   // -30 dB under the song's level
+        FloatBuffer[][] mg = demix(megaOnOther ? other : mix, n, mgChunk, mgStep, MG_HEADS.length, this::megaChunk, "mega", pr, cc);
         mix = null;
         FloatBuffer[] guitar = mg[0], piano = mg[1];
         for (int c = 0; c < 2; c++) for (int i = 0; i < n; i++) other[c].put(i, other[c].get(i) - guitar[c].get(i));   // altro = other - guitar
