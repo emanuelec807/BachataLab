@@ -75,6 +75,9 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;bac
 #themeBtn{background:var(--s1)}
 .search{display:flex;align-items:center;gap:10px;height:48px;padding:0 14px;margin:8px 20px 0;border-radius:14px;background:var(--s1);color:var(--ink3)}
 .filters{padding:14px 20px 4px}
+.plchips{padding:12px 20px 0}.plchips button span{opacity:.6;font-weight:500;margin-left:2px}.plchips button.add{background:transparent;box-shadow:inset 0 0 0 1.5px var(--s2);color:var(--acc)}
+.plist{display:flex;flex-direction:column;gap:6px;margin-top:10px}.plist button{justify-content:flex-start;background:var(--s2)}.plist button.on{box-shadow:inset 0 0 0 2px var(--acc)}
+.plist.checks label{display:flex;align-items:center;gap:10px;min-height:44px;padding:0 10px;border-radius:12px;background:var(--s2)}.plist.checks input{width:20px;height:20px;accent-color:var(--acc)}.plist.checks span{flex:1}.plist.checks small{color:var(--ink3)}
 .sect{display:flex;justify-content:space-between;align-items:baseline;padding:18px 20px 6px}
 .sect h2{font-size:17px;font-weight:600}
 #projects{padding:0 12px}
@@ -458,8 +461,9 @@ select{font:600 14px var(--body);min-height:40px;border:0;border-radius:10px;bac
 <section class="screen" id="s-home">
   <div class="hhead"><div class="row" style="gap:10px"><div class="logo"><svg class="i" style="stroke-width:2.4"><use href="#i-eq"/></svg></div><h1>Bachata Lab</h1></div><button class="icon" id="themeBtn" aria-label="Cambia tema"></button></div>
   <label class="search" id="searchBox" hidden><svg class="i" style="width:18px;height:18px"><use href="#i-search"/></svg><input id="q" type="text" placeholder="Cerca un brano" autocomplete="off" aria-label="Cerca un brano"></label>
+  <div class="chips plchips" id="plChips"></div>
   <div class="row filters"><div class="chips grow" id="filters"></div><button class="link" id="sortBtn">Recenti</button></div>
-  <div class="sect" id="projHead" hidden><h2>Progetti</h2><span class="small mute" id="homeMeta"></span></div>
+  <div class="sect" id="projHead" hidden><h2 id="projTitle">Progetti</h2><button class="icon" id="plMenu" hidden aria-label="Opzioni della playlist"><svg class="i"><use href="#i-more"/></svg></button><span class="small mute grow" id="homeMeta" style="text-align:right"></span></div>
   <div id="projects"></div>
   <div class="empty"><b>Ancora nessun progetto</b>Tocca «Nuovo progetto» e scegli una canzone o un video.</div>
   <div class="card guide" id="guide"><b style="font:700 16px var(--disp)">Come funziona</b>
@@ -599,6 +603,7 @@ select{font:600 14px var(--body);min-height:40px;border:0;border-radius:10px;bac
   <button class="primary" id="oneBtn"><svg class="i"><use href="#i-target"/></svg>L'1 è qui!</button>
   <p class="small mute" style="text-align:center;margin-top:-8px">Conteggio sfasato? Con il brano in riproduzione, tocca esattamente sull'1.</p>
   <div class="grid3"><button data-bpm="reset">Ripristina</button><button id="renameBtn">Rinomina</button><button id="deleteBtn" style="color:var(--bad)">Elimina</button></div>
+  <button id="plBtn" style="width:100%;margin-top:8px">Sposta in playlist</button>
   <button id="mp3Btn" style="background:var(--s2)">Scarica l'MP3 del mix attuale</button>
   <button class="done" data-close>Fatto</button>
 </div>
@@ -701,6 +706,6 @@ select{font:600 14px var(--body);min-height:40px;border:0;border-radius:10px;bac
 <script src="player.js"></script>
 <script src="beats.js"></script>
 <script src="separate.js"></script>
-<script src="app.js?v=71"></script>
+<script src="app.js?v=73"></script>
 </body>
 </html>

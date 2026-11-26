@@ -117,6 +117,104 @@ const getStems = id => tx('stems', 'readonly', s => s.get(id));
 const getMedia = id => tx('media', 'readonly', s => s.get(id));
 async function deleteProject(id) { for (const st of ['projects', 'stems', 'media']) { try { await tx(st, 'readwrite', s => s.delete(id)); } catch (e) {} } }
 function toInt16(f) { const o = new Int16Array(f.length); for (let i = 0; i < f.length; i++) { const v = f[i]; o[i] = v >= 1 ? 32767 : v <= -1 ? -32767 : v * 32767; } return o; }
+// ---------- stem compression: Opus (the phone's own encoder, WebCodecs) in an Ogg file ----------
+// A 3-minute project took about 250 MB as 16-bit PCM (7 stereo tracks); as Opus at 128 kb/s per
+// track it takes about 22 MB. The player gets the same float tracks back after decoding.
+const OPUS_BR = 128000;
+let opusState = null; // null = not tested yet; true/false after a round-trip self-test
+const CRC = (() => { const t = new Uint32Array(256); for (let i = 0; i < 256; i++) { let r = i << 24; for (let k = 0; k < 8; k++) r = r & 0x80000000 ? (r << 1) ^ 0x04c11db7 : r << 1; t[i] = r >>> 0; } return t; })();
+function oggPage(body, granule, seq, flags) {
+  const segs = []; let left = body.length; while (left >= 255) { segs.push(255); left -= 255; } segs.push(left);
+  const h = new Uint8Array(27 + segs.length), v = new DataView(h.buffer);
+  h.set([79, 103, 103, 83]); h[5] = flags; v.setUint32(6, granule % 4294967296, true); v.setUint32(10, Math.floor(granule / 4294967296), true);
+  v.setUint32(14, 0x42414348, true); v.setUint32(18, seq, true); h[26] = segs.length; h.set(segs, 27);
+  const page = new Uint8Array(h.length + body.length); page.set(h); page.set(body, h.length);
+  let c = 0; for (let i = 0; i < page.length; i++) c = ((c << 8) ^ CRC[((c >>> 24) ^ page[i]) & 255]) >>> 0;
+  new DataView(page.buffer).setUint32(22, c, true); return page;
+}
+async function encodeStem(ch, n) {
+  const packets = []; let head = null, err = null;
+  const enc = new AudioEncoder({ output: (c, meta) => { const d = new Uint8Array(c.byteLength); c.copyTo(d); packets.push({ d, dur: c.duration });
+      if (!head && meta && meta.decoderConfig && meta.decoderConfig.description) head = new Uint8Array(meta.decoderConfig.description); },
+    error: e => { err = e; } });
+  enc.configure({ codec: 'opus', sampleRate: SR, numberOfChannels: 2, bitrate: OPUS_BR });
+  const B = SR; // one second at a time
+  for (let i = 0; i < n; i += B) {
+    const m = Math.min(B, n - i), buf = new Float32Array(2 * m); buf.set(ch[0].subarray(i, i + m)); buf.set(ch[1].subarray(i, i + m), m);
+    enc.encode(new AudioData({ format: 'f32-planar', sampleRate: SR, numberOfFrames: m, numberOfChannels: 2, timestamp: Math.round(i / SR * 1e6), data: buf }));
+    if (enc.encodeQueueSize > 8) await new Promise(r => setTimeout(r, 0));
+  }
+  await enc.flush(); enc.close(); if (err) throw err;
+  if (!head || head.length < 19) { head = new Uint8Array(19); head.set([79, 112, 117, 115, 72, 101, 97, 100, 1, 2]); const v = new DataView(head.buffer); v.setUint16(10, 312, true); v.setUint32(12, SR, true); }
+  const preSkip = new DataView(head.buffer, head.byteOffset).getUint16(10, true);
+  const tags = new Uint8Array([79, 112, 117, 115, 84, 97, 103, 115, 11, 0, 0, 0, 66, 97, 99, 104, 97, 116, 97, 76, 97, 98, 0, 0, 0, 0]);
+  const pages = [oggPage(head, 0, 0, 2), oggPage(tags, 0, 1, 0)], end = preSkip + Math.round(n * 48000 / SR);
+  let gp = 0;
+  packets.forEach((p, k) => { gp += Math.round(p.dur * 48 / 1000); const last = k === packets.length - 1; pages.push(oggPage(p.d, last ? end : Math.min(gp, end), k + 2, last ? 4 : 0)); });
+  const out = new Uint8Array(pages.reduce((a, p) => a + p.length, 0)); let o = 0; for (const p of pages) { out.set(p, o); o += p.length; }
+  return out.buffer;
+}
+// Some decoders (Chrome's decodeAudioData) ignore the Opus pre-skip and return the audio a few ms late:
+// the self-test measures that delay once and every decode removes it, so all tracks stay sample-aligned.
+let opusLag = 0;
+async function decodeStem(buf, n, lag = opusLag) {
+  const ac = new OfflineAudioContext(2, Math.max(1, n + Math.max(0, lag)), SR), b = await ac.decodeAudioData(buf.slice(0));
+  const L = new Float32Array(n), R = new Float32Array(n), a = Math.max(0, lag), c0 = b.getChannelData(0), c1 = b.getChannelData(b.numberOfChannels > 1 ? 1 : 0);
+  L.set(c0.subarray(a, a + n)); R.set(c1.subarray(a, a + n));
+  return [L, R];
+}
+// Encode and decode one second of noise once: compression is used only if the round trip works here.
+async function opusOK() {
+  if (opusState != null) return opusState;
+  try {
+    if (typeof AudioEncoder === 'undefined' || !(await AudioEncoder.isConfigSupported({ codec: 'opus', sampleRate: SR, numberOfChannels: 2, bitrate: OPUS_BR })).supported) return opusState = false;
+    // a sweep with soft noise: one clear alignment, like music
+    const n = SR, a = [new Float32Array(n), new Float32Array(n)]; let z = 1;
+    for (let i = 0; i < n; i++) { z = (z * 16807) % 2147483647; const ph = 2 * Math.PI * (100 * i / SR + 1500 * (i / SR) ** 2); a[0][i] = 0.3 * Math.sin(ph) + 0.05 * (z / 2147483647 - 0.5); a[1][i] = a[0][i] * 0.8; }
+    const enc = await encodeStem(a, n), raw = await decodeStem(enc, n + 2000, 0);
+    let best = 0, be = Infinity;
+    for (let lag = 0; lag <= 1500; lag++) { let e = 0; for (let i = 4000; i < n - 4000; i += 5) { const v = raw[0][i + lag] - a[0][i]; e += v * v; } if (e < be) { be = e; best = lag; } }
+    opusLag = best;
+    const d = await decodeStem(enc, n); let e = 0, s = 0; for (let i = 4000; i < n - 4000; i++) { e += (d[0][i] - a[0][i]) ** 2; s += a[0][i] ** 2; }
+    opusState = e / s < 0.01; // > 20 dB once aligned: the round trip works here
+  } catch (e) { opusState = false; }
+  return opusState;
+}
+// Stored tracks -> float tracks, whatever the format (old projects: 16-bit PCM)
+async function stemsF32(st, ids) {
+  const out = {};
+  for (const id of ids || Object.keys(st.data)) { const d = st.data[id]; if (!d) continue;
+    out[id] = st.codec === 'opus' ? await decodeStem(d, st.n) : [toF32(d[0]), toF32(d[1])]; }
+  return out;
+}
+async function packAllProjects() {
+  if (!(await opusOK())) return toast('Questo telefono non sa comprimere le tracce');
+  const list = await listProjects(); let done = 0, saved = 0;
+  for (const p of list) {
+    if (cur && cur.id === p.id) continue;
+    busy(`Comprimo i progetti: ${++done} di ${list.length}…`);
+    try { const st = await getStems(p.id); if (!st || st.codec === 'opus') continue;
+      const r = await compressOld(p.id, await stemsF32(st), st.n); if (r) saved += r.before - r.after; } catch (e) {}
+  }
+  busy(); toast(saved ? `Fatto: liberati ${Math.round(saved / 1e6)} MB` : 'Tutti i progetti erano già compressi'); renderSettings(); renderHome();
+}
+async function packStems(stems, ids, n, onStep) {
+  const data = {}, opus = await opusOK(); let k = 0;
+  for (const id of ids) { data[id] = opus ? await encodeStem(stems[id], n) : [toInt16(stems[id][0]), toInt16(stems[id][1])]; if (onStep) onStep(++k, ids.length); }
+  return { data, codec: opus ? 'opus' : undefined };
+}
+const stemsBytes = st => Object.values(st.data).reduce((a, d) => a + (d.byteLength != null ? d.byteLength : d[0].byteLength + d[1].byteLength), 0);
+// Old projects (PCM) are compressed the first time they are opened, after checking the decoded copy.
+async function compressOld(id, stems, n) {
+  if (!(await opusOK())) return null;
+  const ids = Object.keys(stems), old = await getStems(id); if (!old || old.codec === 'opus') return null;
+  const before = stemsBytes(old), { data } = await packStems(stems, ids, n);
+  const check = await decodeStem(data[ids[0]], n); let e = 0, s = 0; for (let i = 0; i < n; i += 7) { e += (check[0][i] - stems[ids[0]][0][i]) ** 2; s += stems[ids[0]][0][i] ** 2; }
+  if (s > 0 && e / s > 0.05) return null; // something is off: keep the original
+  await tx('stems', 'readwrite', st => st.put({ id, n, sr: SR, codec: 'opus', data }));
+  return { before, after: stemsBytes({ data }) };
+}
+
 function toF32(a) { const o = new Float32Array(a.length); for (let i = 0; i < a.length; i++) o[i] = a[i] / 32767; return o; }
 
 // ---------- navigation ----------
@@ -192,7 +290,17 @@ async function renderHome() {
     .map(([k, l]) => `<button data-f="${k}" class="${homeFilter === k ? 'on' : ''}">${l}</button>`).join('') : '';
   $('guide').hidden = list.length > 2;
   $('projHead').hidden = !list.length;
-  const shown = list.filter(p => (homeFilter === 'all' || (homeFilter === 'video') === (p.kind === 'video')) && (!q || p.name.toLowerCase().includes(q)));
+  // playlists: a song sits in at most one; the chips filter the list
+  const pls = getPlaylists(); if (homePl && homePl !== 'none' && !pls.some(x => x.id === homePl)) homePl = '';
+  const inPl = p => !homePl || (homePl === 'none' ? !p.playlist || !pls.some(x => x.id === p.playlist) : p.playlist === homePl);
+  const nNone = list.filter(p => !p.playlist || !pls.some(x => x.id === p.playlist)).length;
+  $('plChips').innerHTML = !list.length ? '' : [`<button data-pl="" class="${!homePl ? 'on' : ''}">Tutti <span>${list.length}</span></button>`]
+    .concat(pls.map(x => `<button data-pl="${esc(x.id)}" class="${homePl === x.id ? 'on' : ''}">${esc(x.name)} <span>${list.filter(p => p.playlist === x.id).length}</span></button>`))
+    .concat(pls.length && nNone ? [`<button data-pl="none" class="${homePl === 'none' ? 'on' : ''}">Senza playlist <span>${nNone}</span></button>`] : [])
+    .concat([`<button data-pl="+" class="add">${ico('plus')} Playlist</button>`]).join('');
+  const plName = homePl && homePl !== 'none' ? (pls.find(x => x.id === homePl) || {}).name : null;
+  $('projTitle').textContent = plName || (homePl === 'none' ? 'Senza playlist' : 'Progetti'); $('plMenu').hidden = !plName;
+  const shown = list.filter(p => inPl(p) && (homeFilter === 'all' || (homeFilter === 'video') === (p.kind === 'video')) && (!q || p.name.toLowerCase().includes(q)));
   const bars = [12, 24, 16, 28, 10];
   $('projects').innerHTML = !list.length ? '' : shown.map(p => {
     const [st, sc] = mixStatus(p), mk = p.marks && p.marks.length ? ' · ' + esc(p.marks[0].name) : '';
@@ -202,10 +310,60 @@ async function renderHome() {
       <div class="tx"><b>${esc(p.name)}</b><div class="m1">${fmt(p.dur)} · ${p.bpm ? Math.round(p.bpm) + ' BPM' : 'ritmo ?'} · ${p.withGuira === false ? 5 : p.piano ? 7 : 6} tracce</div>
         <div class="m2" style="--sc:${sc}"><i></i>${esc(st)}${mk}</div></div>
       <span class="when">${whenTxt(p.updated)}</span><button class="icon" data-menu="${esc(p.id)}" aria-label="Opzioni">${ico('more')}</button></div>`; }).join('');
-  if (list.length && !shown.length) $('projects').innerHTML = '<p class="mute" style="padding:14px 8px">Nessun progetto trovato.</p>';
+  if (list.length && !shown.length) $('projects').innerHTML = plName && !q ? '<p class="mute" style="padding:14px 8px">Playlist vuota: usa ⋯ → «Aggiungi brani», oppure ⋯ su un brano → «Sposta in playlist».</p>' : '<p class="mute" style="padding:14px 8px">Nessun progetto trovato.</p>';
   try { const e = await navigator.storage.estimate(); $('homeMeta').textContent = list.length + (list.length === 1 ? ' progetto' : ' progetti') + ' · ' + Math.round((e.usage || 0) / 1e6) + ' MB'; }
   catch (e) { $('homeMeta').textContent = list.length + ' progetti'; }
 }
+// ---------- playlists (stored on this phone, like the projects) ----------
+let homePl = ls.get('homePl', '');
+const getPlaylists = () => ls.get('playlists', []);
+const setPlaylists = v => ls.set('playlists', v);
+async function newPlaylist() {
+  const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = 40; inp.placeholder = 'Es. Sensual, Da studiare, Corso giovedì';
+  if (!(await dialog('Nuova playlist', inp, [['Annulla', false], ['Crea', true, true]])) || !inp.value.trim()) return null;
+  const pl = { id: 'pl' + Date.now().toString(36), name: inp.value.trim() }; setPlaylists(getPlaylists().concat([pl])); return pl.id;
+}
+// a list of choices inside the dialog (one button per playlist)
+function pickList(title, items, extra) {
+  const wrap = document.createElement('div'); wrap.className = 'plist';
+  for (const [label, val, on] of items) { const b = document.createElement('button'); b.textContent = label; if (on) b.className = 'on'; b.onclick = () => closeDialog(val); wrap.append(b); }
+  return dialog(title, wrap, extra || [['Annulla', null, true]]);
+}
+async function moveToPlaylist(ids) {
+  ids = [].concat(ids); const pls = getPlaylists(), one = ids.length === 1 ? await getProject(ids[0]) : null;
+  let v = await pickList(ids.length === 1 ? 'Sposta in playlist' : `Sposta ${ids.length} brani`, pls.map(x => [x.name, x.id, one && one.playlist === x.id])
+    .concat([['Nessuna playlist', '', one && !one.playlist], ['＋ Nuova playlist…', '+']]));
+  if (v == null) return;
+  if (v === '+') { v = await newPlaylist(); if (!v) return; }
+  for (const id of ids) {
+    if (cur && cur.id === id) { cur.playlist = v || null; await putProject(cur); continue; }
+    const p = await getProject(id); if (p) { p.playlist = v || null; await putProject(p); }
+  }
+  const name = (getPlaylists().find(x => x.id === v) || {}).name; toast(v ? 'Spostato in «' + name + '»' : 'Tolto dalla playlist'); renderHome();
+}
+async function playlistMenu() {
+  const pls = getPlaylists(), pl = pls.find(x => x.id === homePl); if (!pl) return;
+  const v = await dialog(pl.name, null, [['Aggiungi brani', 'add'], ['Rinomina', 'ren'], ['Elimina playlist', 'del'], ['Chiudi', null, true]]);
+  if (v === 'ren') { const inp = document.createElement('input'); inp.type = 'text'; inp.value = pl.name; inp.maxLength = 40;
+    if (await dialog('Rinomina playlist', inp, [['Annulla', false], ['Salva', true, true]]) && inp.value.trim()) { pl.name = inp.value.trim(); setPlaylists(pls); renderHome(); } }
+  if (v === 'del') { if (await dialog('Eliminare «' + pl.name + '»?', textEl('I brani restano: tornano senza playlist.'), [['Annulla', false], ['Elimina', true, true]])) {
+      setPlaylists(pls.filter(x => x !== pl)); for (const p of await listProjects()) if (p.playlist === pl.id) { p.playlist = null; await putProject(p); } homePl = ''; ls.set('homePl', ''); renderHome(); } }
+  if (v === 'add') {
+    const all = (await listProjects()).sort((a, b) => a.name.localeCompare(b.name, 'it')), wrap = document.createElement('div'); wrap.className = 'plist checks';
+    for (const p of all) { const l = document.createElement('label'); const c = document.createElement('input'); c.type = 'checkbox'; c.value = p.id; c.checked = p.playlist === pl.id;
+      const t = document.createElement('span'); t.textContent = p.name; const o = document.createElement('small'); const opl = pls.find(x => x.id === p.playlist);
+      o.textContent = opl && opl !== pl ? 'in «' + opl.name + '»' : ''; l.append(c, t, o); wrap.append(l); }
+    if (!all.length) wrap.append(textEl('Ancora nessun progetto.'));
+    if (!(await dialog('Brani in «' + pl.name + '»', wrap, [['Annulla', false], ['Salva', true, true]]))) return;
+    for (const c of wrap.querySelectorAll('input')) { const p = all.find(x => x.id === c.value); const want = c.checked ? pl.id : (p.playlist === pl.id ? null : p.playlist);
+      if ((p.playlist || null) !== (want || null)) { if (cur && cur.id === p.id) { cur.playlist = want; await putProject(cur); } else { p.playlist = want; await putProject(p); } } }
+    renderHome();
+  }
+}
+$('plChips').addEventListener('click', async e => { const b = e.target.closest('[data-pl]'); if (!b) return;
+  let v = b.dataset.pl; if (v === '+') { v = await newPlaylist(); if (!v) return; }
+  homePl = v; ls.set('homePl', v); renderHome(); });
+$('plMenu').addEventListener('click', playlistMenu);
 $('sortBtn').addEventListener('click', () => { homeSort = homeSort === 'name' ? 'recent' : 'name'; ls.set('homeSort', homeSort); renderHome(); });
 $('q').addEventListener('input', () => renderHome());
 $('filters').addEventListener('click', e => { const b = e.target.closest('[data-f]'); if (b) { homeFilter = b.dataset.f; renderHome(); } });
@@ -235,7 +393,8 @@ async function removeProject(id) {
 }
 async function projectMenu(id) {
   const p = await getProject(id); if (!p) return;
-  const v = await dialog(p.name, null, [['Rinomina', 'ren'], ['Elimina', 'del'], ['Chiudi', null, true]]);
+  const v = await dialog(p.name, null, [['Sposta in playlist', 'pl'], ['Rinomina', 'ren'], ['Elimina', 'del'], ['Chiudi', null, true]]);
+  if (v === 'pl') moveToPlaylist(id);
   if (v === 'ren') renameProject(id);
   if (v === 'del') removeProject(id);
 }
@@ -264,6 +423,10 @@ async function renderSettings() {
   const row = (a, b) => `<div class="setrow"><span class="grow">${a}</span><b>${b}</b></div>`;
   $('setInfo').innerHTML = row('Progetti', n + ' · ' + mb(est.usage || 0)) + row('Modelli di separazione', NATIVE ? "dentro l'app" : models.length ? 'scaricati' : 'non ancora') +
     row('Versione', 'Bachata Lab 6' + (NATIVE ? ' · Android' : '')) + (!NATIVE && models.length ? '<div class="setrow"><span class="grow">Libera circa 160 MB (si riscaricano al prossimo progetto)</span><button class="pill" id="delModels">Elimina modelli</button></div>' : '');
+  const ok = await opusOK();
+  $('setInfo').insertAdjacentHTML('beforeend', row('Compressione delle tracce', ok ? 'attiva (Opus 128 kb/s)' : 'non disponibile qui'));
+  if (ok) $('setInfo').insertAdjacentHTML('beforeend', '<div class="setrow"><span class="grow">I progetti nuovi sono già compressi (circa 10 volte meno spazio). Quelli fatti prima si comprimono quando li apri, oppure tutti qui.</span><button class="pill" id="packAll">Comprimi</button></div>');
+  if (ok) $('packAll').onclick = packAllProjects;
   const dm = $('delModels'); if (dm) dm.onclick = async () => { for (const k of models) { try { await caches.delete(k); } catch (e) {} } ls.set('modelsCached', false); toast('Modelli eliminati'); renderSettings(); };
 }
 document.querySelectorAll('[data-theme]').forEach(b => b.addEventListener('click', () => { ls.set('theme', b.dataset.theme); applyTheme(); renderSettings(); }));
@@ -635,9 +798,10 @@ async function saveNew({ name, stems, dur, offset, srcDur, withG, kind, file, th
   let bt = { bpm: 0, beats: new Float64Array(0), confidence: 0 };
   try { bt = BeatTracker.analyze(rhythmMono(stems, n), SR); } catch (e) {}
   const beats = Array.from(bt.beats), oneIdx = guessOne(stems, beats, n);
-  const data = {}; for (const s of STEMS) data[s.id] = [toInt16(stems[s.id][0]), toInt16(stems[s.id][1])];
+  $('procStage').textContent = 'Comprimo le tracce per occupare meno spazio…';
+  const { data, codec } = await packStems(stems, STEMS.map(s => s.id), n, (k, m) => { $('procStage').textContent = `Comprimo le tracce: ${k} di ${m}`; });
   try {
-    await tx('stems', 'readwrite', s => s.put({ id, n, sr: SR, data }));
+    await tx('stems', 'readwrite', s => s.put({ id, n, sr: SR, codec, data }));
     if (kind === 'video') await tx('media', 'readwrite', s => s.put({ id, blob: file, type: file.type || 'video/mp4' }));
     const p = normalize({ id, name, kind, thumb, dur, offset, srcDur, piano, altroName, altroParts: lastAltroParts, created: Date.now(), updated: Date.now(), withGuira: withG,
       bpm: bt.bpm, bpmDetected: bt.bpm, beats, beatsDetected: beats.slice(), confidence: bt.confidence, oneIdx, oneDetected: oneIdx,
@@ -687,7 +851,7 @@ async function openPlayer(id) {
   try {
     useStems(!!st.data.piano, p.altroName);
     cur = normalize(p);
-    const stems = {}; for (const s of STEMS) stems[s.id] = [toF32(st.data[s.id][0]), toF32(st.data[s.id][1])];
+    const stems = await stemsF32(st, STEMS.map(s => s.id)), wasPcm = st.codec !== 'opus', nFrames = st.n;
     st = null;
     if (!cur.oneAlgo && cur.beats.length >= 16) {
       try { const g = guessOne(stems, cur.beatsDetected, stems.vocals[0].length);
@@ -715,6 +879,8 @@ async function openPlayer(id) {
     if (!ls.get('padTipSeen', false)) { ls.set('padTipSeen', true); setTimeout(() => toast(isVideo() ? 'Tocca uno strumento per spegnerlo, tienilo premuto per sentirlo da solo' : 'M spegne uno strumento, S lo fa sentire da solo, il nome regola il volume'), 600); }
     requestAnimationFrame(() => { drawTimelineStatic(); syncVideo(true); });
     raf = requestAnimationFrame(tick);
+    // projects saved before the compression: compress them now, in the background
+    if (wasPcm) { const pid = cur.id; setTimeout(() => compressOld(pid, stems, nFrames).then(r => { if (r) toast(`Progetto compresso: da ${Math.round(r.before / 1e6)} a ${Math.round(r.after / 1e6)} MB`); }).catch(() => {}), 1500); }
     // projects made before the naming: listen to Altro once, in the background
     if (cur.altroName === undefined || cur.altroParts === undefined) { const proj = cur; nameAltro(stems.altro, stems.altro[0].length).then(nm => {
       proj.altroName = nm || null; proj.altroParts = lastAltroParts; if (cur !== proj) return putProject(proj).catch(() => {});
@@ -1103,6 +1269,7 @@ $('metBtn').addEventListener('click', () => openPop('popMet'));
 $('menuBtn').addEventListener('click', () => { if (cur) { updateBeatInfo(); openPop('popRhythm'); } });
 $('secBtn').addEventListener('click', () => { if (cur) { renderMarks(); openPop('popSec'); } });
 $('renameBtn').addEventListener('click', () => { if (cur) { closePop(); renameProject(cur.id); } });
+$('plBtn').addEventListener('click', () => { if (cur) { closePop(); moveToPlaylist(cur.id); } });
 $('deleteBtn').addEventListener('click', () => { if (cur) { const id = cur.id; closePop(); setTimeout(() => removeProject(id), 50); } });
 
 // ---- rhythm: metronome, the "1", BPM ----
@@ -1361,9 +1528,9 @@ async function exportMp3() {
   try {
     await loadScript('lame.min.js');
     const st = await getStems(cur.id), n = st.n, L = new Int16Array(n), R = new Int16Array(n);
-    const gains = STEMS.map(s => mapGain(s.id));
-    for (let i = 0; i < n; i++) { let l = 0, r = 0; STEMS.forEach((s, k) => { const g = gains[k]; if (g) { l += st.data[s.id][0][i] * g; r += st.data[s.id][1][i] * g; } });
-      L[i] = Math.max(-32767, Math.min(32767, l)); R[i] = Math.max(-32767, Math.min(32767, r)); }
+    const gains = STEMS.map(s => mapGain(s.id)), on = STEMS.filter((s, k) => gains[k]).map(s => s.id), f = await stemsF32(st, on);
+    for (let i = 0; i < n; i++) { let l = 0, r = 0; STEMS.forEach((s, k) => { const g = gains[k]; if (g && f[s.id]) { l += f[s.id][0][i] * g; r += f[s.id][1][i] * g; } });
+      L[i] = Math.max(-32767, Math.min(32767, l * 32767)); R[i] = Math.max(-32767, Math.min(32767, r * 32767)); }
     const enc = new lamejs.Mp3Encoder(2, SR, 192), parts = [];
     for (let i = 0; i < n; i += 1152) { const b = enc.encodeBuffer(L.subarray(i, i + 1152), R.subarray(i, i + 1152)); if (b.length) parts.push(new Uint8Array(b)); if ((i & 0xfffff) === 0) await new Promise(r => setTimeout(r)); }
     const end = enc.flush(); if (end.length) parts.push(new Uint8Array(end));
@@ -1693,9 +1860,9 @@ async function lyrTranscribe(pid, auto) {
   pid = pid || (cur && cur.id); if (!pid || lyrBusy) return; lyrBusy = true; lyrFor = pid; lyrCancelled = false;
   try {
     lyrStatus('Preparo la voce…', null);
-    const st = await getStems(pid), [L, R] = st.data.vocals, n = L.length;
+    const st = await getStems(pid), [L, R] = (await stemsF32(st, ['vocals'])).vocals, n = L.length;
     const buf = new AudioBuffer({ length: n, numberOfChannels: 1, sampleRate: SR }), ch = buf.getChannelData(0);
-    for (let i = 0; i < n; i++) ch[i] = (L[i] + R[i]) / 65536;
+    for (let i = 0; i < n; i++) ch[i] = (L[i] + R[i]) * 0.5;
     const oc = new OfflineAudioContext(1, Math.ceil(n * 16000 / SR), 16000), bs = oc.createBufferSource();
     bs.buffer = buf; bs.connect(oc.destination); bs.start();
     const audio = (await oc.startRendering()).getChannelData(0).slice();
