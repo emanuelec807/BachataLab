@@ -46,6 +46,12 @@ Bachata Lab è un'app per studiare la **musicalità in bachata**. Carichi una ca
   - lo stato del mix lasciato (es. "Mix completo", "Voce spenta", "Solo Bongo + Güira").
 - Tocco sulla riga: apre il player. I tre puntini: **Rinomina** o **Elimina** (chiede conferma e cancella tracce e video).
 - "Come funziona" (tre passi) compare finché hai al massimo 2 progetti.
+- **Playlist** (riga di chip sopra l'elenco):
+  - **Tutti**, una chip per playlist (con il numero di brani), **Senza playlist** e **＋ Playlist** per crearne una.
+  - Toccare una chip mostra solo i suoi brani; la scelta si ricorda.
+  - Ogni brano sta in al massimo una playlist. **Sposta in playlist** si trova nel ⋯ del brano nella home e nel menu ⋯ del player (Ritmo del brano); da lì si può anche creare una playlist nuova o togliere il brano.
+  - Con una playlist aperta, il ⋯ accanto al titolo permette: **Aggiungi brani** (elenco con caselle di tutti i progetti, con l'indicazione se un brano è già in un'altra playlist), **Rinomina**, **Elimina playlist** (i brani restano, senza playlist).
+  - Le playlist stanno sul telefono, come i progetti.
 - Il grande tasto **Nuovo progetto** apre la scelta del file: MP3, M4A, WAV, OGG, FLAC, AAC, oppure video MP4, MOV, WEBM.
 - **Barra in basso**: Progetti, Allenati (sull'ultimo brano usato, disattivato senza progetti), Impostazioni.
 
@@ -119,7 +125,9 @@ Il cerchio mostra la percentuale totale; sotto, i passaggi finiti, quello in cor
 - Alla fine il progetto si apre da solo nel player.
 
 **Cosa viene salvato**
-- Le 6 tracce stereo, a 16 bit.
+- Le tracce stereo (6 o 7), **compresse in Opus a 128 kb/s** con il codificatore del telefono (WebCodecs), in file Ogg: circa 10 volte meno spazio del PCM a 16 bit (3:20 di brano: da circa 250 MB a circa 25 MB). Prima di usarla, l'app fa una prova di codifica e decodifica e misura il piccolo ritardo del decodificatore, così tutte le tracce restano allineate al campione. Se la prova non riesce, salva a 16 bit come prima. Impostazioni → Memoria dice se la compressione è attiva.
+- I progetti salvati prima vengono compressi da soli la prima volta che si aprono (dopo aver controllato la copia compressa), oppure tutti insieme da Impostazioni → Memoria → **Comprimi**.
+- Analisi (ritmo, 1, livelli, piano, "Altro") si fanno sulle tracce non compresse, prima di comprimerle.
 - Il video originale e una miniatura, se c'è un video e non hai scelto "Usa solo l'audio".
 - Il livello di ogni strumento nel tempo (20 valori al secondo), usato da forme d'onda, mappa e pulsanti che si accendono.
 - BPM, posizione di ogni battito e posizione dell'1 (vedi §11).
@@ -341,6 +349,8 @@ Il conteggio sparisce: si ascolta e si tocca.
 ---
 
 ## Registro modifiche
+
+- **26/11/2026**: playlist (crea, rinomina, elimina, sposta e aggiungi brani). Tracce compresse in Opus 128 kb/s: circa 10 volte meno spazio, anche per i progetti già fatti.
 
 - **26/11/2026**: testi: prima si cerca su LRCLIB, Whisper solo a richiesta; allineamento automatico del testo alla voce; righe lunghe di Whisper spezzate; Whisper si ferma se scegli un testo (la scritta non resta più).
 
