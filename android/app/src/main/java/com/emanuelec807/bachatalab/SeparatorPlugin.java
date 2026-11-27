@@ -102,8 +102,17 @@ public class SeparatorPlugin extends Plugin {
                 File tiny = null; try { tiny = assetFile(ctx, "tiny.tflite"); } catch (Exception ignored) {}
                 String dev = android.os.Build.MANUFACTURER + " " + android.os.Build.MODEL
                     + (android.os.Build.VERSION.SDK_INT >= 31 ? " · " + android.os.Build.SOC_MANUFACTURER + " " + android.os.Build.SOC_MODEL : " · " + android.os.Build.HARDWARE);
+                // pieces of the network ("parts.txt": file|element count of each input)
+                java.util.ArrayList<File> pf = new java.util.ArrayList<>(); java.util.ArrayList<int[]> ps = new java.util.ArrayList<>();
+                try (java.io.BufferedReader br = new java.io.BufferedReader(new java.io.InputStreamReader(ctx.getAssets().open("public/models/parts.txt")))) {
+                    String l; while ((l = br.readLine()) != null) {
+                        String[] a = l.trim().split("\\|"); if (a.length < 2) continue;
+                        String[] n = a[1].split(","); int[] sz = new int[n.length]; for (int i = 0; i < n.length; i++) sz[i] = Integer.parseInt(n[i].trim());
+                        pf.add(assetFile(ctx, a[0])); ps.add(sz);
+                    }
+                } catch (java.io.FileNotFoundException ignored) {}
                 int t = cpuPlan()[0];
-                String r = GpuTest.run(ctx, OrtEnvironment.getEnvironment(), onnx, tfl, tiny, t, s -> { stage = "gpu: " + s; });
+                String r = GpuTest.run(ctx, OrtEnvironment.getEnvironment(), onnx, tfl, tiny, pf.toArray(new File[0]), ps.toArray(new int[0][]), t, s -> { stage = "gpu: " + s; });
                 JSObject o = new JSObject(); o.put("device", dev); o.put("report", r); call.resolve(o);
             } catch (Throwable e) { call.reject(e.getClass().getSimpleName() + ": " + e.getMessage()); }
             finally { stage = ""; }

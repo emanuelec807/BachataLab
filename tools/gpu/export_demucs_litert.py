@@ -1,9 +1,6 @@
-"""htdemucs_6s core (no STFT) as LiteRT .tflite for the phone GPU (branch veloce).
-Only operators the GPU knows: attention written out plainly (PyTorch's adds SELECT guards), position tables as
-constants, GELU from ABS/EXP (erf does not convert; the tanh form costs ~40 dB on the quiet stems).
-Outputs kept 4-D/3-D: zout [1,24,2048,T] (= [6 sources x 4 ch]), xt [1,12,L]: same memory layout as demucs6.onnx.
-usage: <venv with litert-torch and demucs>/python export_demucs_litert.py out.tflite
-then:  python to_fp16.py out.tflite demucs_gpu.tflite  (float16 weights, 62 MB)"""
+"""htdemucs_6s core (no STFT) as LiteRT .tflite for the phone GPU test.
+Outputs are kept 4-D/3-D (GPU limit): zout [1,24,2048,T] (= [6 sources x 4 ch]), xt [1,12,L].
+usage: lt/bin/python export_demucs_litert.py out.tflite [gelu_tanh=1]"""
 import sys, os, time
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 import numpy as np, torch
@@ -52,6 +49,17 @@ def swap(mod):
         if isinstance(ch, torch.nn.MultiheadAttention): setattr(mod, name, PlainMHA(ch))
         else: swap(ch)
 swap(m)
+
+# Linear on 3-D token data computed as a 1x1 convolution (same math). As FULLY_CONNECTED the converter emitted some
+# going 3-D -> 2-D (keep_num_dims off) and the phone GPU computed those wrong ("Shape mismatch ... convolution1x1",
+# result -66 dB); reshapes around the Linear get folded back in, a convolution does not.
+_lin = torch.nn.Linear.forward
+def lin_conv(self, x):
+    if x.dim() != 3: return _lin(self, x)
+    B, N, C = x.shape
+    y = torch.nn.functional.conv2d(x.transpose(1, 2).reshape(B, C, N, 1), self.weight[:, :, None, None], self.bias)
+    return y.reshape(B, self.out_features, N).transpose(1, 2)
+torch.nn.Linear.forward = lin_conv
 
 # Position tables depend only on shapes: compute them once and hand the converter plain constants
 # (built inside the graph they became BROADCAST_TO / STABLEHLO_PAD / SELECT, which the GPU rejects).

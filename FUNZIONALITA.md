@@ -363,7 +363,9 @@ Il conteggio sparisce: si ascolta e si tocca.
   - Demucs convertito per LiteRT con solo operazioni che la GPU conosce: attenzione scritta in forma semplice, tabelle di posizione precalcolate, GELU fatta di operazioni elementari. Pesi float16 (62 MB). Sul PC dà lo stesso risultato di oggi a 55–86 dB secondo lo strumento (differenza non udibile).
   - Il test fa lo stesso pezzo da 7,8 s con il motore di oggi (ONNX Runtime) e con LiteRT su processore e GPU in vari modi (OpenCL, OpenGL, fp32, GPU con il processore dove serve): tempo per pezzo e somiglianza per strumento.
   - L'app ora dichiara la libreria OpenCL del telefono: da Android 12 senza questa dichiarazione la GPU non è raggiungibile in modo OpenCL.
-  - Strumenti: `tools/gpu/` (conversione, pesi float16, elenco operazioni).
+  - Primo test sul Vivo X300 (7.0.33): la GPU compila tutto Demucs e fa un pezzo in 0,7–0,9 s invece di 2,7 s (circa 3,5 volte più veloce), ma il risultato era sbagliato. Causa trovata nel registro: in ogni strato del trasformatore uno dei livelli lineari passava da 3 a 2 dimensioni e la GPU lo calcolava male. Ora tutti i livelli lineari del trasformatore sono convoluzioni 1×1 (stessa matematica, stesso risultato sul PC).
+  - Il test prova anche due pezzi della rete da soli (il trasformatore; tutto tranne il trasformatore), per capire subito dove sta un eventuale errore rimasto.
+  - Strumenti: `tools/gpu/` (conversione, pezzi di prova, pesi float16, elenco operazioni).
 
 - **27/11/2026 (branch `veloce`, APK di prova «Bachata Lab Veloce»)**: la versione con Demucs (quella di `main`) più veloce, senza cambiare il risultato.
   - Thread scelti sui core veri del telefono (core grandi e medi; uno libero se sono tutti grandi): sul Vivo X300 7 invece di 4.
