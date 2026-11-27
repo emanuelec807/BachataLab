@@ -9,7 +9,7 @@ m = onnx.load(src)
 g = m.graph
 new_inits, new_nodes = [], []
 for init in g.initializer:
-    if init.data_type == TensorProto.FLOAT and np.prod(init.dims) >= 1024:
+    if init.data_type == TensorProto.FLOAT and np.prod(init.dims) >= 1024 and not init.name.endswith(("_scale", "_zero_point")):   # int8 scales stay float32
         arr = numpy_helper.to_array(init).astype(np.float16)
         h = numpy_helper.from_array(arr, init.name + '__fp16')
         new_inits.append(h)

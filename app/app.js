@@ -82,7 +82,7 @@ const vibrate = ms => { try { navigator.vibrate && navigator.vibrate(ms); } catc
 
 // ---------- toast, busy overlay, dialog ----------
 let toastT;
-function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), 2200); }
+function toast(msg, ms) { const t = $('toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), ms || 2200); }
 function busy(msg) { $('busyT').textContent = msg || ''; $('busy').classList.toggle('on', !!msg); }
 let dlgResolve = null;
 function closeDialog(val) { if (!dlgResolve) return; const r = dlgResolve; dlgResolve = null; $('dlg').classList.remove('on'); r(val); }
@@ -674,7 +674,7 @@ $('createBtn').addEventListener('click', async () => {
     if (m.type === 'done') try {
       if (worker) { worker.terminate(); worker = null; }
       const workS = (Date.now() - tWork) / 1000;
-      if (NATIVE) { ls.set('speedFactorMit', Math.max(0.05, Math.min(10, workS / (dur * nT)))); setTimeout(() => toast(T('Separato in {t} ({x} per minuto di brano)', { t: fmt(workS), x: fmt(workS * 60 / dur) })), 1500); } else ls.set(SPEED_KEY(), Math.max(0.05, Math.min(10, workS / (dur * (wD + wG)))));
+      if (NATIVE) { ls.set('speedFactorMit', Math.max(0.05, Math.min(10, workS / (dur * nT)))); setTimeout(() => toast(T('Separato in {t} ({x} per minuto di brano)', { t: fmt(workS), x: fmt(workS * 60 / dur) }) + (m.threads ? ' · ' + T('{n} thread, {w} pezzi alla volta', { n: m.threads, w: m.workers || 1 }) : ''), 7000), 1500); } else ls.set(SPEED_KEY(), Math.max(0.05, Math.min(10, workS / (dur * (wD + wG)))));
       clearInterval(procClock); setSteps(steps, steps.length - 1); $('procStage').textContent = T('Trovo il ritmo e salvo…'); $('procWhat').textContent = T('Ritmo'); $('procLeft').textContent = T('quasi fatto'); setProgress(1, 0.5);
       const args = { name, stems: m.stems, dur, offset, srcDur, withG, kind, file, thumb };
       for (;;) {
@@ -726,7 +726,7 @@ function nativeWorker() {
               stems[id] = [toF32(a.subarray(0, h)), toF32(a.subarray(h))];
             }
             call('cleanup').catch(() => {});
-            return emit({ type: 'done', stems });
+            return emit({ type: 'done', stems, threads: s.threads, workers: s.workers });
           }
         }
       } catch (e) { fallback(String(e && e.message || e)); }

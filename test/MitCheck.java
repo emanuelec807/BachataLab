@@ -28,11 +28,21 @@ public class MitCheck {
     OrtEnvironment env = OrtEnvironment.getEnvironment();
     OrtSession.SessionOptions o = new OrtSession.SessionOptions(); o.setIntraOpNumThreads(2); o.setCPUArenaAllocator(false); o.setMemoryPatternOptimization(false); o.setOptimizationLevel(OrtSession.SessionOptions.OptLevel.ALL_OPT);
     String M = "/home/claude/mit/onnx/";
-    OrtSession sc = env.createSession(M + "scnet.onnx", o), mg = env.createSession(M + "mega.onnx", o), g = env.createSession("/home/claude/bachata/onnx/guira_h.onnx", o);
+    int W = Integer.parseInt(System.getProperty("workers", "1")), TH = Integer.parseInt(System.getProperty("threads", "2"));
+    String megaPath = System.getProperty("mega", M + "mega.onnx");
+    Map<String, String> paths = new HashMap<>(); paths.put("scnet", M + "scnet.onnx"); paths.put("mega", megaPath); paths.put("guira", "/home/claude/bachata/onnx/guira_h.onnx");
+    int MW = Integer.parseInt(System.getProperty("megaWorkers", "" + W));
+    MitSeparator.Models models = name -> { int nw = name.equals("mega") ? MW : W; OrtSession[] ss = new OrtSession[nw];
+      for (int w = 0; w < nw; w++) { OrtSession.SessionOptions so = new OrtSession.SessionOptions(); so.setIntraOpNumThreads(Math.max(1, TH / nw + (w < TH % nw ? 1 : 0)));
+        so.setCPUArenaAllocator(false); so.setMemoryPatternOptimization(false); so.setOptimizationLevel(OrtSession.SessionOptions.OptLevel.ALL_OPT);
+        ss[w] = env.createSession(paths.get(name), so); }
+      return ss; };
+    Separator.javaThreads = TH;
     float[][] in = readWav(wav, s0, s1);
     Separator.tmpDir = new File("/tmp/septmp"); Separator.tmpDir.mkdirs();
     long t = System.currentTimeMillis(); Map<String, Long> st = new LinkedHashMap<>(); String[] last = {""}; long[] lt = {t};
-    Map<String, FloatBuffer[]> r = new MitSeparator(env, sc, mg, g).separate(in, true, (s, i, n) -> {
+    Map<String, FloatBuffer[]> r = new MitSeparator(env, models).separate(in, true, (s, i, n) -> {
+      if (i % 3 == 0 || !s.equals(last[0])) { try { String l = new String(Files.readAllBytes(Paths.get("/proc/self/status"))); for (String x : l.split("\n")) if (x.startsWith("VmRSS")) System.out.println(s + " " + i + "/" + n + " " + x.trim() + " heap MB " + (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) / 1048576); } catch (Exception e) {} }
       if (!s.equals(last[0])) { long now = System.currentTimeMillis(); if (!last[0].isEmpty()) st.put(last[0], now - lt[0]); last[0] = s; lt[0] = now; } }, () -> false);
     st.put(last[0], System.currentTimeMillis() - lt[0]);
     System.out.println(song + " java total secs " + (System.currentTimeMillis() - t) / 1000.0 + " stages(ms) " + st);

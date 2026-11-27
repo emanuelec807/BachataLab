@@ -15,6 +15,9 @@ import java.util.Map;
  *  - AudioSep (MIT) on the drums: güira, and bongo = drums without the güira (as before).
  * The networks run on ONNX Runtime; STFT/ISTFT, chunking and cross-fades are here, ported from
  * ZFTurbo's demix() (fade window, reflect padding of the borders) so the result matches the reference.
+ * With two sessions per model the chunks run two at a time (each with half the threads), and the STFT/ISTFT
+ * of one chunk overlaps the network of the other; chunks are still added up in order, so the result does not
+ * depend on how many run at once.
  * Plain Java (no Android classes): it is checked on a desktop JVM against the PyTorch reference.
  */
 public final class MitSeparator {
@@ -35,18 +38,31 @@ public final class MitSeparator {
     public static boolean megaOnOther = true;
     public static double GLO = 1000, GHI = 2000;
 
-    private final OrtEnvironment env;
-    private final OrtSession scnet, mega, guira;
+    /** Opens the sessions of one model, one per worker (null: model not available). Each model is opened just
+     *  before its step and closed right after, so only one model at a time takes memory. */
+    public interface Models { OrtSession[] open(String name) throws Exception; }
 
+    private final OrtEnvironment env;
+    private final Models models;
+
+    public MitSeparator(OrtEnvironment env, Models models) { this.env = env; this.models = models; }
+    /** single sessions, kept open (desktop checks) */
     public MitSeparator(OrtEnvironment env, OrtSession scnet, OrtSession mega, OrtSession guira) {
-        this.env = env; this.scnet = scnet; this.mega = mega; this.guira = guira;
+        this(env, name -> { OrtSession s = name.equals("scnet") ? scnet : name.equals("mega") ? mega : guira;
+                            return s == null ? null : new OrtSession[]{s}; });
+        keepOpen = true;
+    }
+    private boolean keepOpen = false;
+    private void close(OrtSession[] ss) {
+        if (keepOpen || ss == null) return;
+        for (OrtSession x : ss) try { if (x != null) x.close(); } catch (Exception ignored) {}
     }
 
-    interface ChunkModel { float[][][] run(float[][] chunk) throws Exception; }   // [stems][2][len]
+    interface ChunkModel { float[][][] run(int worker, float[][] chunk) throws Exception; }   // [stems][2][len]
 
     /** ZFTurbo's generic demix: chunks every chunk/overlap samples, linear fades of chunk/10 (none at the
      *  song edges), the borders reflect-padded, the last chunk reflect- or zero-padded. */
-    static FloatBuffer[][] demix(FloatBuffer[] mix, int n, int chunk, int step, int stems, ChunkModel model,
+    static FloatBuffer[][] demix(FloatBuffer[] mix, int n, int chunk, int step, int stems, int workers, ChunkModel model,
                                  String stage, Separator.Progress pr, Separator.Cancel cc) throws Exception {
         int fade = chunk / 10, border = chunk - step;
         boolean pad = n > 2 * border && border > 0;
@@ -57,16 +73,18 @@ public final class MitSeparator {
         for (int s = 0; s < stems; s++) for (int c = 0; c < 2; c++) acc[s][c] = Separator.newBuf(n);
         float[] cnt = new float[n];
         int nChunks = 0; for (int i = 0; i < Lp; i += step) nChunks++;
-        int k = 0;
-        for (int i = 0; i < Lp; i += step) {
-            if (cc.cancelled()) throw new InterruptedException("cancelled");
-            int ln = Math.min(chunk, Lp - i);
+        final int total = nChunks;
+        // the chunks run on the workers (model + STFT/ISTFT); they are added up here in order, as in a plain loop
+        Par.ordered(total, workers, (w, k) -> {
+            int i = k * step, ln = Math.min(chunk, Lp - i);
             float[][] part = new float[2][chunk];
             for (int c = 0; c < 2; c++) {
                 for (int j = 0; j < ln; j++) part[c][j] = mix[c].get(reflect(i + j - off, n));
                 if (ln < chunk && ln > chunk / 2) for (int j = ln; j < chunk; j++) part[c][j] = part[c][reflect(j, ln)];
             }
-            float[][][] y = model.run(part);
+            return model.run(w, part);
+        }, (k, y) -> {
+            int i = k * step, ln = Math.min(chunk, Lp - i);
             boolean first = i == 0, last = i + step >= Lp;
             for (int j = 0; j < ln; j++) {
                 int p = i + j - off; if (p < 0 || p >= n) continue;
@@ -75,8 +93,8 @@ public final class MitSeparator {
                 for (int s = 0; s < stems; s++) for (int c = 0; c < 2; c++) acc[s][c].put(p, acc[s][c].get(p) + y[s][c][j] * w);
                 cnt[p] += w;
             }
-            pr.on(stage, ++k, nChunks);
-        }
+            pr.on(stage, k + 1, total);
+        }, cc);
         for (FloatBuffer[] st : acc) for (FloatBuffer ch : st) for (int j = 0; j < n; j++) ch.put(j, ch.get(j) / Math.max(cnt[j], 1e-8f));
         return acc;
     }
@@ -84,13 +102,14 @@ public final class MitSeparator {
     static int reflect(int j, int n) { if (n == 1) return 0; while (j < 0 || j >= n) { if (j < 0) j = -j; if (j >= n) j = 2 * (n - 1) - j; } return j; }
 
     // ---------- SCNet ----------
-    float[][][] scnetChunk(float[][] ch) throws Exception {
+    float[][][] scnetChunk(OrtSession scnet, float[][] ch) throws Exception {
         int L = ch[0].length, padding = SC_HOP - L % SC_HOP;
         if ((L + padding) / SC_HOP % 2 == 0) padding += SC_HOP;
         int Lp = L + padding;
         double[] w = Separator.rect(SC_NFFT);
-        Separator.Spec[] z = new Separator.Spec[2];
-        for (int c = 0; c < 2; c++) { double[] x = new double[Lp]; for (int i = 0; i < L; i++) x[i] = ch[c][i]; z[c] = Separator.stft(x, SC_NFFT, SC_HOP, true, w); }
+        double[] x0 = new double[Lp], x1 = new double[Lp];
+        for (int i = 0; i < L; i++) { x0[i] = ch[0][i]; x1[i] = ch[1][i]; }
+        Separator.Spec[] z = Separator.stft2(x0, x1, SC_NFFT, SC_HOP, true, w);
         int F = z[0].F, T = z[0].T, FT = F * T;
         float[] in = new float[4 * FT];
         for (int c = 0; c < 2; c++) { System.arraycopy(z[c].re, 0, in, (2 * c) * FT, FT); System.arraycopy(z[c].im, 0, in, (2 * c + 1) * FT, FT); }
@@ -100,11 +119,12 @@ public final class MitSeparator {
             try (OrtSession.Result r = scnet.run(feeds)) { out = Separator.toArray((OnnxTensor) r.get(0)); }
         }
         float[][][] res = new float[4][2][];
-        for (int s = 0; s < 4; s++) for (int c = 0; c < 2; c++) {
-            int j = s * 2 + c;
-            float[] re = java.util.Arrays.copyOfRange(out, (2 * j) * FT, (2 * j + 1) * FT), im = java.util.Arrays.copyOfRange(out, (2 * j + 1) * FT, (2 * j + 2) * FT);
-            float[] y = Separator.istft(re, im, F, T, SC_NFFT, SC_HOP, Lp, true, w);
-            res[s][c] = java.util.Arrays.copyOf(y, L);
+        for (int s = 0; s < 4; s++) {   // both channels of a source in one inverse FFT
+            int j0 = s * 2, j1 = s * 2 + 1;
+            float[][] y = Separator.istft2(java.util.Arrays.copyOfRange(out, (2 * j0) * FT, (2 * j0 + 1) * FT), java.util.Arrays.copyOfRange(out, (2 * j0 + 1) * FT, (2 * j0 + 2) * FT),
+                                           java.util.Arrays.copyOfRange(out, (2 * j1) * FT, (2 * j1 + 1) * FT), java.util.Arrays.copyOfRange(out, (2 * j1 + 1) * FT, (2 * j1 + 2) * FT),
+                                           F, T, SC_NFFT, SC_HOP, Lp, true, w);
+            for (int c = 0; c < 2; c++) res[s][c] = java.util.Arrays.copyOf(y[c], L);
         }
         return res;
     }
@@ -113,12 +133,12 @@ public final class MitSeparator {
     // Mega works only where there is something to separate: a chunk of "altro" much quieter than the song
     // (intro without guitar, breaks with only percussion) gives silent guitar and piano without running the model.
     double megaGate = 0;
-    int megaSkipped = 0;
-    float[][][] megaChunk(float[][] ch) throws Exception {
+    final java.util.concurrent.atomic.AtomicInteger megaSkipped = new java.util.concurrent.atomic.AtomicInteger();
+    float[][][] megaChunk(OrtSession mega, float[][] ch) throws Exception {
         int L = ch[0].length;
         double e = 0; for (float[] c : ch) for (float v : c) e += v * v;
-        if (Math.sqrt(e / (2.0 * L)) < megaGate) { megaSkipped++; return new float[MG_HEADS.length][2][L]; }
-        Separator.Spec[] z = { Separator.stft(ch[0], MG_NFFT, MG_HOP, false), Separator.stft(ch[1], MG_NFFT, MG_HOP, false) };
+        if (Math.sqrt(e / (2.0 * L)) < megaGate) { megaSkipped.incrementAndGet(); return new float[MG_HEADS.length][2][L]; }
+        Separator.Spec[] z = Separator.stft2(ch[0], ch[1], MG_NFFT, MG_HOP, false);
         int F = z[0].F, T = z[0].T;
         float[] in = new float[F * 2 * T * 2];   // [1, F*2 (freq-major, stereo interleaved), T, 2 (re, im)]
         for (int f = 0; f < F; f++) for (int s = 0; s < 2; s++) for (int t = 0; t < T; t++) {
@@ -131,12 +151,12 @@ public final class MitSeparator {
         }
         int S = (int) shape[0];
         float[][][] res = new float[S][2][];
-        for (int n = 0; n < S; n++) for (int s = 0; s < 2; s++) {
-            float[] re = new float[F * T], im = new float[F * T];
-            for (int f = 1; f < F; f++) for (int t = 0; t < T; t++) {   // f = 0 stays 0: zero_dc
-                int o = ((((n * F + f) * 2 + s) * T) + t) * 2; re[f * T + t] = out[o]; im[f * T + t] = out[o + 1];
+        for (int n = 0; n < S; n++) {
+            float[][] re = new float[2][F * T], im = new float[2][F * T];
+            for (int s = 0; s < 2; s++) for (int f = 1; f < F; f++) for (int t = 0; t < T; t++) {   // f = 0 stays 0: zero_dc
+                int o = ((((n * F + f) * 2 + s) * T) + t) * 2; re[s][f * T + t] = out[o]; im[s][f * T + t] = out[o + 1];
             }
-            res[n][s] = Separator.istft(re, im, F, T, MG_NFFT, MG_HOP, L, false);
+            res[n] = Separator.istft2(re[0], im[0], re[1], im[1], F, T, MG_NFFT, MG_HOP, L, false);   // both channels at once
         }
         return res;
     }
@@ -151,35 +171,47 @@ public final class MitSeparator {
         in[0] = null; in[1] = null;
         final float mean = (float) (sum / n), std = (float) Math.max(1e-8, Math.sqrt(Math.max(0, sq / n - (sum / n) * (sum / n))));
         // SCNet: input normalized (inference.normalize in its config), output brought back to the original scale
-        FloatBuffer[][] sc = demix(mix, n, SC_CH, scStep, 4, ch -> {
-            for (float[] x : ch) for (int i = 0; i < x.length; i++) x[i] = (x[i] - mean) / std;
-            float[][][] y = scnetChunk(ch);
-            for (float[][] s : y) for (float[] x : s) for (int i = 0; i < x.length; i++) x[i] = x[i] * std + mean;
-            return y;
-        }, "scnet", pr, cc);
+        pr.on("scnet", 0, 1);
+        final OrtSession[] scs = models.open("scnet");
+        FloatBuffer[][] sc;
+        try {
+            sc = demix(mix, n, SC_CH, scStep, 4, scs.length, (w, ch) -> {
+                for (float[] x : ch) for (int i = 0; i < x.length; i++) x[i] = (x[i] - mean) / std;
+                float[][][] y = scnetChunk(scs[w], ch);
+                for (float[][] s : y) for (float[] x : s) for (int i = 0; i < x.length; i++) x[i] = x[i] * std + mean;
+                return y;
+            }, "scnet", pr, cc);
+        } finally { close(scs); }
         FloatBuffer[] drums = sc[0], bass = sc[1], other = sc[2], vocals = sc[3];
         { FloatBuffer[] src = megaOnOther ? other : mix; double e = 0; for (FloatBuffer c : src) for (int i = 0; i < n; i++) { float v = c.get(i); e += v * v; }
           megaGate = 0.03 * Math.sqrt(e / (2.0 * n)); }   // -30 dB under the song's level
-        FloatBuffer[][] mg = demix(megaOnOther ? other : mix, n, mgChunk, mgStep, MG_HEADS.length, this::megaChunk, "mega", pr, cc);
+        pr.on("mega", 0, 1);
+        final OrtSession[] mgs = models.open("mega");
+        FloatBuffer[][] mg;
+        try { mg = demix(megaOnOther ? other : mix, n, mgChunk, mgStep, MG_HEADS.length, mgs.length, (w, ch) -> megaChunk(mgs[w], ch), "mega", pr, cc); }
+        finally { close(mgs); }
         mix = null;
         FloatBuffer[] guitar = mg[0], piano = mg[1];
         for (int c = 0; c < 2; c++) for (int i = 0; i < n; i++) other[c].put(i, other[c].get(i) - guitar[c].get(i));   // altro = other - guitar
         pr.on("resample", 0, 0);
         FloatBuffer[] bongo, guiraSt;
-        if (!withGuira || guira == null) { bongo = drums; guiraSt = new FloatBuffer[]{Separator.newBuf(n), Separator.newBuf(n)}; }
+        OrtSession[] gss = withGuira ? models.open("guira") : null;
+        if (gss == null) { bongo = drums; guiraSt = new FloatBuffer[]{Separator.newBuf(n), Separator.newBuf(n)}; }
         else {
             // SCNet does not know the güira: part of its scraping lands in "other". AudioSep listens to drums and
             // "altro" together, and the güira it finds is taken out of both: güira = both parts, bongo and altro clean.
             float[] mono = new float[n]; for (int i = 0; i < n; i++) mono[i] = 0.5f * (drums[0].get(i) + drums[1].get(i) + other[0].get(i) + other[1].get(i));
             float[] m32 = Separator.resample(mono, SR, Separator.GSR); mono = null;
-            float[] g32 = Separator.guiraAll(env, guira, m32, pr, cc); m32 = null;
+            float[] g32;
+            try { g32 = Separator.guiraAll(env, gss, m32, pr, cc); } finally { close(gss); }
+            m32 = null;
             float[] g44 = java.util.Arrays.copyOf(Separator.resample(g32, Separator.GSR, SR), n); g32 = null;
             pr.on("split", 0, 0);
             guiraSt = new FloatBuffer[]{Separator.newBuf(n), Separator.newBuf(n)}; bongo = new FloatBuffer[]{Separator.newBuf(n), Separator.newBuf(n)};
             // the güira is a scrape above ~2 kHz: below that nothing moves (otherwise guitar and bongo slipped into it)
-            Separator.splitDrums(drums, g44, guiraSt, bongo, GLO, GHI);
+            Separator.splitDrums(drums, g44, guiraSt, bongo, GLO, GHI, cc);
             FloatBuffer[] gOther = {Separator.newBuf(n), Separator.newBuf(n)}, altroClean = {Separator.newBuf(n), Separator.newBuf(n)};
-            Separator.splitDrums(other, g44, gOther, altroClean, GLO, GHI);
+            Separator.splitDrums(other, g44, gOther, altroClean, GLO, GHI, cc);
             for (int c = 0; c < 2; c++) for (int i = 0; i < n; i++) guiraSt[c].put(i, guiraSt[c].get(i) + gOther[c].get(i));
             other = altroClean;
         }

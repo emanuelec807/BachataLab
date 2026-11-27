@@ -139,23 +139,100 @@ public final class Separator {
         for (int i = 0; i < length; i++) { int j = start + i; if (j >= total) break; double e = env[j]; out[i] = (float) (e > 1e-11 ? y[j] / e : y[j]); }
         return out;
     }
-    /** Windowed-sinc resampler (same as separate.js). */
+    /** Two real signals in one complex FFT (a in the real part, b in the imaginary part), then the two spectra
+     *  pulled apart by symmetry: half the FFTs of two separate stft() calls, same result. */
+    static Spec[] stft2(double[] a, double[] b, int nfft, int hop, boolean normalized, double[] w) {
+        double[] ap = reflectPad(a, nfft / 2, nfft / 2), bp = reflectPad(b, nfft / 2, nfft / 2);
+        Spec sa = new Spec(), sb = new Spec();
+        sa.T = sb.T = 1 + (ap.length - nfft) / hop; sa.F = sb.F = nfft / 2 + 1;
+        int F = sa.F, T = sa.T;
+        sa.re = new float[F * T]; sa.im = new float[F * T]; sb.re = new float[F * T]; sb.im = new float[F * T];
+        double[] br = new double[nfft], bi = new double[nfft];
+        double scale = (normalized ? 1 / Math.sqrt(nfft) : 1) * 0.5;
+        for (int t = 0; t < T; t++) {
+            int off = t * hop;
+            for (int i = 0; i < nfft; i++) { br[i] = ap[off + i] * w[i]; bi[i] = bp[off + i] * w[i]; }
+            fft(br, bi, -1);
+            for (int f = 0; f < F; f++) {
+                int m = f == 0 ? 0 : nfft - f, o = f * T + t;
+                sa.re[o] = (float) ((br[f] + br[m]) * scale); sa.im[o] = (float) ((bi[f] - bi[m]) * scale);
+                sb.re[o] = (float) ((bi[f] + bi[m]) * scale); sb.im[o] = (float) ((br[m] - br[f]) * scale);
+            }
+        }
+        return new Spec[]{sa, sb};
+    }
+    static Spec[] stft2(float[] a, float[] b, int nfft, int hop, boolean normalized) {
+        double[] da = new double[a.length], db = new double[b.length];
+        for (int i = 0; i < a.length; i++) da[i] = a[i];
+        for (int i = 0; i < b.length; i++) db[i] = b[i];
+        return stft2(da, db, nfft, hop, normalized, hann(nfft));
+    }
+    /** Two istft() in one complex inverse FFT: spectrum A + i*B gives signal a in the real part, b in the imaginary. */
+    static float[][] istft2(float[] reA, float[] imA, float[] reB, float[] imB, int F, int T, int nfft, int hop, int length, boolean normalized, double[] w) {
+        int total = nfft + hop * (T - 1);
+        double[] ya = new double[total], yb = new double[total], env = new double[total], br = new double[nfft], bi = new double[nfft];
+        double scale = (normalized ? Math.sqrt(nfft) : 1) / nfft;
+        for (int t = 0; t < T; t++) {
+            for (int f = 0; f < F; f++) {
+                int o = f * T + t;
+                double ar = reA[o], ai = (f == 0 || f == F - 1) ? 0 : imA[o];
+                double cr = reB[o], ci = (f == 0 || f == F - 1) ? 0 : imB[o];
+                br[f] = ar - ci; bi[f] = ai + cr;                                   // A + iB
+                if (f > 0 && f < F - 1) { br[nfft - f] = ar + ci; bi[nfft - f] = cr - ai; }   // conj(A) + i conj(B)
+            }
+            fft(br, bi, 1);
+            int off = t * hop;
+            for (int i = 0; i < nfft; i++) { ya[off + i] += br[i] * scale * w[i]; yb[off + i] += bi[i] * scale * w[i]; env[off + i] += w[i] * w[i]; }
+        }
+        float[] oa = new float[length], ob = new float[length]; int start = nfft / 2;
+        for (int i = 0; i < length; i++) { int j = start + i; if (j >= total) break; double e = env[j];
+            oa[i] = (float) (e > 1e-11 ? ya[j] / e : ya[j]); ob[i] = (float) (e > 1e-11 ? yb[j] / e : yb[j]); }
+        return new float[][]{oa, ob};
+    }
+    static float[][] istft2(float[] reA, float[] imA, float[] reB, float[] imB, int F, int T, int nfft, int hop, int length, boolean normalized) {
+        return istft2(reA, imA, reB, imB, F, T, nfft, hop, length, normalized, hann(nfft));
+    }
+    /** Windowed-sinc resampler (same as separate.js). The rates are rational (44100/32000 = 441/320), so the
+     *  fractional position of each output sample repeats every few hundred samples: the filter taps are
+     *  computed once per position instead of with a sine and a cosine for every tap of every sample. */
     static float[] resample(float[] x, int from, int to) {
         if (from == to) return x.clone();
         double ratio = (double) from / to; int n = (int) Math.floor(x.length / ratio);
-        double cutoff = Math.min(1, (double) to / from); int W = 24;
+        double cutoff = Math.min(1, (double) to / from); final int W = 24;
+        int g = gcd(from, to), p = from / g, q = to / g;
         float[] out = new float[n];
-        for (int i = 0; i < n; i++) {
-            double t = i * ratio; int c = (int) Math.floor(t); double s = 0, norm = 0;
-            for (int k = c - W + 1; k <= c + W; k++) {
-                double d = t - k, win = 0.5 + 0.5 * Math.cos(Math.PI * d / W), a = Math.PI * cutoff * d;
-                double h = (d == 0 ? 1 : Math.sin(a) / a) * win;
-                norm += h; if (k >= 0 && k < x.length) s += x[k] * h;
+        if (q > 4096) {   // unusual rates: the direct formula
+            for (int i = 0; i < n; i++) {
+                double t = i * ratio; int c = (int) Math.floor(t); double s = 0, norm = 0;
+                for (int k = c - W + 1; k <= c + W; k++) {
+                    double d = t - k, win = 0.5 + 0.5 * Math.cos(Math.PI * d / W), a = Math.PI * cutoff * d;
+                    double h = (d == 0 ? 1 : Math.sin(a) / a) * win;
+                    norm += h; if (k >= 0 && k < x.length) s += x[k] * h;
+                }
+                out[i] = (float) (s / norm);
             }
-            out[i] = (float) (s / norm);
+            return out;
+        }
+        double[][] taps = new double[q][2 * W]; double[] norms = new double[q];
+        for (int r = 0; r < q; r++) {
+            double frac = (double) r / q, norm = 0;
+            for (int j = 0; j < 2 * W; j++) {
+                double d = frac + (W - 1 - j), win = 0.5 + 0.5 * Math.cos(Math.PI * d / W), a = Math.PI * cutoff * d;
+                double h = (d == 0 ? 1 : Math.sin(a) / a) * win;
+                taps[r][j] = h; norm += h;
+            }
+            norms[r] = norm;
+        }
+        for (int i = 0; i < n; i++) {
+            long ip = (long) i * p; int c = (int) (ip / q), r = (int) (ip % q), k0 = c - W + 1;
+            double[] h = taps[r]; double s = 0;
+            if (k0 >= 0 && k0 + 2 * W <= x.length) for (int j = 0; j < 2 * W; j++) s += x[k0 + j] * h[j];
+            else for (int j = 0; j < 2 * W; j++) { int k = k0 + j; if (k >= 0 && k < x.length) s += x[k] * h[j]; }
+            out[i] = (float) (s / norms[r]);
         }
         return out;
     }
+    static int gcd(int a, int b) { while (b != 0) { int t = a % b; a = b; b = t; } return a; }
 
     // ---------- Demucs ----------
     static float[] demucsSpec(float[][] ch, int[] tOut) {
@@ -188,7 +265,9 @@ public final class Separator {
         return res;
     }
     static float[] toArray(OnnxTensor t) {
-        FloatBuffer b = t.getFloatBuffer(); float[] a = new float[b.remaining()]; b.get(a); return a;
+        FloatBuffer b = t.getFloatBuffer();   // already a copy: reuse its array instead of copying it again
+        if (b.hasArray() && b.arrayOffset() == 0 && b.position() == 0 && b.array().length == b.remaining()) return b.array();
+        float[] a = new float[b.remaining()]; b.get(a); return a;
     }
 
     Map<String, FloatBuffer[]> demucsAll(float[] left, float[] right, Progress pr, Cancel cc) throws Exception {
@@ -230,31 +309,37 @@ public final class Separator {
     }
 
     static float[] guiraAll(OrtEnvironment env, OrtSession guira, float[] mono32, Progress pr, Cancel cc) throws Exception {
-        int total = mono32.length, NL = (int) Math.round(GCTX * GSR), NR = NL, NC = GWIN - NL - NR;
+        return guiraAll(env, new OrtSession[]{guira}, mono32, pr, cc);
+    }
+    /** One session per worker: the windows are independent and each writes its own stretch of the output. */
+    static float[] guiraAll(OrtEnvironment env, OrtSession[] guira, float[] mono32, Progress pr, Cancel cc) throws Exception {
+        int total = mono32.length, NL = (int) Math.round(GCTX * GSR), NR = NL;
         float[] out = new float[total];
         java.util.List<Integer> all = new java.util.ArrayList<>();
-        int cur = 0; while (cur + GWIN < total) { all.add(cur); cur += NC; }
+        int cur = 0, NC = GWIN - NL - NR; while (cur + GWIN < total) { all.add(cur); cur += NC; }
         int tail = cur < total ? cur : -1; if (tail >= 0) all.add(tail);
-        for (int i = 0; i < all.size(); i++) {
-            if (cc.cancelled()) throw new InterruptedException("cancelled");
+        final int count = all.size();
+        Par.ordered(count, guira.length, (w, i) -> {
             int s = all.get(i); float[] chunk = new float[GWIN];
             System.arraycopy(mono32, s, chunk, 0, Math.min(GWIN, total - s));
             float[] d; long[] dims;
             try (OnnxTensor tc = OnnxTensor.createTensor(env, FloatBuffer.wrap(chunk), new long[]{1, 1, GWIN})) {
                 Map<String, OnnxTensor> feeds = new HashMap<>(); feeds.put("chunk", tc);
-                try (OrtSession.Result r = guira.run(feeds)) {
+                try (OrtSession.Result r = guira[w].run(feeds)) {
                     OnnxTensor g = (OnnxTensor) r.get("guira").get(); dims = g.getInfo().getShape(); d = toArray(g);
                 }
             }
             int T = (int) dims[2], F = (int) dims[3];
             float[] re = new float[F * T], im = new float[F * T];
             for (int t = 0; t < T; t++) for (int f = 0; f < F; f++) { re[f * T + t] = d[t * F + f]; im[f * T + t] = d[T * F + t * F + f]; }
-            float[] y = istft(re, im, F, T, GNFFT, GHOP, GWIN, false);
-            if (i == all.size() - 1 && s == tail) { int segLen = Math.min(GWIN, total - s); for (int j = NL; j < segLen; j++) out[s + j] = y[j]; }
+            return istft(re, im, F, T, GNFFT, GHOP, GWIN, false);
+        }, (i, y) -> {
+            int s = all.get(i);
+            if (i == count - 1 && s == tail) { int segLen = Math.min(GWIN, total - s); for (int j = NL; j < segLen; j++) out[s + j] = y[j]; }
             else if (s == 0) { for (int j = 0; j < GWIN - NR; j++) out[j] = y[j]; }
             else { for (int j = NL; j < GWIN - NR; j++) out[s + j] = y[j]; }
-            pr.on("guira", i + 1, all.size());
-        }
+            pr.on("guira", i + 1, count);
+        }, cc);
         return out;
     }
 
@@ -264,16 +349,24 @@ public final class Separator {
     static final int SPLIT_SEG = 512 * 2560, SPLIT_PAD = 512 * 8;
     static void splitDrums(FloatBuffer[] drums, float[] guira44, FloatBuffer[] gu, FloatBuffer[] bo) { splitDrums(drums, guira44, gu, bo, 0, 0); }
     /** fLo..fHi (Hz): below fLo nothing moves to the güira, above fHi the full mask, a linear ramp between (0, 0 = no limit). */
+    /** Threads for the plain-Java steps (the models are closed by then); set by the app. */
+    public static int javaThreads = Math.max(1, Math.min(4, Runtime.getRuntime().availableProcessors()));
     static void splitDrums(FloatBuffer[] drums, float[] guira44, FloatBuffer[] gu, FloatBuffer[] bo, double fLo, double fHi) {
-        int n = drums[0].capacity();
-        for (int s = 0; s < n; s += SPLIT_SEG) {
-            int a = Math.max(0, s - SPLIT_PAD), b = Math.min(n, s + SPLIT_SEG + SPLIT_PAD), cnt = Math.min(SPLIT_SEG, n - s);
-            float[][][] r = splitBlock(new float[][]{range(drums[0], a, b), range(drums[1], a, b)}, java.util.Arrays.copyOfRange(guira44, a, b), fLo, fHi);
+        try { splitDrums(drums, guira44, gu, bo, fLo, fHi, () -> false); } catch (RuntimeException e) { throw e; } catch (Exception e) { throw new RuntimeException(e); }
+    }
+    /** Blocks are independent (each keeps its own context): they run on a few threads, written back in order. */
+    static void splitDrums(FloatBuffer[] drums, float[] guira44, FloatBuffer[] gu, FloatBuffer[] bo, double fLo, double fHi, Cancel cc) throws Exception {
+        int n = drums[0].capacity(), blocks = (n + SPLIT_SEG - 1) / SPLIT_SEG;
+        Par.ordered(blocks, javaThreads, (w, k) -> {
+            int s = k * SPLIT_SEG, a = Math.max(0, s - SPLIT_PAD), b = Math.min(n, s + SPLIT_SEG + SPLIT_PAD);
+            return splitBlock(new float[][]{range(drums[0], a, b), range(drums[1], a, b)}, java.util.Arrays.copyOfRange(guira44, a, b), fLo, fHi);
+        }, (k, r) -> {
+            int s = k * SPLIT_SEG, a = Math.max(0, s - SPLIT_PAD), cnt = Math.min(SPLIT_SEG, n - s);
             for (int c = 0; c < 2; c++) {
                 FloatBuffer g = gu[c].duplicate(); g.position(s); g.put(r[0][c], s - a, cnt);
                 FloatBuffer o = bo[c].duplicate(); o.position(s); o.put(r[1][c], s - a, cnt);
             }
-        }
+        }, cc);
     }
 
     static float[][][] splitBlock(float[][] drums, float[] guira44) { return splitBlock(drums, guira44, 0, 0); }
@@ -282,18 +375,21 @@ public final class Separator {
         Spec g = stft(guira44, nfft, hop, false);
         float[] gm = new float[g.re.length];
         for (int i = 0; i < gm.length; i++) gm[i] = (float) Math.hypot(g.re[i], g.im[i]);
-        float[][] gu = new float[2][], bo = new float[2][];
+        g = null;
+        Spec[] zz = stft2(drums[0], drums[1], nfft, hop, false);
+        int m = zz[0].re.length, F = zz[0].F, T = zz[0].T;
+        float[][] ar = new float[2][m], ai = new float[2][m], br = new float[2][m], bi = new float[2][m];
         for (int c = 0; c < 2; c++) {
-            Spec z = stft(drums[c], nfft, hop, false); int m = z.re.length;
-            float[] ar = new float[m], ai = new float[m], br = new float[m], bi = new float[m];
+            Spec z = zz[c];
             for (int i = 0; i < m; i++) {
                 float k = (float) Math.min(1, gm[i] / (Math.hypot(z.re[i], z.im[i]) + 1e-8));
                 if (fHi > 0) { double hz = (i / z.T) * (double) SR / nfft; k *= (float) Math.max(0, Math.min(1, (hz - fLo) / (fHi - fLo))); }
-                ar[i] = z.re[i] * k; ai[i] = z.im[i] * k; br[i] = z.re[i] * (1 - k); bi[i] = z.im[i] * (1 - k);
+                ar[c][i] = z.re[i] * k; ai[c][i] = z.im[i] * k; br[c][i] = z.re[i] * (1 - k); bi[c][i] = z.im[i] * (1 - k);
             }
-            gu[c] = istft(ar, ai, z.F, z.T, nfft, hop, n, false);
-            bo[c] = istft(br, bi, z.F, z.T, nfft, hop, n, false);
         }
+        zz = null;
+        float[][] gu = istft2(ar[0], ai[0], ar[1], ai[1], F, T, nfft, hop, n, false);
+        float[][] bo = istft2(br[0], bi[0], br[1], bi[1], F, T, nfft, hop, n, false);
         return new float[][][]{gu, bo};
     }
 

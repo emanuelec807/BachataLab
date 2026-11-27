@@ -358,6 +358,14 @@ Il conteggio sparisce: si ascolta e si tocca.
 
 ## Registro modifiche
 
+- **27/11/2026 (branch `modelli-mit`)**: separazione MIT più veloce senza perdere qualità. Sul PC di prova 171 s per minuto di brano invece di 232 (−27%).
+  - Mega 53 riesportato con l'attenzione e la normalizzazione come operatori unici di ONNX Runtime (stessi calcoli, senza la matrice di attenzione da ~0,4 GB per strato) e pesi int8 con una scala per canale invece di una per matrice. Rispetto al modello a piena precisione, a parità di lavoro, il risultato è più fedele: chitarra 32,5 dB invece di 25,5, «Altro» 30,1 invece di 23,1, güira 33,8 invece di 30,2. File da 85 a 61 MB, −0,3 GB di memoria.
+  - Due pezzi di brano alla volta, ognuno con metà dei thread, per SCNet, Mega e güira: i pezzi vengono comunque sommati in ordine, quindi il risultato è identico a farli uno per volta. Serve memoria (due pezzi di Mega insieme occupano circa 3,4 GB): l'app li fa insieme solo se in quel momento il telefono ha abbastanza memoria libera (Mega 5,5 GB, SCNet 4,5 GB, güira 3 GB), altrimenti uno alla volta. Anche uno alla volta: 188 s invece di 232 (−19%).
+  - Thread scelti sui core veri del telefono (anche con 7 core o con core spenti dal sistema): si contano i core grandi e medi, si lasciano fuori i piccoli (Cortex-A5xx), e se sono tutti grandi uno resta libero per lo schermo.
+  - Ogni modello si carica solo per il suo passaggio e poi si chiude.
+  - Trasformate (STFT/ISTFT) dei due canali in un solo calcolo, ricampionamento a 32 kHz con i coefficienti calcolati una volta sola (da ~8 s a meno di 1 s per minuto), divisione güira/bongo su più thread: stesso risultato.
+  - Il messaggio finale con il tempo resta 7 s e dice anche quanti thread e quanti pezzi alla volta ha usato.
+
 - **27/11/2026 (branch `modelli-mit`)**: la güira non finisce più in «Altro». SCNet ne metteva una parte nel suo «altro»: ora AudioSep la cerca in batteria e «altro» insieme e la toglie da entrambi; la traccia güira riunisce le due parti. Lo spostamento avviene solo sopra 1–2 kHz, dove sta il raschio della güira: sotto, chitarra e bongo restano dove sono.
 
 - **26/11/2026 (branch `modelli-mit`)**: separazione MIT più veloce, circa 1,7 volte (sul PC di prova 215 s per minuto di brano invece di 363; la pipeline di oggi ne impiega 75). Mega 53: rotazione rotary dentro le proiezioni, tutte le moltiplicazioni con pesi in int8, segmenti da 5 s che si sovrappongono solo nella dissolvenza invece che a metà, e salto dei segmenti dove l'«altro» di SCNet è quasi muto. SCNet resta con mezzo segmento di sovrapposizione (le sue percussioni alimentano la güira, che altrimenti cambiava in modo udibile). Sui telefoni con 8 core la separazione usa 6 thread invece di 4. A fine separazione l'app mostra quanto ci ha messo per minuto di brano.
