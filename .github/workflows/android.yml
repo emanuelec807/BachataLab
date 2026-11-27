@@ -11,6 +11,7 @@ on:
       - 'package.json'
       - 'package-lock.json'
       - '.github/workflows/android.yml'
+      - 'models-gpu/**'
   workflow_dispatch:
 
 permissions:
@@ -88,6 +89,11 @@ jobs:
               for p in parts: os.remove(p)
               print(name, len(parts), 'parti ->', len(raw), 'byte')
           PY
+
+      - name: Demucs per la GPU (LiteRT, test)
+        run: |
+          cp models-gpu/*.tflite android/app/src/main/assets/public/models/
+          ls -la android/app/src/main/assets/public/models/
 
       - name: App di prova separata (si installa accanto a quella normale)
         run: |

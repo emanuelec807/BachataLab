@@ -90,6 +90,44 @@ public class SeparatorPlugin extends Plugin {
     @PluginMethod
     public void cancel(PluginCall call) { cancel = true; call.resolve(); }
 
+    /** GPU test (branch veloce): one Demucs piece on the processor (today) and through LiteRT on the GPU,
+     *  times and how close the results are. Only measures. */
+    @PluginMethod
+    public void gpuTest(PluginCall call) {
+        if (job != null) { call.reject("busy"); return; }
+        new Thread(() -> {
+            try {
+                Context ctx = getContext();
+                File onnx = modelFile(ctx, "demucs6"), tfl = assetFile(ctx, "demucs_gpu.tflite");
+                File tiny = null; try { tiny = assetFile(ctx, "tiny.tflite"); } catch (Exception ignored) {}
+                String dev = android.os.Build.MANUFACTURER + " " + android.os.Build.MODEL
+                    + (android.os.Build.VERSION.SDK_INT >= 31 ? " · " + android.os.Build.SOC_MANUFACTURER + " " + android.os.Build.SOC_MODEL : " · " + android.os.Build.HARDWARE);
+                int t = cpuPlan()[0];
+                String r = GpuTest.run(ctx, OrtEnvironment.getEnvironment(), onnx, tfl, tiny, t, s -> { stage = "gpu: " + s; });
+                JSObject o = new JSObject(); o.put("device", dev); o.put("report", r); call.resolve(o);
+            } catch (Throwable e) { call.reject(e.getClass().getSimpleName() + ": " + e.getMessage()); }
+            finally { stage = ""; }
+        }, "gputest").start();
+    }
+
+    /** Copies a web-asset file into app storage once per app version (like the models). */
+    private File assetFile(Context ctx, String name) throws Exception {
+        File dir = new File(ctx.getFilesDir(), "models"); dir.mkdirs();
+        long ver = 0;
+        try { android.content.pm.PackageInfo p = ctx.getPackageManager().getPackageInfo(ctx.getPackageName(), 0);
+              ver = android.os.Build.VERSION.SDK_INT >= 28 ? p.getLongVersionCode() : p.versionCode; } catch (Exception ignored) {}
+        File out = new File(dir, ver + "." + name);
+        if (out.exists() && out.length() > 10_000) return out;
+        File[] olds = dir.listFiles((d, f) -> f.endsWith("." + name)); if (olds != null) for (File f : olds) f.delete();
+        File tmp = new File(dir, name + ".tmp");
+        try (InputStream is = ctx.getAssets().open("public/models/" + name);
+             OutputStream os = new BufferedOutputStream(new FileOutputStream(tmp), 1 << 20)) {
+            byte[] buf = new byte[1 << 20]; int r; while ((r = is.read(buf)) > 0) os.write(buf, 0, r);
+        }
+        if (!tmp.renameTo(out)) throw new Exception("asset " + name);
+        return out;
+    }
+
     /** Deletes the stem files once the page has stored them. */
     @PluginMethod
     public void cleanup(PluginCall call) {

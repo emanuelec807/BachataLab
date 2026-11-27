@@ -358,6 +358,13 @@ Il conteggio sparisce: si ascolta e si tocca.
 
 ## Registro modifiche
 
+- **27/11/2026 (branch `veloce`)**: test di Demucs sulla GPU, nelle Impostazioni («Test GPU», solo misura: la separazione resta sul processore).
+  - Sul telefono la versione veloce separa Frío in 57 s per minuto di brano (Demucs 33 s, AudioSep 19 s, resto 4 s; 7 thread, un pezzo alla volta).
+  - Demucs convertito per LiteRT con solo operazioni che la GPU conosce: attenzione scritta in forma semplice, tabelle di posizione precalcolate, GELU fatta di operazioni elementari. Pesi float16 (62 MB). Sul PC dà lo stesso risultato di oggi a 55–86 dB secondo lo strumento (differenza non udibile).
+  - Il test fa lo stesso pezzo da 7,8 s con il motore di oggi (ONNX Runtime) e con LiteRT su processore e GPU in vari modi (OpenCL, OpenGL, fp32, GPU con il processore dove serve): tempo per pezzo e somiglianza per strumento.
+  - L'app ora dichiara la libreria OpenCL del telefono: da Android 12 senza questa dichiarazione la GPU non è raggiungibile in modo OpenCL.
+  - Strumenti: `tools/gpu/` (conversione, pesi float16, elenco operazioni).
+
 - **27/11/2026 (branch `veloce`, APK di prova «Bachata Lab Veloce»)**: la versione con Demucs (quella di `main`) più veloce, senza cambiare il risultato.
   - Thread scelti sui core veri del telefono (core grandi e medi; uno libero se sono tutti grandi): sul Vivo X300 7 invece di 4.
   - Due pezzi di Demucs (e di AudioSep) alla volta, ognuno con metà dei thread, quando il telefono ha abbastanza memoria libera (Demucs 6 GB, AudioSep 3 GB: ogni pezzo di Demucs occupa circa 1,9 GB); i pezzi si sommano in ordine, risultato identico. Se con due pezzi qualcosa fallisce, il passaggio riparte con uno.

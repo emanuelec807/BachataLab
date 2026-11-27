@@ -432,11 +432,18 @@ async function renderSettings() {
   try { models = (await caches.keys()).filter(k => k.startsWith('bachata-models')); } catch (e) {}
   const row = (a, b) => `<div class="setrow"><span class="grow">${a}</span><b>${b}</b></div>`;
   $('setInfo').innerHTML = row(T('Progetti'), n + ' · ' + mb(est.usage || 0)) + row(T('Modelli di separazione'), NATIVE ? T("dentro l'app") : models.length ? T('scaricati') : T('non ancora')) +
-    row(T('Versione'), 'Bachata Lab 7' + (NATIVE ? ' · Android · veloce' : '')) + (!NATIVE && models.length ? '<div class="setrow"><span class="grow">' + T('Libera circa 160 MB (si riscaricano al prossimo progetto)') + '</span><button class="pill" id="delModels">' + T('Elimina modelli') + '</button></div>' : '');
+    row(T('Versione'), 'Bachata Lab 7' + (NATIVE ? ' · Android · veloce' : '')) + (NATIVE ? '<div class="setrow"><span class="grow">' + T('Prova la separazione sulla GPU (solo misura)') + '</span><button class="pill" id="gpuTest">' + T('Test GPU') + '</button></div>' : '') + (!NATIVE && models.length ? '<div class="setrow"><span class="grow">' + T('Libera circa 160 MB (si riscaricano al prossimo progetto)') + '</span><button class="pill" id="delModels">' + T('Elimina modelli') + '</button></div>' : '');
   const ok = await opusOK();
   $('setInfo').insertAdjacentHTML('beforeend', row(T('Compressione delle tracce'), ok ? T('attiva (Opus 128 kb/s)') : T('non disponibile qui')));
   if (ok) $('setInfo').insertAdjacentHTML('beforeend', '<div class="setrow"><span class="grow">' + T('I progetti nuovi sono già compressi (circa 10 volte meno spazio). Quelli fatti prima si comprimono quando li apri, oppure tutti qui.') + '</span><button class="pill" id="packAll">' + T('Comprimi') + '</button></div>');
   if (ok) $('packAll').onclick = packAllProjects;
+  const gt = $('gpuTest'); if (gt) gt.onclick = async () => {
+    gt.disabled = true; toast(T('Test GPU in corso: 2–5 minuti, non chiudere l\'app'), 6000);
+    try { const r = await window.Capacitor.nativePromise('Separator', 'gpuTest', {});
+          const txt = r.device + '\n\n' + r.report, el = textEl(txt); el.style.whiteSpace = 'pre-line'; el.style.fontSize = '13px';
+          if (await dialog(T('Risultato test GPU'), el, [[T('Copia'), 1], ['OK', 0, true]]) === 1) { try { await navigator.clipboard.writeText(txt); toast(T('Copiato')); } catch (e) {} } }
+    catch (e) { await dialog(T('Risultato test GPU'), textEl(String(e && e.message || e)), [['OK', 0, true]]); }
+    gt.disabled = false; };
   const dm = $('delModels'); if (dm) dm.onclick = async () => { for (const k of models) { try { await caches.delete(k); } catch (e) {} } ls.set('modelsCached', false); toast(T('Modelli eliminati')); renderSettings(); };
 }
 document.querySelectorAll('[data-theme]').forEach(b => b.addEventListener('click', () => { ls.set('theme', b.dataset.theme); applyTheme(); renderSettings(); }));
