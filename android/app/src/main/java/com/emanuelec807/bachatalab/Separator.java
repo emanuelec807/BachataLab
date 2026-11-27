@@ -262,11 +262,13 @@ public final class Separator {
     // window): the STFT frames line up with the whole-song ones, so the result is the same, but the
     // memory no longer grows with the length of the song (a full STFT of 4 minutes took about 1 GB).
     static final int SPLIT_SEG = 512 * 2560, SPLIT_PAD = 512 * 8;
-    static void splitDrums(FloatBuffer[] drums, float[] guira44, FloatBuffer[] gu, FloatBuffer[] bo) {
+    static void splitDrums(FloatBuffer[] drums, float[] guira44, FloatBuffer[] gu, FloatBuffer[] bo) { splitDrums(drums, guira44, gu, bo, 0, 0); }
+    /** fLo..fHi (Hz): below fLo nothing moves to the güira, above fHi the full mask, a linear ramp between (0, 0 = no limit). */
+    static void splitDrums(FloatBuffer[] drums, float[] guira44, FloatBuffer[] gu, FloatBuffer[] bo, double fLo, double fHi) {
         int n = drums[0].capacity();
         for (int s = 0; s < n; s += SPLIT_SEG) {
             int a = Math.max(0, s - SPLIT_PAD), b = Math.min(n, s + SPLIT_SEG + SPLIT_PAD), cnt = Math.min(SPLIT_SEG, n - s);
-            float[][][] r = splitBlock(new float[][]{range(drums[0], a, b), range(drums[1], a, b)}, java.util.Arrays.copyOfRange(guira44, a, b));
+            float[][][] r = splitBlock(new float[][]{range(drums[0], a, b), range(drums[1], a, b)}, java.util.Arrays.copyOfRange(guira44, a, b), fLo, fHi);
             for (int c = 0; c < 2; c++) {
                 FloatBuffer g = gu[c].duplicate(); g.position(s); g.put(r[0][c], s - a, cnt);
                 FloatBuffer o = bo[c].duplicate(); o.position(s); o.put(r[1][c], s - a, cnt);
@@ -274,7 +276,8 @@ public final class Separator {
         }
     }
 
-    static float[][][] splitBlock(float[][] drums, float[] guira44) {
+    static float[][][] splitBlock(float[][] drums, float[] guira44) { return splitBlock(drums, guira44, 0, 0); }
+    static float[][][] splitBlock(float[][] drums, float[] guira44, double fLo, double fHi) {
         int nfft = 2048, hop = 512, n = drums[0].length;
         Spec g = stft(guira44, nfft, hop, false);
         float[] gm = new float[g.re.length];
@@ -285,6 +288,7 @@ public final class Separator {
             float[] ar = new float[m], ai = new float[m], br = new float[m], bi = new float[m];
             for (int i = 0; i < m; i++) {
                 float k = (float) Math.min(1, gm[i] / (Math.hypot(z.re[i], z.im[i]) + 1e-8));
+                if (fHi > 0) { double hz = (i / z.T) * (double) SR / nfft; k *= (float) Math.max(0, Math.min(1, (hz - fLo) / (fHi - fLo))); }
                 ar[i] = z.re[i] * k; ai[i] = z.im[i] * k; br[i] = z.re[i] * (1 - k); bi[i] = z.im[i] * (1 - k);
             }
             gu[c] = istft(ar, ai, z.F, z.T, nfft, hop, n, false);

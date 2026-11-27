@@ -33,6 +33,7 @@ public final class MitSeparator {
     // Mega 53 listens to SCNet's "other" (where guitar and piano are) rather than to the whole mix: on the test
     // songs the subtraction other - guitar then leaves no negative copy of the guitar in "altro".
     public static boolean megaOnOther = true;
+    public static double GLO = 1000, GHI = 2000;
 
     private final OrtEnvironment env;
     private final OrtSession scnet, mega, guira;
@@ -167,13 +168,20 @@ public final class MitSeparator {
         FloatBuffer[] bongo, guiraSt;
         if (!withGuira || guira == null) { bongo = drums; guiraSt = new FloatBuffer[]{Separator.newBuf(n), Separator.newBuf(n)}; }
         else {
-            float[] mono = new float[n]; for (int i = 0; i < n; i++) mono[i] = 0.5f * (drums[0].get(i) + drums[1].get(i));
+            // SCNet does not know the güira: part of its scraping lands in "other". AudioSep listens to drums and
+            // "altro" together, and the güira it finds is taken out of both: güira = both parts, bongo and altro clean.
+            float[] mono = new float[n]; for (int i = 0; i < n; i++) mono[i] = 0.5f * (drums[0].get(i) + drums[1].get(i) + other[0].get(i) + other[1].get(i));
             float[] m32 = Separator.resample(mono, SR, Separator.GSR); mono = null;
             float[] g32 = Separator.guiraAll(env, guira, m32, pr, cc); m32 = null;
             float[] g44 = java.util.Arrays.copyOf(Separator.resample(g32, Separator.GSR, SR), n); g32 = null;
             pr.on("split", 0, 0);
             guiraSt = new FloatBuffer[]{Separator.newBuf(n), Separator.newBuf(n)}; bongo = new FloatBuffer[]{Separator.newBuf(n), Separator.newBuf(n)};
-            Separator.splitDrums(drums, g44, guiraSt, bongo);
+            // the güira is a scrape above ~2 kHz: below that nothing moves (otherwise guitar and bongo slipped into it)
+            Separator.splitDrums(drums, g44, guiraSt, bongo, GLO, GHI);
+            FloatBuffer[] gOther = {Separator.newBuf(n), Separator.newBuf(n)}, altroClean = {Separator.newBuf(n), Separator.newBuf(n)};
+            Separator.splitDrums(other, g44, gOther, altroClean, GLO, GHI);
+            for (int c = 0; c < 2; c++) for (int i = 0; i < n; i++) guiraSt[c].put(i, guiraSt[c].get(i) + gOther[c].get(i));
+            other = altroClean;
         }
         Map<String, FloatBuffer[]> res = new LinkedHashMap<>();
         res.put("vocals", vocals); res.put("guitar", guitar); res.put("bass", bass);
