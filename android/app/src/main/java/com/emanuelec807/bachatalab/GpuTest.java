@@ -43,8 +43,19 @@ final class GpuTest {
         return 10 * Math.log10(s / Math.max(e, 1e-30));
     }
 
-    static String run(OrtEnvironment env, File onnx, File tflite, File[] parts, int threads, Log log) throws Exception {
+    static String run(android.content.Context ctx, OrtEnvironment env, File onnx, File tflite, File tiny, File[] parts, int threads, Log log) throws Exception {
         StringBuilder sb = new StringBuilder();
+        // 0) a tiny model (one 256x256 layer): does the GPU work at all? Default environment and one made with the app context.
+        {
+            float[] x = new float[64 * 256]; for (int i = 0; i < x.length; i++) x[i] = (float) Math.sin(i * 0.01);
+            Result c = lite(tiny, x, Accelerator.CPU, null, null);
+            sb.append(c.text("mini · CPU", null)).append('\n');
+            sb.append(lite(tiny, x, Accelerator.GPU, null, null).text("mini · GPU", c.y)).append('\n');
+            com.google.ai.edge.litert.Environment e = null;
+            try { e = com.google.ai.edge.litert.Environment.create(ctx); sb.append(lite(tiny, x, Accelerator.GPU, null, e).text("mini · GPU (ambiente app)", c.y)).append('\n'); }
+            catch (Throwable t) { sb.append("mini · ambiente app: ").append(t.getClass().getSimpleName()).append(": ").append(t.getMessage()).append('\n'); }
+            finally { if (e != null) try { e.close(); } catch (Exception ignored) {} }
+        }
         int[] ft = new int[2]; float[] in = MitSeparator.megaSpec(testAudio(), ft);
         long[] shape = {1, ft[0] * 2, ft[1], 2};
         // 1) processor, ONNX Runtime (what the separation uses today)
@@ -69,7 +80,7 @@ final class GpuTest {
             float[] cpu = null;
             for (Object[] c : CONFIGS) {
                 String name = nm + " · " + c[0]; log.line(name + "…");
-                Result r = lite(part, x, (Accelerator) c[1], (CompiledModel.GpuOptions) c[2]);
+                Result r = lite(part, x, (Accelerator) c[1], (CompiledModel.GpuOptions) c[2], null);
                 if (c[1] == Accelerator.CPU && r.y != null) cpu = r.y;
                 sb.append(r.text(name, cpu)).append('\n');
             }
@@ -78,8 +89,22 @@ final class GpuTest {
         for (Object[] c : CONFIGS) {
             if (c[1] == Accelerator.CPU) continue;
             String name = "Mega intero · " + c[0]; log.line(name + "…");
-            sb.append(lite(tflite, in, Accelerator.GPU, (CompiledModel.GpuOptions) c[2]).text(name, ref)).append('\n');
+            sb.append(lite(tflite, in, Accelerator.GPU, (CompiledModel.GpuOptions) c[2], null).text(name, ref)).append('\n');
         }
+        // what LiteRT wrote in the system log (an app can read its own lines): the real reason of a failure
+        try {
+            Process pr = Runtime.getRuntime().exec(new String[]{"logcat", "-d", "-v", "brief", "-t", "3000"});
+            java.util.ArrayList<String> keep = new java.util.ArrayList<>();
+            try (java.io.BufferedReader br = new java.io.BufferedReader(new java.io.InputStreamReader(pr.getInputStream()))) {
+                String l; while ((l = br.readLine()) != null) {
+                    String lo = l.toLowerCase(java.util.Locale.ROOT);
+                    if (lo.contains("litert") || lo.contains("tflite") || lo.contains("opencl") || lo.contains("gpu") || lo.contains("delegate") || lo.contains("accelerator"))
+                        { keep.add(l.length() > 220 ? l.substring(0, 220) : l); if (keep.size() > 40) keep.remove(0); }
+                }
+            }
+            sb.append("\n— registro di sistema (ultime righe) —\n");
+            for (String l : keep) sb.append(l).append('\n');
+        } catch (Throwable t) { sb.append("registro non leggibile: ").append(t.getMessage()).append('\n'); }
         return sb.toString();
     }
 
@@ -104,13 +129,13 @@ final class GpuTest {
                                  ref != null && ref != y ? String.format(java.util.Locale.ROOT, ", uguale a %.1f dB", snrDb(ref, y)) : "");
         }
     }
-    static Result lite(File model, float[] in, Accelerator acc, CompiledModel.GpuOptions go) {
+    static Result lite(File model, float[] in, Accelerator acc, CompiledModel.GpuOptions go, com.google.ai.edge.litert.Environment env) {
         Result res = new Result(); CompiledModel m = null; List<TensorBuffer> ins = null, outs = null;
         try {
             CompiledModel.Options op = new CompiledModel.Options(acc);
             if (acc == Accelerator.GPU) { op.disableAutoFallbackToCpu(); if (go != null) op.setGpuOptions(go); }
             long t0 = System.nanoTime();
-            m = CompiledModel.create(model.getAbsolutePath(), op);
+            m = env != null ? CompiledModel.create(model.getAbsolutePath(), op, env) : CompiledModel.create(model.getAbsolutePath(), op);
             ins = m.createInputBuffers(); outs = m.createOutputBuffers();
             ins.get(0).writeFloat(in); m.run(ins, outs); res.y = outs.get(0).readFloat();
             res.first = (System.nanoTime() - t0) / 1e9;

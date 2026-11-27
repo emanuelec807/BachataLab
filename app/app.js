@@ -444,7 +444,8 @@ async function renderSettings() {
   const gt = $('gpuTest'); if (gt) gt.onclick = async () => {
     gt.disabled = true; toast(T('Test GPU in corso: 2–5 minuti, non chiudere l\'app'), 6000);
     try { const r = await window.Capacitor.nativePromise('Separator', 'gpuTest', {});
-          { const el = textEl(r.device + '\n\n' + r.report); el.style.whiteSpace = 'pre-line'; await dialog(T('Risultato test GPU'), el, [['OK', 0, true]]); } }
+          { const txt = r.device + '\n\n' + r.report, el = textEl(txt); el.style.whiteSpace = 'pre-line'; el.style.fontSize = '13px';
+            if (await dialog(T('Risultato test GPU'), el, [[T('Copia'), 1], ['OK', 0, true]]) === 1) { try { await navigator.clipboard.writeText(txt); toast(T('Copiato')); } catch (e) {} } } }
     catch (e) { await dialog(T('Risultato test GPU'), textEl(String(e && e.message || e)), [['OK', 0, true]]); }
     gt.disabled = false; };
   const dm = $('delModels'); if (dm) dm.onclick = async () => { for (const k of models) { try { await caches.delete(k); } catch (e) {} } ls.set('modelsCached', false); toast(T('Modelli eliminati')); renderSettings(); };

@@ -97,10 +97,11 @@ public class SeparatorPlugin extends Plugin {
                 Context ctx = getContext();
                 File onnx = modelFile(ctx, "mega"), tfl = assetFile(ctx, "mega.tflite");
                 File[] parts = { assetFile(ctx, "mega_layer_431.tflite"), assetFile(ctx, "mega_layer_64.tflite") };
+                File tiny = assetFile(ctx, "tiny.tflite");
                 String dev = android.os.Build.MANUFACTURER + " " + android.os.Build.MODEL
                     + (android.os.Build.VERSION.SDK_INT >= 31 ? " · " + android.os.Build.SOC_MANUFACTURER + " " + android.os.Build.SOC_MODEL : " · " + android.os.Build.HARDWARE);
                 int t = cpuPlan()[0];
-                String r = GpuTest.run(OrtEnvironment.getEnvironment(), onnx, tfl, parts, t, s -> { stage = "gpu: " + s; });
+                String r = GpuTest.run(ctx, OrtEnvironment.getEnvironment(), onnx, tfl, tiny, parts, t, s -> { stage = "gpu: " + s; });
                 JSObject o = new JSObject(); o.put("device", dev); o.put("report", r); call.resolve(o);
             } catch (Throwable e) { call.reject(e.getClass().getSimpleName() + ": " + e.getMessage()); }
             finally { stage = ""; }
@@ -114,7 +115,7 @@ public class SeparatorPlugin extends Plugin {
         try { android.content.pm.PackageInfo p = ctx.getPackageManager().getPackageInfo(ctx.getPackageName(), 0);
               ver = android.os.Build.VERSION.SDK_INT >= 28 ? p.getLongVersionCode() : p.versionCode; } catch (Exception ignored) {}
         File out = new File(dir, ver + "." + name);
-        if (out.exists() && out.length() > 100_000) return out;
+        if (out.exists() && out.length() > 10_000) return out;
         File[] olds = dir.listFiles((d, f) -> f.endsWith("." + name)); if (olds != null) for (File f : olds) f.delete();
         File tmp = new File(dir, name + ".tmp");
         try (InputStream is = ctx.getAssets().open("public/models/" + name);

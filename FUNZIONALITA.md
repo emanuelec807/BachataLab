@@ -358,6 +358,8 @@ Il conteggio sparisce: si ascolta e si tocca.
 
 ## Registro modifiche
 
+- **27/11/2026 (branch `modelli-mit`)**: secondo test GPU sul Vivo X300: nessuna configurazione compila, neanche uno strato da 64 frame con pesi float32 (quindi non è la grandezza dei dati). Il test ora prova prima un modello minuscolo (un solo strato 256×256), anche con l'ambiente LiteRT creato con il contesto dell'app, e mostra le righe del registro di sistema scritte da LiteRT, con il motivo vero dell'errore. Tasto «Copia» per incollare il risultato.
+
 - **27/11/2026 (branch `modelli-mit`)**: güira che non cambia più spegnendo la voce, meno bongo nella güira.
   - SCNet lasciava parecchia güira nella voce (misurata con AudioSep sopra 2 kHz: +2,8 dB rispetto alla traccia güira; con Demucs −7,9 dB): spegnendo la voce la güira calava. Ora AudioSep ascolta batteria + «Altro» + voce e cerca güira, bongo e voce; la güira viene tolta anche dalla voce, che però la divide con la stima della voce, così le «s» restano nella voce. Su Frío: güira nella voce da +2,8 a −10,3 dB, voce tra 4 e 10 kHz −0,8 dB, bongo dentro la güira da −0,3 a −7,9 dB, somma di tutte le tracce identica. Il passaggio AudioSep richiede circa un terzo in più (sul PC 66 s invece di 50 per minuto di brano).
   - Test GPU: corretto il calcolo della lunghezza dello strato di prova (chiedeva 1,8 GB di memoria).
