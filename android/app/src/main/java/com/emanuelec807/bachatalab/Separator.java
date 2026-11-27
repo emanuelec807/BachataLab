@@ -426,15 +426,22 @@ public final class Separator {
      *  shares the güira mask with AudioSep's voice estimate, so its own sibilants stay where they are. */
     static void splitJoint(FloatBuffer[] drums, FloatBuffer[] other, FloatBuffer[] vocals, float[] guira44, float[] bongo44, float[] voice44,
                            FloatBuffer[] gu, FloatBuffer[] bo, FloatBuffer[] al, FloatBuffer[] vo, double fLo, double fHi, Cancel cc) throws Exception {
-        int n = drums[0].capacity(), blocks = (n + SPLIT_SEG - 1) / SPLIT_SEG;
-        Par.ordered(blocks, javaThreads, (w, k) -> {
-            int s = k * SPLIT_SEG, a = Math.max(0, s - SPLIT_PAD), b = Math.min(n, s + SPLIT_SEG + SPLIT_PAD);
+        // ~10 s blocks (same result as any block length, thanks to the context on each side) and only as many at a
+        // time as the Java heap holds: on the phone the heap is 512 MB, and a 30 s block with the voice took ~0.4 GB
+        final int SEG = 512 * 860, nTr = vocals != null ? 3 : 2;
+        int n = drums[0].capacity(), blocks = (n + SEG - 1) / SEG;
+        long perBlock = (long) ((SEG + 2 * SPLIT_PAD) / 512 + 1) * 1025 * 4 * (12L * nTr + 10) + (long) (SEG + 2 * SPLIT_PAD) * 8 * 6;
+        Runtime rt = Runtime.getRuntime();
+        long free = rt.maxMemory() - (rt.totalMemory() - rt.freeMemory());
+        int workers = (int) Math.max(1, Math.min(javaThreads, (free - 64L * 1024 * 1024) / perBlock));
+        Par.ordered(blocks, workers, (w, k) -> {
+            int s = k * SEG, a = Math.max(0, s - SPLIT_PAD), b = Math.min(n, s + SEG + SPLIT_PAD);
             return splitBlockJoint(new float[][]{range(drums[0], a, b), range(drums[1], a, b)}, new float[][]{range(other[0], a, b), range(other[1], a, b)},
                                    vocals == null ? null : new float[][]{range(vocals[0], a, b), range(vocals[1], a, b)},
                                    java.util.Arrays.copyOfRange(guira44, a, b), bongo44 == null ? null : java.util.Arrays.copyOfRange(bongo44, a, b),
                                    voice44 == null ? null : java.util.Arrays.copyOfRange(voice44, a, b), fLo, fHi);
         }, (k, r) -> {
-            int s = k * SPLIT_SEG, a = Math.max(0, s - SPLIT_PAD), cnt = Math.min(SPLIT_SEG, n - s);
+            int s = k * SEG, a = Math.max(0, s - SPLIT_PAD), cnt = Math.min(SEG, n - s);
             FloatBuffer[][] dst = {gu, bo, al, vo};
             for (int t = 0; t < r.length; t++) for (int c = 0; c < 2; c++) { FloatBuffer g = dst[t][c].duplicate(); g.position(s); g.put(r[t][c], s - a, cnt); }
         }, cc);

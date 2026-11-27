@@ -40,7 +40,7 @@ public class MitCheck {
         so.setCPUArenaAllocator(false); so.setMemoryPatternOptimization(false); so.setOptimizationLevel(OrtSession.SessionOptions.OptLevel.ALL_OPT);
         ss[w] = env.createSession(paths.get(name), so); }
       return ss; };
-    Separator.javaThreads = TH;
+    Separator.javaThreads = Integer.parseInt(System.getProperty("javaThreads", "" + TH));
     float[][] in = readWav(wav, s0, s1);
     Separator.tmpDir = new File("/tmp/septmp"); Separator.tmpDir.mkdirs();
     long t = System.currentTimeMillis(); Map<String, Long> st = new LinkedHashMap<>(); String[] last = {""}; long[] lt = {t};

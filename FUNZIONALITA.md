@@ -358,6 +358,8 @@ Il conteggio sparisce: si ascolta e si tocca.
 
 ## Registro modifiche
 
+- **27/11/2026 (branch `modelli-mit`)**: corretto l'errore a fine «Isolo la güira» (versioni 6.0.27–6.0.30): la divisione güira/bongo/voce lavorava a blocchi di 30 s, quattro alla volta, e con tre tracce superava i 512 MB di memoria Java del telefono. Ora i blocchi sono di 10 s e ne lavorano insieme solo quanti ne entrano nella memoria libera (stesso risultato, verificato con 512 MB). L'errore di memoria non viene più mostrato come «Non riesco a scaricare i modelli».
+
 - **27/11/2026 (branch `modelli-mit`)**: secondo test GPU sul Vivo X300: nessuna configurazione compila, neanche uno strato da 64 frame con pesi float32 (quindi non è la grandezza dei dati). Il test ora prova prima un modello minuscolo (un solo strato 256×256), anche con l'ambiente LiteRT creato con il contesto dell'app, e mostra le righe del registro di sistema scritte da LiteRT, con il motivo vero dell'errore. Tasto «Copia» per incollare il risultato.
 
 - **27/11/2026 (branch `modelli-mit`)**: güira che non cambia più spegnendo la voce, meno bongo nella güira.

@@ -675,7 +675,8 @@ $('createBtn').addEventListener('click', async () => {
     }
     if (m.type === 'error') {
       if (worker) { worker.terminate(); worker = null; } procRunning = false; releaseWake(); clearInterval(procClock);
-      const net = /download|fetch|network|Failed/i.test(m.message);
+      // only a real download problem says so ("Failed to allocate" is memory, not network)
+      const net = /download|fetch|network|Failed to fetch/i.test(m.message) && !/memory|allocat/i.test(m.message);
       await dialog(T('Qualcosa è andato storto'), textEl(net ? T('Non riesco a scaricare i modelli: controlla la connessione e riprova.') : T('La separazione si è fermata ({x}). Prova con una parte più corta.', { x: m.message })), [['OK', 0, true]]);
       go('home');
     }
