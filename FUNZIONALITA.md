@@ -368,6 +368,9 @@ Il conteggio sparisce: si ascolta e si tocca.
   - **Demucs sulla GPU nella separazione vera**: la GPU lavora come un aiutante in più, prende il pezzo successivo appena è libera; se c'è memoria (circa 5 GB liberi) lavora anche il processore su altri pezzi, altrimenti solo la GPU. I pezzi si sommano in ordine: il risultato non dipende da chi ha calcolato cosa.
   - Controllo la prima volta (per versione dell'app): il primo pezzo viene fatto sia dalla GPU sia dal processore e confrontato strumento per strumento; sotto 30 dB la GPU viene esclusa e si usa solo il processore. Se la GPU si rompe durante un brano, Demucs riparte sul processore.
   - Il messaggio di fine separazione dice quanti pezzi ha fatto la GPU e quanti il processore, e l'esito del controllo.
+  - Primo Frío sul telefono (7.0.35): GPU verificata (41 dB), 10 pezzi su 11 fatti dalla GPU.
+  - Due thread si alternano sulla GPU: mentre uno ha la GPU occupata, l'altro prepara il pezzo successivo e rifinisce il precedente (prima la GPU restava ferma durante queste operazioni). La GPU fa comunque un pezzo alla volta.
+  - Il programma GPU compilato viene salvato (una volta per versione dell'app): le separazioni successive non perdono i secondi della compilazione. Il pezzo del controllo iniziale riusa la GPU già pronta.
   - Verificato sul PC con una «GPU» simulata: tracce identiche alla sola CPU in tutti i casi (GPU e CPU insieme, solo GPU, GPU che si rompe, GPU sbagliata al controllo, GPU esclusa).
   - Strumenti: `tools/gpu/` (conversione, pesi float16, elenco operazioni; esperimento float16 con `fp16_where.py`).
 

@@ -47,13 +47,29 @@ final class GpuDemucs implements Separator.Gpu {
         } catch (Exception e) { return 0; }
     }
 
+    /** Compiled GPU programs are kept on storage (key: app version), so only the first separation pays the
+     *  few seconds of compiling; if opening with the saved programs fails they are dropped and it compiles again. */
     @Override public Separator.Engine open() throws Exception {
+        File cache = new File(ctx.getCacheDir(), "gpucache");
+        CompiledModel m;
+        try { m = create(cache); }
+        catch (Exception e) {
+            File[] fs = cache.listFiles(); if (fs != null) for (File f : fs) f.delete();
+            m = create(null);
+        }
+        return engine(m);
+    }
+    private CompiledModel create(File cache) throws Exception {
+        if (cache != null) cache.mkdirs();
         CompiledModel.Options op = new CompiledModel.Options(Accelerator.GPU);
         op.disableAutoFallbackToCpu();
         op.setGpuOptions(new CompiledModel.GpuOptions(null, null, Boolean.TRUE, CompiledModel.GpuOptions.Precision.FP32,
-            CompiledModel.GpuOptions.BufferStorageType.BUFFER, null, null, null, null, null, null, null,
-            CompiledModel.GpuOptions.Backend.OPENCL, null, null));
-        final CompiledModel m = CompiledModel.create(model.getAbsolutePath(), op);
+            CompiledModel.GpuOptions.BufferStorageType.BUFFER, null,
+            cache != null ? cache.getAbsolutePath() : null, cache != null ? key : null, cache != null ? Boolean.TRUE : null,
+            null, null, null, CompiledModel.GpuOptions.Backend.OPENCL, null, null));
+        return CompiledModel.create(model.getAbsolutePath(), op);
+    }
+    private Separator.Engine engine(final CompiledModel m) throws Exception {
         final List<TensorBuffer> ins, outs;
         try { ins = m.createInputBuffers(); outs = m.createOutputBuffers(); }
         catch (Exception e) { m.close(); throw e; }

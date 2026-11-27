@@ -360,31 +360,34 @@ public final class Separator {
      *  has a GPU that passed the check, the GPU too. The pieces are still added up in order, so the result does not
      *  depend on who computed what. If the GPU fails, Demucs is redone on the processor alone. */
     Map<String, FloatBuffer[]> demucsAll(float[] left, float[] right, OrtSession[] ss, Progress pr, Cancel cc) throws Exception {
-        if (gpu == null || Boolean.FALSE.equals(gpu.verified())) { demucsHow = ""; return demucsAll(left, right, ss, false, null, pr, cc); }
-        float[][] first = null;
+        if (gpu == null || Boolean.FALSE.equals(gpu.verified())) { demucsHow = ""; return demucsAll(left, right, ss, false, null, null, pr, cc); }
+        float[][] first = null; Engine kept = null;
         if (gpu.verified() == null) {   // first time on this phone: piece 0 on both, compared instrument by instrument
             int[] T = new int[1]; float[][] in = pieceInput(left, right, 0, left.length, T);
             float[][] c = ortPiece(ss[0], in[0], in[1], T[0]), g = null; String why;
-            try (Engine e = gpu.open()) { g = e.run(in[0], in[1], T[0]); why = null; }
+            try { kept = gpu.open(); g = kept.run(in[0], in[1], T[0]); why = null; }
             catch (Throwable t) { why = t.getClass().getSimpleName() + ": " + t.getMessage(); }
-            if (cc.cancelled()) throw new InterruptedException("cancelled");
+            if (cc.cancelled()) { if (kept != null) kept.close(); throw new InterruptedException("cancelled"); }
             double db = g == null ? -999 : minStemDb(c, g, T[0]);
             boolean ok = g != null && db >= GPU_MIN_DB;
             gpu.verdict(ok, why != null ? why : String.format(java.util.Locale.ROOT, "%.0f dB", db));
-            if (!ok) { demucsHow = ""; return demucsAll(left, right, ss, false, null, pr, cc); }
+            if (!ok) { if (kept != null) kept.close(); demucsHow = ""; return demucsAll(left, right, ss, false, null, null, pr, cc); }
             first = new float[][]{c[0], c[1], {T[0]}};
         }
-        try { return demucsAll(left, right, ss, true, first, pr, cc); }
+        try { return demucsAll(left, right, ss, true, first, kept, pr, cc); }
         catch (GpuFailed e) {   // the GPU failed during this song: the processor does it all again
             if (cc.cancelled()) throw new InterruptedException("cancelled");
             System.gc();
             demucsHow = "GPU non riuscita, solo CPU";
-            return demucsAll(left, right, ss, false, null, pr, cc);
+            return demucsAll(left, right, ss, false, null, null, pr, cc);
         }
     }
 
+    /** GPU workers: two threads share the one GPU, so one prepares its piece (STFT) and finishes the previous one
+     *  (inverse STFT) while the other has the GPU busy; the GPU itself runs one piece at a time. */
+    static final int GPU_WORKERS = 2;
     private Map<String, FloatBuffer[]> demucsAll(float[] left, float[] right, OrtSession[] ss, boolean useGpu, float[][] first,
-                                                  Progress pr, Cancel cc) throws Exception {
+                                                  Engine kept, Progress pr, Cancel cc) throws Exception {
         int total = left.length, overlap = (int) Math.floor(L * OVERLAP), stride = L - overlap;
         final int n = Math.max(1, (int) Math.ceil((double) total / stride));
         float[] win = new float[L]; java.util.Arrays.fill(win, 1f);
@@ -392,20 +395,24 @@ public final class Separator {
         FloatBuffer[][] out = new FloatBuffer[SOURCES.length][2];
         for (int k = 0; k < SOURCES.length; k++) for (int c = 0; c < 2; c++) out[k][c] = newBuf(total);
         float[] wsum = new float[total];
-        // workers 0..nCpu-1: processor sessions; worker nCpu: the GPU
+        // workers 0..nCpu-1: processor sessions; workers nCpu..: threads taking turns on the GPU
         final int nCpu = useGpu ? Math.max(0, Math.min(ss.length, gpu.cpuWorkers(ss.length))) : ss.length;
-        final Engine[] eng = new Engine[1];
+        final Engine[] eng = {kept};
+        final Object gpuLock = new Object();
         final java.util.concurrent.atomic.AtomicInteger onGpu = new java.util.concurrent.atomic.AtomicInteger(), onCpu = new java.util.concurrent.atomic.AtomicInteger();
         try {
-            Par.ordered(n, nCpu + (useGpu ? 1 : 0), (w, i) -> {
+            Par.ordered(n, nCpu + (useGpu ? GPU_WORKERS : 0), (w, i) -> {
                 if (i == 0 && first != null) { onCpu.incrementAndGet(); return new Object[]{demucsIspec(first[0], SOURCES.length, (int) first[2][0]), first[1]}; }
                 int[] T = new int[1]; float[][] in = pieceInput(left, right, i * stride, total, T);
                 float[][] r;
                 if (w < nCpu) { r = ortPiece(ss[w], in[0], in[1], T[0]); onCpu.incrementAndGet(); }
                 else {
                     try {
-                        if (eng[0] == null) eng[0] = gpu.open();
-                        r = eng[0].run(in[0], in[1], T[0]);
+                        synchronized (gpuLock) {
+                            if (cc.cancelled()) throw new InterruptedException("cancelled");
+                            if (eng[0] == null) eng[0] = gpu.open();
+                            r = eng[0].run(in[0], in[1], T[0]);
+                        }
                         for (float v : r[1]) if (Float.isNaN(v) || Float.isInfinite(v)) throw new IllegalStateException("GPU: valori non validi");
                     } catch (InterruptedException e) { throw e; }
                     catch (Throwable t) { throw new GpuFailed(t); }
