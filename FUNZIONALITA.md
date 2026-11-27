@@ -358,6 +358,8 @@ Il conteggio sparisce: si ascolta e si tocca.
 
 ## Registro modifiche
 
+- **27/11/2026 (branch `modelli-mit`)**: primo test GPU sul Vivo X300 (Dimensity 9500): Mega 53 sul processore 6,4 s per pezzo di 5 s (7 thread); LiteRT sulla CPU 12,3 s; sulla GPU il modello non si compila («Failed to compile model»), anche se l'analisi statica lo dà compatibile. Il test ora prova anche un solo strato del modello (431 e 64 frame, pesi float32) e più modi di caricarlo sulla GPU (OpenCL con buffer, float32, OpenGL), per capire cosa la blocca. Il messaggio di fine separazione mostra anche i secondi di ogni passaggio (SCNet, Mega, AudioSep, resto) e resta 10 s.
+
 - **27/11/2026 (branch `modelli-mit`)**: bongo più brillante e test della GPU.
   - Il bongo perdeva le sue «schiocche»: stanno nelle stesse frequenze del raschio della güira, e la güira se le prendeva quasi tutte (bongo −6 dB a 2–5 kHz e −11,5 dB sopra 5 kHz rispetto alla batteria di SCNet). Ora AudioSep ascolta batteria + «Altro» due volte, una cercando la güira e una il bongo, e dove entrambi reclamano la stessa frequenza la batteria la divide in proporzione alle loro energie. Su Frío: bongo +3,6 dB a 2–5 kHz e +7,3 dB sopra 5 kHz, güira circa −6 dB sulle alte, «Altro», voce, chitarra, basso e piano invariati. Un solo modello AudioSep con la descrizione testuale come ingresso fa entrambe le ricerche (l'APK non cresce); il passaggio güira richiede circa il doppio (sul PC +30 s per minuto di brano, circa +13% in tutto).
   - Provata la testa «congas» di Mega 53 per recuperare il bongo: in «Altro» trova poco e non a tempo con il bongo, sulla batteria taglia tutto sopra 5 kHz. Non usata.

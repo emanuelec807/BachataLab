@@ -14,7 +14,7 @@ import java.util.Map;
 
 /**
  * GPU test (branch modelli-mit): the same 5 s piece of Mega 53 on the processor (ONNX Runtime, as in the
- * separation) and through LiteRT on the GPU, and on LiteRT's own CPU path. Reports the time per piece and how
+ * separation) and through LiteRT on the GPU in several ways; one transformer layer alone at full and small size. Reports the time per piece and how
  * far each result is from the processor one (dB: higher = closer). Nothing is kept: it only measures.
  */
 final class GpuTest {
@@ -43,7 +43,7 @@ final class GpuTest {
         return 10 * Math.log10(s / Math.max(e, 1e-30));
     }
 
-    static String run(OrtEnvironment env, File onnx, File tflite, int threads, Log log) throws Exception {
+    static String run(OrtEnvironment env, File onnx, File tflite, File[] parts, int threads, Log log) throws Exception {
         StringBuilder sb = new StringBuilder();
         int[] ft = new int[2]; float[] in = MitSeparator.megaSpec(testAudio(), ft);
         long[] shape = {1, ft[0] * 2, ft[1], 2};
@@ -58,39 +58,72 @@ final class GpuTest {
             double sec = (System.nanoTime() - t) / 2e9;
             sb.append(String.format(java.util.Locale.ROOT, "CPU ONNX Runtime (%d thread): %.2f s per pezzo\n", threads, sec));
         }
-        // 2) LiteRT: GPU (float16 and float32) and its CPU path
-        Object[][] cfgs = {
-            {"GPU", Accelerator.GPU, CompiledModel.GpuOptions.Precision.FP16},
-            {"GPU fp32", Accelerator.GPU, CompiledModel.GpuOptions.Precision.FP32},
-            {"CPU LiteRT", Accelerator.CPU, null}};
-        for (Object[] c : cfgs) {
-            String name = (String) c[0]; log.line(name + "…");
-            CompiledModel m = null; List<TensorBuffer> ins = null, outs = null;
-            try {
-                CompiledModel.Options op = new CompiledModel.Options((Accelerator) c[1]);
-                if (c[1] == Accelerator.GPU) {
-                    op.disableAutoFallbackToCpu();   // a GPU that cannot run the model must say so, not hide behind the CPU
-                    op.setGpuOptions(new CompiledModel.GpuOptions(null, null, null, (CompiledModel.GpuOptions.Precision) c[2], null, null,
-                                                                  null, null, null, null, null, null, null, null, null));
-                }
-                long t0 = System.nanoTime();
-                m = CompiledModel.create(tflite.getAbsolutePath(), op);
-                ins = m.createInputBuffers(); outs = m.createOutputBuffers();
-                ins.get(0).writeFloat(in); m.run(ins, outs); float[] y = outs.get(0).readFloat();
-                double first = (System.nanoTime() - t0) / 1e9;
-                long t = System.nanoTime();
-                for (int r = 0; r < 2; r++) { ins.get(0).writeFloat(in); m.run(ins, outs); y = outs.get(0).readFloat(); }
-                double sec = (System.nanoTime() - t) / 2e9;
-                sb.append(String.format(java.util.Locale.ROOT, "%s: %.2f s per pezzo (preparazione %.1f s), uguale alla CPU a %.1f dB\n", name, sec, first, snrDb(ref, y)));
-            } catch (Throwable e) {
-                sb.append(name).append(": non funziona (").append(e.getClass().getSimpleName()).append(": ").append(String.valueOf(e.getMessage())).append(")\n");
-            } finally {
-                if (ins != null) for (TensorBuffer b : ins) try { b.close(); } catch (Exception ignored) {}
-                if (outs != null) for (TensorBuffer b : outs) try { b.close(); } catch (Exception ignored) {}
-                if (m != null) try { m.close(); } catch (Exception ignored) {}
+        // 2) one transformer layer (float32 weights) at full size and small: does the GPU take it at all, and how?
+        for (File part : parts) {
+            String nm = part.getName().replace("mega_layer_", "strato ").replace(".tflite", " frame");
+            int T = Integer.parseInt(part.getName().replaceAll("\\D+", ""));
+            float[] x = new float[T * 62 * 256]; long seed = 7;
+            for (int i = 0; i < x.length; i++) { seed = seed * 6364136223846793005L + 1442695040888963407L; x[i] = ((seed >>> 40) / (float) (1 << 24) - 0.5f); }
+            float[] cpu = null;
+            for (Object[] c : CONFIGS) {
+                String name = nm + " · " + c[0]; log.line(name + "…");
+                Result r = lite(part, x, (Accelerator) c[1], (CompiledModel.GpuOptions) c[2]);
+                if (c[1] == Accelerator.CPU && r.y != null) cpu = r.y;
+                sb.append(r.text(name, cpu)).append('\n');
             }
         }
+        // 3) the whole Mega 53 (int8 weights) on the GPU, in the different ways LiteRT can load it
+        for (Object[] c : CONFIGS) {
+            if (c[1] == Accelerator.CPU) continue;
+            String name = "Mega intero · " + c[0]; log.line(name + "…");
+            sb.append(lite(tflite, in, Accelerator.GPU, (CompiledModel.GpuOptions) c[2]).text(name, ref)).append('\n');
+        }
         return sb.toString();
+    }
+
+
+    static CompiledModel.GpuOptions gpu(CompiledModel.GpuOptions.Precision p, CompiledModel.GpuOptions.BufferStorageType st,
+                                        CompiledModel.GpuOptions.Backend be) {
+        return new CompiledModel.GpuOptions(null, null, Boolean.TRUE, p, st, null, null, null, null, null, null, null, be, null, null);
+    }
+    static final Object[][] CONFIGS = {
+        {"CPU LiteRT", Accelerator.CPU, null},
+        {"GPU", Accelerator.GPU, gpu(null, null, null)},
+        {"GPU OpenCL buffer", Accelerator.GPU, gpu(null, CompiledModel.GpuOptions.BufferStorageType.BUFFER, CompiledModel.GpuOptions.Backend.OPENCL)},
+        {"GPU OpenCL fp32", Accelerator.GPU, gpu(CompiledModel.GpuOptions.Precision.FP32, CompiledModel.GpuOptions.BufferStorageType.BUFFER, CompiledModel.GpuOptions.Backend.OPENCL)},
+        {"GPU OpenGL", Accelerator.GPU, gpu(null, null, CompiledModel.GpuOptions.Backend.OPENGL)},
+    };
+
+    static final class Result {
+        float[] y; double sec, first; String err;
+        String text(String name, float[] ref) {
+            if (err != null) return name + ": non funziona (" + err + ")";
+            return String.format(java.util.Locale.ROOT, "%s: %.2f s (prima volta %.1f s)%s", name, sec, first,
+                                 ref != null && ref != y ? String.format(java.util.Locale.ROOT, ", uguale a %.1f dB", snrDb(ref, y)) : "");
+        }
+    }
+    static Result lite(File model, float[] in, Accelerator acc, CompiledModel.GpuOptions go) {
+        Result res = new Result(); CompiledModel m = null; List<TensorBuffer> ins = null, outs = null;
+        try {
+            CompiledModel.Options op = new CompiledModel.Options(acc);
+            if (acc == Accelerator.GPU) { op.disableAutoFallbackToCpu(); if (go != null) op.setGpuOptions(go); }
+            long t0 = System.nanoTime();
+            m = CompiledModel.create(model.getAbsolutePath(), op);
+            ins = m.createInputBuffers(); outs = m.createOutputBuffers();
+            ins.get(0).writeFloat(in); m.run(ins, outs); res.y = outs.get(0).readFloat();
+            res.first = (System.nanoTime() - t0) / 1e9;
+            long t = System.nanoTime();
+            for (int r = 0; r < 2; r++) { ins.get(0).writeFloat(in); m.run(ins, outs); res.y = outs.get(0).readFloat(); }
+            res.sec = (System.nanoTime() - t) / 2e9;
+        } catch (Throwable e) {
+            String msg = String.valueOf(e.getMessage()); if (msg.length() > 160) msg = msg.substring(0, 160);
+            res.err = e.getClass().getSimpleName() + ": " + msg; res.y = null;
+        } finally {
+            if (ins != null) for (TensorBuffer b : ins) try { b.close(); } catch (Exception ignored) {}
+            if (outs != null) for (TensorBuffer b : outs) try { b.close(); } catch (Exception ignored) {}
+            if (m != null) try { m.close(); } catch (Exception ignored) {}
+        }
+        return res;
     }
 
     private static float[] ort(OrtEnvironment env, OrtSession s, float[] in, long[] shape) throws Exception {

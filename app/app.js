@@ -442,7 +442,7 @@ async function renderSettings() {
   if (ok) $('setInfo').insertAdjacentHTML('beforeend', '<div class="setrow"><span class="grow">' + T('I progetti nuovi sono già compressi (circa 10 volte meno spazio). Quelli fatti prima si comprimono quando li apri, oppure tutti qui.') + '</span><button class="pill" id="packAll">' + T('Comprimi') + '</button></div>');
   if (ok) $('packAll').onclick = packAllProjects;
   const gt = $('gpuTest'); if (gt) gt.onclick = async () => {
-    gt.disabled = true; toast(T('Test GPU in corso: 1–3 minuti, non chiudere l\'app'), 6000);
+    gt.disabled = true; toast(T('Test GPU in corso: 2–5 minuti, non chiudere l\'app'), 6000);
     try { const r = await window.Capacitor.nativePromise('Separator', 'gpuTest', {});
           { const el = textEl(r.device + '\n\n' + r.report); el.style.whiteSpace = 'pre-line'; await dialog(T('Risultato test GPU'), el, [['OK', 0, true]]); } }
     catch (e) { await dialog(T('Risultato test GPU'), textEl(String(e && e.message || e)), [['OK', 0, true]]); }
@@ -681,7 +681,7 @@ $('createBtn').addEventListener('click', async () => {
     if (m.type === 'done') try {
       if (worker) { worker.terminate(); worker = null; }
       const workS = (Date.now() - tWork) / 1000;
-      if (NATIVE) { ls.set('speedFactorMit', Math.max(0.05, Math.min(10, workS / (dur * nT)))); setTimeout(() => toast(T('Separato in {t} ({x} per minuto di brano)', { t: fmt(workS), x: fmt(workS * 60 / dur) }) + (m.threads ? ' · ' + T('{n} thread, {w} pezzi alla volta', { n: m.threads, w: m.workers || 1 }) : ''), 7000), 1500); } else ls.set(SPEED_KEY(), Math.max(0.05, Math.min(10, workS / (dur * (wD + wG)))));
+      if (NATIVE) { ls.set('speedFactorMit', Math.max(0.05, Math.min(10, workS / (dur * nT)))); setTimeout(() => toast(T('Separato in {t} ({x} per minuto di brano)', { t: fmt(workS), x: fmt(workS * 60 / dur) }) + (m.threads ? ' · ' + T('{n} thread, {w} pezzi alla volta', { n: m.threads, w: m.workers || 1 }) : '') + (m.times ? ' · ' + m.times : ''), 10000), 1500); } else ls.set(SPEED_KEY(), Math.max(0.05, Math.min(10, workS / (dur * (wD + wG)))));
       clearInterval(procClock); setSteps(steps, steps.length - 1); $('procStage').textContent = T('Trovo il ritmo e salvo…'); $('procWhat').textContent = T('Ritmo'); $('procLeft').textContent = T('quasi fatto'); setProgress(1, 0.5);
       const args = { name, stems: m.stems, dur, offset, srcDur, withG, kind, file, thumb };
       for (;;) {
@@ -738,7 +738,7 @@ function nativeWorker() {
               stems[id] = [toF32(a.subarray(0, h)), toF32(a.subarray(h))];
             }
             call('cleanup').catch(() => {});
-            return emit({ type: 'done', stems, threads: s.threads, workers: s.workers });
+            return emit({ type: 'done', stems, threads: s.threads, workers: s.workers, times: s.times });
           }
         }
       } catch (e) { fallback(String(e && e.message || e)); }

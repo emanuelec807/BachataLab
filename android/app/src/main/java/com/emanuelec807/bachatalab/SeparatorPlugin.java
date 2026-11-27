@@ -35,6 +35,7 @@ public class SeparatorPlugin extends Plugin {
     private volatile boolean cancel;
     private volatile String state = "idle", stage = "", error = null;
     private volatile int pi = 0, pn = 0, threads = 1, workers = 1;
+    private volatile String times = "";   // seconds per step of the last separation, for the final message
     private volatile JSObject files = null;
     private volatile int frames = 0;
 
@@ -81,7 +82,7 @@ public class SeparatorPlugin extends Plugin {
     public void status(PluginCall call) {
         JSObject r = new JSObject();
         r.put("state", state); r.put("stage", stage); r.put("i", pi); r.put("n", pn);
-        r.put("threads", threads); r.put("workers", workers); r.put("frames", frames);
+        r.put("threads", threads); r.put("workers", workers); r.put("frames", frames); r.put("times", times);
         if (error != null) r.put("error", error);
         if (files != null) r.put("files", files);
         call.resolve(r);
@@ -95,10 +96,11 @@ public class SeparatorPlugin extends Plugin {
             try {
                 Context ctx = getContext();
                 File onnx = modelFile(ctx, "mega"), tfl = assetFile(ctx, "mega.tflite");
+                File[] parts = { assetFile(ctx, "mega_layer_431.tflite"), assetFile(ctx, "mega_layer_64.tflite") };
                 String dev = android.os.Build.MANUFACTURER + " " + android.os.Build.MODEL
                     + (android.os.Build.VERSION.SDK_INT >= 31 ? " · " + android.os.Build.SOC_MANUFACTURER + " " + android.os.Build.SOC_MODEL : " · " + android.os.Build.HARDWARE);
                 int t = cpuPlan()[0];
-                String r = GpuTest.run(OrtEnvironment.getEnvironment(), onnx, tfl, t, s -> { stage = "gpu: " + s; });
+                String r = GpuTest.run(OrtEnvironment.getEnvironment(), onnx, tfl, parts, t, s -> { stage = "gpu: " + s; });
                 JSObject o = new JSObject(); o.put("device", dev); o.put("report", r); call.resolve(o);
             } catch (Throwable e) { call.reject(e.getClass().getSimpleName() + ": " + e.getMessage()); }
             finally { stage = ""; }
@@ -112,7 +114,7 @@ public class SeparatorPlugin extends Plugin {
         try { android.content.pm.PackageInfo p = ctx.getPackageManager().getPackageInfo(ctx.getPackageName(), 0);
               ver = android.os.Build.VERSION.SDK_INT >= 28 ? p.getLongVersionCode() : p.versionCode; } catch (Exception ignored) {}
         File out = new File(dir, ver + "." + name);
-        if (out.exists() && out.length() > 1_000_000) return out;
+        if (out.exists() && out.length() > 100_000) return out;
         File[] olds = dir.listFiles((d, f) -> f.endsWith("." + name)); if (olds != null) for (File f : olds) f.delete();
         File tmp = new File(dir, name + ".tmp");
         try (InputStream is = ctx.getAssets().open("public/models/" + name);
@@ -214,8 +216,22 @@ public class SeparatorPlugin extends Plugin {
             Separator.tmpDir = tmp;
             state = "running";
             float[][] in = input; input = null; // the separator frees the channels after the first step
+            final java.util.LinkedHashMap<String, Long> ms = new java.util.LinkedHashMap<>();
+            final long[] last = {System.currentTimeMillis()}; final String[] cur = {"scnet"}; times = "";
             Map<String, FloatBuffer[]> stems = new MitSeparator(env, models).separate(in, withGuira,
-                (s, i, n) -> { stage = s; pi = i; pn = n; }, () -> cancel);
+                (s, i, n) -> {
+                    if (!s.equals(cur[0])) { long now = System.currentTimeMillis(); ms.merge(cur[0], now - last[0], Long::sum); last[0] = now; cur[0] = s; }
+                    stage = s; pi = i; pn = n;
+                }, () -> cancel);
+            ms.merge(cur[0], System.currentTimeMillis() - last[0], Long::sum);
+            StringBuilder tb = new StringBuilder();
+            long other = 0;
+            for (Map.Entry<String, Long> e : ms.entrySet()) {
+                String k = e.getKey();
+                if (k.equals("scnet") || k.equals("mega") || k.equals("guira")) tb.append(tb.length() > 0 ? " · " : "").append(k.equals("guira") ? "AudioSep" : k.equals("scnet") ? "SCNet" : "Mega").append(' ').append(Math.round(e.getValue() / 1000.0)).append(" s");
+                else other += e.getValue();
+            }
+            times = tb.append(" · resto ").append(Math.round(other / 1000.0)).append(" s").toString();
             stage = "write"; pi = 0; pn = stems.size();
             File dir = new File(ctx.getFilesDir(), "sep"); dir.mkdirs();
             JSObject fl = new JSObject();
