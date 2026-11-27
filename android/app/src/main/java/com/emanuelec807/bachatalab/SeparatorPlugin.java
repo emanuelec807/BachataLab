@@ -87,6 +87,42 @@ public class SeparatorPlugin extends Plugin {
         call.resolve(r);
     }
 
+    /** GPU test (branch modelli-mit): Mega 53 on the processor and on the GPU, times and difference. */
+    @PluginMethod
+    public void gpuTest(PluginCall call) {
+        if (job != null) { call.reject("busy"); return; }
+        new Thread(() -> {
+            try {
+                Context ctx = getContext();
+                File onnx = modelFile(ctx, "mega"), tfl = assetFile(ctx, "mega.tflite");
+                String dev = android.os.Build.MANUFACTURER + " " + android.os.Build.MODEL
+                    + (android.os.Build.VERSION.SDK_INT >= 31 ? " · " + android.os.Build.SOC_MANUFACTURER + " " + android.os.Build.SOC_MODEL : " · " + android.os.Build.HARDWARE);
+                int t = cpuPlan()[0];
+                String r = GpuTest.run(OrtEnvironment.getEnvironment(), onnx, tfl, t, s -> { stage = "gpu: " + s; });
+                JSObject o = new JSObject(); o.put("device", dev); o.put("report", r); call.resolve(o);
+            } catch (Throwable e) { call.reject(e.getClass().getSimpleName() + ": " + e.getMessage()); }
+            finally { stage = ""; }
+        }, "gputest").start();
+    }
+
+    /** Copies a web-asset file into app storage once per app version (like the models). */
+    private File assetFile(Context ctx, String name) throws Exception {
+        File dir = new File(ctx.getFilesDir(), "models"); dir.mkdirs();
+        long ver = 0;
+        try { android.content.pm.PackageInfo p = ctx.getPackageManager().getPackageInfo(ctx.getPackageName(), 0);
+              ver = android.os.Build.VERSION.SDK_INT >= 28 ? p.getLongVersionCode() : p.versionCode; } catch (Exception ignored) {}
+        File out = new File(dir, ver + "." + name);
+        if (out.exists() && out.length() > 1_000_000) return out;
+        File[] olds = dir.listFiles((d, f) -> f.endsWith("." + name)); if (olds != null) for (File f : olds) f.delete();
+        File tmp = new File(dir, name + ".tmp");
+        try (InputStream is = ctx.getAssets().open("public/models/" + name);
+             OutputStream os = new BufferedOutputStream(new FileOutputStream(tmp), 1 << 20)) {
+            byte[] buf = new byte[1 << 20]; int r; while ((r = is.read(buf)) > 0) os.write(buf, 0, r);
+        }
+        if (!tmp.renameTo(out)) throw new Exception("asset " + name);
+        return out;
+    }
+
     @PluginMethod
     public void cancel(PluginCall call) { cancel = true; call.resolve(); }
 
@@ -132,7 +168,7 @@ public class SeparatorPlugin extends Plugin {
      *  only when the phone has that twice over plus a margin free right now. */
     private int workersFor(Context ctx, String name) {
         if (threads < 4) return 1;
-        long need = (name.equals("mega") ? 5632L : name.equals("scnet") ? 4608L : 3072L) * 1024 * 1024;
+        long need = (name.equals("mega") ? 5632L : name.equals("scnet") ? 4608L : 3072L) * 1024 * 1024;   // asep: 3 GB
         try {
             android.app.ActivityManager am = (android.app.ActivityManager) ctx.getSystemService(Context.ACTIVITY_SERVICE);
             android.app.ActivityManager.MemoryInfo mi = new android.app.ActivityManager.MemoryInfo(); am.getMemoryInfo(mi);
@@ -146,12 +182,13 @@ public class SeparatorPlugin extends Plugin {
             stage = "models"; pi = 0; pn = withGuira ? 3 : 2;
             File sm = modelFile(ctx, "scnet"); pi = 1;
             File mm = modelFile(ctx, "mega"); pi = 2;
-            File gm = withGuira ? modelFile(ctx, "guira") : null; pi = pn;
+            File gm = withGuira ? modelFile(ctx, "asep") : null; pi = pn;
+            if (withGuira) { MitSeparator.condGuira = assetFloats(ctx, "cond_guira.f32"); MitSeparator.condBongo = assetFloats(ctx, "cond_bongo.f32"); }
             OrtEnvironment env = OrtEnvironment.getEnvironment();
             threads = cpuPlan()[0];
             Separator.javaThreads = Math.min(4, threads);
             java.util.Map<String, File> modelFiles = new java.util.HashMap<>();
-            modelFiles.put("scnet", sm); modelFiles.put("mega", mm); if (gm != null) modelFiles.put("guira", gm);
+            modelFiles.put("scnet", sm); modelFiles.put("mega", mm); if (gm != null) modelFiles.put("asep", gm);
             // each model is opened just before its step (one session per worker) and closed after it
             MitSeparator.Models models = (name, max) -> {
                 File f = modelFiles.get(name); if (f == null) return null;
@@ -196,6 +233,16 @@ public class SeparatorPlugin extends Plugin {
         } finally {
             job = null;
         }
+    }
+
+    /** A small float32 little-endian file from the web assets (AudioSep text conditions); null if missing. */
+    private static float[] assetFloats(Context ctx, String name) {
+        try (InputStream is = ctx.getAssets().open("public/models/" + name)) {
+            ByteArrayOutputStream bo = new ByteArrayOutputStream(); byte[] buf = new byte[8192]; int r;
+            while ((r = is.read(buf)) > 0) bo.write(buf, 0, r);
+            FloatBuffer fb = ByteBuffer.wrap(bo.toByteArray()).order(ByteOrder.LITTLE_ENDIAN).asFloatBuffer();
+            float[] a = new float[fb.remaining()]; fb.get(a); return a;
+        } catch (Exception e) { return null; }
     }
 
     /** Planar int16 little-endian: all of the left channel, then all of the right. */

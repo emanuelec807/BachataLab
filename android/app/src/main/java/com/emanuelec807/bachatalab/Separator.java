@@ -343,6 +343,47 @@ public final class Separator {
         return out;
     }
 
+    /** AudioSep with the text condition as an input (branch modelli-mit): every 5 s window is separated once per
+     *  condition (güira, bongo, ...) by the same network. Result [condition][sample], 32 kHz. */
+    static float[][] asepAll(OrtEnvironment env, OrtSession[] ss, float[] mono32, float[][] conds, Progress pr, Cancel cc) throws Exception {
+        int total = mono32.length, NL = (int) Math.round(GCTX * GSR), NR = NL, Q = conds.length;
+        float[][] out = new float[Q][total];
+        java.util.List<Integer> all = new java.util.ArrayList<>();
+        int cur = 0, NC = GWIN - NL - NR; while (cur + GWIN < total) { all.add(cur); cur += NC; }
+        int tail = cur < total ? cur : -1; if (tail >= 0) all.add(tail);
+        final int count = all.size();
+        Par.ordered(count, ss.length, (w, i) -> {
+            int s = all.get(i); float[] chunk = new float[GWIN];
+            System.arraycopy(mono32, s, chunk, 0, Math.min(GWIN, total - s));
+            float[][] ys = new float[Q][];
+            for (int q = 0; q < Q; q++) {
+                float[] d; long[] dims;
+                try (OnnxTensor tc = OnnxTensor.createTensor(env, FloatBuffer.wrap(chunk), new long[]{1, 1, GWIN});
+                     OnnxTensor tq = OnnxTensor.createTensor(env, FloatBuffer.wrap(conds[q]), new long[]{1, conds[q].length})) {
+                    Map<String, OnnxTensor> feeds = new HashMap<>(); feeds.put("chunk", tc); feeds.put("cond", tq);
+                    try (OrtSession.Result r = ss[w].run(feeds)) {
+                        OnnxTensor g = (OnnxTensor) r.get(0); dims = g.getInfo().getShape(); d = toArray(g);
+                    }
+                }
+                int T = (int) dims[2], F = (int) dims[3];
+                float[] re = new float[F * T], im = new float[F * T];
+                for (int t = 0; t < T; t++) for (int f = 0; f < F; f++) { re[f * T + t] = d[t * F + f]; im[f * T + t] = d[T * F + t * F + f]; }
+                ys[q] = istft(re, im, F, T, GNFFT, GHOP, GWIN, false);
+            }
+            return ys;
+        }, (i, ys) -> {
+            int s = all.get(i);
+            for (int q = 0; q < Q; q++) {
+                float[] y = ys[q], o = out[q];
+                if (i == count - 1 && s == tail) { int segLen = Math.min(GWIN, total - s); for (int j = NL; j < segLen; j++) o[s + j] = y[j]; }
+                else if (s == 0) { for (int j = 0; j < GWIN - NR; j++) o[j] = y[j]; }
+                else { for (int j = NL; j < GWIN - NR; j++) o[s + j] = y[j]; }
+            }
+            pr.on("guira", i + 1, count);
+        }, cc);
+        return out;
+    }
+
     // The güira mask is computed on blocks of ~30 s (plus 8 hops of context on each side, more than a
     // window): the STFT frames line up with the whole-song ones, so the result is the same, but the
     // memory no longer grows with the length of the song (a full STFT of 4 minutes took about 1 GB).
@@ -374,24 +415,32 @@ public final class Separator {
      *  Two separate masks (one per track) could take up to twice the güira estimate out of them: the drums
      *  (bongo) lost too much of their high end. fLo..fHi: below fLo nothing moves, a linear ramp up to fHi. */
     static void splitJoint(FloatBuffer[] drums, FloatBuffer[] other, float[] guira44, FloatBuffer[] gu, FloatBuffer[] bo, FloatBuffer[] al,
+                           double fLo, double fHi, Cancel cc) throws Exception { splitJoint(drums, other, guira44, null, gu, bo, al, fLo, fHi, cc); }
+    /** bongo44 (may be null): AudioSep's bongo estimate. Where güira and bongo both claim a frequency (the bongo's
+     *  slaps sit where the güira scrapes), it is shared by their energies: k *= |G|^2 / (|G|^2 + |B|^2). */
+    static void splitJoint(FloatBuffer[] drums, FloatBuffer[] other, float[] guira44, float[] bongo44, FloatBuffer[] gu, FloatBuffer[] bo, FloatBuffer[] al,
                            double fLo, double fHi, Cancel cc) throws Exception {
         int n = drums[0].capacity(), blocks = (n + SPLIT_SEG - 1) / SPLIT_SEG;
         Par.ordered(blocks, javaThreads, (w, k) -> {
             int s = k * SPLIT_SEG, a = Math.max(0, s - SPLIT_PAD), b = Math.min(n, s + SPLIT_SEG + SPLIT_PAD);
             return splitBlockJoint(new float[][]{range(drums[0], a, b), range(drums[1], a, b)}, new float[][]{range(other[0], a, b), range(other[1], a, b)},
-                                   java.util.Arrays.copyOfRange(guira44, a, b), fLo, fHi);
+                                   java.util.Arrays.copyOfRange(guira44, a, b), bongo44 == null ? null : java.util.Arrays.copyOfRange(bongo44, a, b), fLo, fHi);
         }, (k, r) -> {
             int s = k * SPLIT_SEG, a = Math.max(0, s - SPLIT_PAD), cnt = Math.min(SPLIT_SEG, n - s);
             FloatBuffer[][] dst = {gu, bo, al};
             for (int t = 0; t < 3; t++) for (int c = 0; c < 2; c++) { FloatBuffer g = dst[t][c].duplicate(); g.position(s); g.put(r[t][c], s - a, cnt); }
         }, cc);
     }
-    static float[][][] splitBlockJoint(float[][] drums, float[][] other, float[] guira44, double fLo, double fHi) {
+    static float[][][] splitBlockJoint(float[][] drums, float[][] other, float[] guira44, float[] bongo44, double fLo, double fHi) {
         int nfft = 2048, hop = 512, n = drums[0].length;
         Spec g = stft(guira44, nfft, hop, false);
-        float[] gm = new float[g.re.length];
+        float[] gm = new float[g.re.length], share = null;
         for (int i = 0; i < gm.length; i++) gm[i] = (float) Math.hypot(g.re[i], g.im[i]);
         g = null;
+        if (bongo44 != null) {
+            Spec bs = stft(bongo44, nfft, hop, false); share = new float[gm.length];
+            for (int i = 0; i < gm.length; i++) { double gg = (double) gm[i] * gm[i], bb = (double) bs.re[i] * bs.re[i] + (double) bs.im[i] * bs.im[i]; share[i] = (float) (gg / (gg + bb + 1e-12)); }
+        }
         Spec[] zd = stft2(drums[0], drums[1], nfft, hop, false), zo = stft2(other[0], other[1], nfft, hop, false);
         int m = zd[0].re.length, F = zd[0].F, T = zd[0].T;
         float[][] gr = new float[2][m], gi = new float[2][m], dr = new float[2][m], di = new float[2][m], or = new float[2][m], oi = new float[2][m];
@@ -401,8 +450,9 @@ public final class Separator {
                 float sr = d.re[i] + o.re[i], si = d.im[i] + o.im[i];
                 float k = (float) Math.min(1, gm[i] / (Math.hypot(sr, si) + 1e-8));
                 if (fHi > 0) { double hz = (i / T) * (double) SR / nfft; k *= (float) Math.max(0, Math.min(1, (hz - fLo) / (fHi - fLo))); }
-                gr[c][i] = sr * k; gi[c][i] = si * k;
-                dr[c][i] = d.re[i] * (1 - k); di[c][i] = d.im[i] * (1 - k);
+                float kd = share != null ? k * share[i] : k;   // only the drums share with the bongo: "altro" has no bongo
+                gr[c][i] = d.re[i] * kd + o.re[i] * k; gi[c][i] = d.im[i] * kd + o.im[i] * k;
+                dr[c][i] = d.re[i] * (1 - kd); di[c][i] = d.im[i] * (1 - kd);
                 or[c][i] = o.re[i] * (1 - k); oi[c][i] = o.im[i] * (1 - k);
             }
         }

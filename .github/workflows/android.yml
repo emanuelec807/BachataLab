@@ -82,16 +82,12 @@ jobs:
           python3 - <<'PY'
           import base64, glob, os
           d = 'android/app/src/main/assets/public/models'
-          for name in ('guira',):
-              parts = sorted(glob.glob(f'{d}/{name}.*.b64.txt'), key=lambda p: int(p.split('.')[-3]))
-              raw = b''.join(base64.b64decode(open(p, 'rb').read().strip()) for p in parts)
-              open(f'{d}/{name}.onnx', 'wb').write(raw)
-              for p in parts: os.remove(p)
-              print(name, len(parts), 'parti ->', len(raw), 'byte')
-          # branch modelli-mit: no Demucs in the APK, only MIT models (SCNet, Mega 53 reduced, AudioSep)
-          for p in glob.glob(f'{d}/demucs6.*.b64.txt'): os.remove(p)
           import shutil
-          for name in ('scnet', 'mega'): shutil.copy(f'models-mit/{name}.onnx', f'{d}/{name}.onnx')
+          # branch modelli-mit: no Demucs and no fixed-query güira model in the APK, only MIT models:
+          # SCNet, Mega 53 reduced, AudioSep with the text condition as input (+ the conditions), Mega for the GPU test
+          for p in glob.glob(f'{d}/demucs6.*.b64.txt') + glob.glob(f'{d}/guira.*.b64.txt'): os.remove(p)
+          for name in ('scnet', 'mega', 'asep'): shutil.copy(f'models-mit/{name}.onnx', f'{d}/{name}.onnx')
+          for f in glob.glob('models-mit/cond_*.f32') + glob.glob('models-mit/*.tflite'): shutil.copy(f, d)
           print(sorted(os.listdir(d)))
           PY
 

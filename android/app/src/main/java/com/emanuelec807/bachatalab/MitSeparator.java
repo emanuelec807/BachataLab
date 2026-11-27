@@ -36,6 +36,8 @@ public final class MitSeparator {
     // Mega 53 listens to SCNet's "other" (where guitar and piano are) rather than to the whole mix: on the test
     // songs the subtraction other - guitar then leaves no negative copy of the guitar in "altro".
     public static boolean megaOnOther = true;
+    /** AudioSep text conditions (512 values each, from tools/mit/export_audiosep.py); the bongo one may be null. */
+    public static float[] condGuira, condBongo;
     public static double GLO = 1000, GHI = 2000;
 
     /** Opens the sessions of one model, one per worker (null: model not available). Each model is opened just
@@ -148,18 +150,24 @@ public final class MitSeparator {
     // ---------- Mega 53 (guitar, piano) ----------
     // Mega works only where there is something to separate: a chunk of "altro" much quieter than the song
     // (intro without guitar, breaks with only percussion) gives silent guitar and piano without running the model.
+    /** Mega's input: [1, F*2 (freq-major, stereo interleaved), T, 2 (re, im)]; ft receives F and T. */
+    static float[] megaSpec(float[][] ch, int[] ft) {
+        Separator.Spec[] z = Separator.stft2(ch[0], ch[1], MG_NFFT, MG_HOP, false);
+        int F = z[0].F, T = z[0].T; ft[0] = F; ft[1] = T;
+        float[] in = new float[F * 2 * T * 2];
+        for (int f = 0; f < F; f++) for (int s = 0; s < 2; s++) for (int t = 0; t < T; t++) {
+            int o = (((f * 2 + s) * T) + t) * 2; in[o] = z[s].re[f * T + t]; in[o + 1] = z[s].im[f * T + t];
+        }
+        return in;
+    }
     double megaGate = 0;
     final java.util.concurrent.atomic.AtomicInteger megaSkipped = new java.util.concurrent.atomic.AtomicInteger();
     float[][][] megaChunk(OrtSession mega, float[][] ch) throws Exception {
         int L = ch[0].length;
         double e = 0; for (float[] c : ch) for (float v : c) e += v * v;
         if (Math.sqrt(e / (2.0 * L)) < megaGate) { megaSkipped.incrementAndGet(); return new float[MG_HEADS.length][2][L]; }
-        Separator.Spec[] z = Separator.stft2(ch[0], ch[1], MG_NFFT, MG_HOP, false);
-        int F = z[0].F, T = z[0].T;
-        float[] in = new float[F * 2 * T * 2];   // [1, F*2 (freq-major, stereo interleaved), T, 2 (re, im)]
-        for (int f = 0; f < F; f++) for (int s = 0; s < 2; s++) for (int t = 0; t < T; t++) {
-            int o = (((f * 2 + s) * T) + t) * 2; in[o] = z[s].re[f * T + t]; in[o + 1] = z[s].im[f * T + t];
-        }
+        int[] ft = new int[2]; float[] in = megaSpec(ch, ft);
+        int F = ft[0], T = ft[1];
         float[] out; long[] shape;
         try (OnnxTensor t = OnnxTensor.createTensor(env, FloatBuffer.wrap(in), new long[]{1, F * 2, T, 2})) {
             Map<String, OnnxTensor> feeds = new HashMap<>(); feeds.put("spec", t);
@@ -206,23 +214,26 @@ public final class MitSeparator {
         for (int c = 0; c < 2; c++) for (int i = 0; i < n; i++) other[c].put(i, other[c].get(i) - guitar[c].get(i));   // altro = other - guitar
         pr.on("resample", 0, 0);
         FloatBuffer[] bongo, guiraSt;
-        float[] g32 = null; final float[] m32;
-        if (withGuira) {
+        float[][] est = null; final float[] m32;
+        if (withGuira && condGuira != null) {
             // SCNet does not know the güira: part of its scraping lands in "other". AudioSep listens to drums and
-            // "altro" together, and the güira it finds is taken out of both: güira = both parts, bongo and altro clean.
+            // "altro" together, once asked for the güira and once for the bongo; the güira is taken out of both tracks
+            // with one mask, shared with the bongo where both claim the same frequencies (the bongo keeps its slaps).
             float[] mono = new float[n]; for (int i = 0; i < n; i++) mono[i] = 0.5f * (drums[0].get(i) + drums[1].get(i) + other[0].get(i) + other[1].get(i));
             m32 = Separator.resample(mono, SR, Separator.GSR); mono = null;
-            g32 = withModel("guira", gss -> Separator.guiraAll(env, gss, m32, pr, cc));
+            final float[][] conds = condBongo != null ? new float[][]{condGuira, condBongo} : new float[][]{condGuira};
+            est = withModel("asep", ss -> Separator.asepAll(env, ss, m32, conds, pr, cc));
         }
-        if (g32 == null) { bongo = drums; guiraSt = new FloatBuffer[]{Separator.newBuf(n), Separator.newBuf(n)}; }
+        if (est == null) { bongo = drums; guiraSt = new FloatBuffer[]{Separator.newBuf(n), Separator.newBuf(n)}; }
         else {
-            float[] g44 = java.util.Arrays.copyOf(Separator.resample(g32, Separator.GSR, SR), n); g32 = null;
+            float[] g44 = java.util.Arrays.copyOf(Separator.resample(est[0], Separator.GSR, SR), n);
+            float[] b44 = est.length > 1 ? java.util.Arrays.copyOf(Separator.resample(est[1], Separator.GSR, SR), n) : null;
+            est = null;
             pr.on("split", 0, 0);
             guiraSt = new FloatBuffer[]{Separator.newBuf(n), Separator.newBuf(n)}; bongo = new FloatBuffer[]{Separator.newBuf(n), Separator.newBuf(n)};
             FloatBuffer[] altroClean = {Separator.newBuf(n), Separator.newBuf(n)};
-            // one mask on drums + altro together (what AudioSep listened to); the güira is a scrape above ~2 kHz:
-            // below that nothing moves (otherwise guitar and bongo slipped into it)
-            Separator.splitJoint(drums, other, g44, guiraSt, bongo, altroClean, GLO, GHI, cc);
+            // below ~1-2 kHz nothing moves (otherwise guitar and bongo slipped into the güira)
+            Separator.splitJoint(drums, other, g44, b44, guiraSt, bongo, altroClean, GLO, GHI, cc);
             other = altroClean;
         }
         Map<String, FloatBuffer[]> res = new LinkedHashMap<>();

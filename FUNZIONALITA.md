@@ -358,6 +358,11 @@ Il conteggio sparisce: si ascolta e si tocca.
 
 ## Registro modifiche
 
+- **27/11/2026 (branch `modelli-mit`)**: bongo più brillante e test della GPU.
+  - Il bongo perdeva le sue «schiocche»: stanno nelle stesse frequenze del raschio della güira, e la güira se le prendeva quasi tutte (bongo −6 dB a 2–5 kHz e −11,5 dB sopra 5 kHz rispetto alla batteria di SCNet). Ora AudioSep ascolta batteria + «Altro» due volte, una cercando la güira e una il bongo, e dove entrambi reclamano la stessa frequenza la batteria la divide in proporzione alle loro energie. Su Frío: bongo +3,6 dB a 2–5 kHz e +7,3 dB sopra 5 kHz, güira circa −6 dB sulle alte, «Altro», voce, chitarra, basso e piano invariati. Un solo modello AudioSep con la descrizione testuale come ingresso fa entrambe le ricerche (l'APK non cresce); il passaggio güira richiede circa il doppio (sul PC +30 s per minuto di brano, circa +13% in tutto).
+  - Provata la testa «congas» di Mega 53 per recuperare il bongo: in «Altro» trova poco e non a tempo con il bongo, sulla batteria taglia tutto sopra 5 kHz. Non usata.
+  - Impostazioni → «Test GPU»: lo stesso pezzo di 5 s di Mega 53 sul processore (ONNX Runtime) e sulla GPU con LiteRT (float16 e float32) e sulla CPU di LiteRT; mostra il tempo per pezzo e quanto il risultato si discosta da quello del processore. Serve solo a misurare: la separazione resta sul processore. Modello LiteRT con pesi int8 (62 MB, `models-mit/mega.tflite`, script `tools/mit/export_litert.py`).
+
 - **27/11/2026 (branch `modelli-mit`)**: correzioni dopo una revisione esterna del codice (verificate una per una).
   - Güira tolta da batteria e «Altro» con **una sola maschera** calcolata sulla loro somma: prima due maschere separate potevano togliere fino al doppio della stima. Effetto misurato piccolo (bongo +0,3–0,4 dB sopra i 2 kHz).
   - «Riprova» dopo un salvataggio fallito non toglie più il piano da «Altro» una seconda volta.

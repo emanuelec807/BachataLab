@@ -188,7 +188,7 @@
     'Traduzione in {x}': 'Translation into {x}', 'Traduzione spenta': 'Translation off', 'Trascrizione della voce': 'Vocals transcription',
     'Separo voce, basso, batteria e altro': 'Separating vocals, bass, drums and other', 'Separo chitarra e piano': 'Separating guitar and piano',
     'Separo voce, basso, batteria e altro: parte {i} di {n}': 'Separating vocals, bass, drums and other: part {i} of {n}',
-    'Separo chitarra e piano: parte {i} di {n}': 'Separating guitar and piano: part {i} of {n}', 'modelli MIT': 'MIT models', 'Separato in {t} ({x} per minuto di brano)': 'Separated in {t} ({x} per minute of song)', '{n} thread, {w} pezzi alla volta': '{n} threads, {w} parts at a time',
+    'Separo chitarra e piano: parte {i} di {n}': 'Separating guitar and piano: part {i} of {n}', 'modelli MIT': 'MIT models', 'Separato in {t} ({x} per minuto di brano)': 'Separated in {t} ({x} per minute of song)', '{n} thread, {w} pezzi alla volta': '{n} threads, {w} parts at a time', 'Test GPU in corso: 1–3 minuti, non chiudere l\'app': 'GPU test running: 1–3 minutes, keep the app open', 'Risultato test GPU': 'GPU test result', 'Prova la separazione sulla GPU (solo misura)': 'Try the separation on the GPU (measurement only)', 'Test GPU': 'GPU test',
   };
 
   const ES = {
@@ -363,7 +363,7 @@
     'Traduzione in {x}': 'Traducción al {x}', 'Traduzione spenta': 'Traducción desactivada', 'Trascrizione della voce': 'Transcripción de la voz',
     'Separo voce, basso, batteria e altro': 'Separando voz, bajo, batería y otros', 'Separo chitarra e piano': 'Separando guitarra y piano',
     'Separo voce, basso, batteria e altro: parte {i} di {n}': 'Separando voz, bajo, batería y otros: parte {i} de {n}',
-    'Separo chitarra e piano: parte {i} di {n}': 'Separando guitarra y piano: parte {i} de {n}', 'modelli MIT': 'modelos MIT', 'Separato in {t} ({x} per minuto di brano)': 'Separado en {t} ({x} por minuto de canción)', '{n} thread, {w} pezzi alla volta': '{n} hilos, {w} partes a la vez',
+    'Separo chitarra e piano: parte {i} di {n}': 'Separando guitarra y piano: parte {i} de {n}', 'modelli MIT': 'modelos MIT', 'Separato in {t} ({x} per minuto di brano)': 'Separado en {t} ({x} por minuto de canción)', '{n} thread, {w} pezzi alla volta': '{n} hilos, {w} partes a la vez', 'Test GPU in corso: 1–3 minuti, non chiudere l\'app': 'Prueba de GPU en curso: 1–3 minutos, no cierres la app', 'Risultato test GPU': 'Resultado de la prueba de GPU', 'Prova la separazione sulla GPU (solo misura)': 'Prueba la separación en la GPU (solo medición)', 'Test GPU': 'Prueba GPU',
   };
   const DICT = { en: EN, es: ES };
 
