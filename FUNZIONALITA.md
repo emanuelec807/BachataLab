@@ -358,6 +358,17 @@ Il conteggio sparisce: si ascolta e si tocca.
 
 ## Registro modifiche
 
+- **27/11/2026 (branch `modelli-mit`)**: correzioni dopo una revisione esterna del codice (verificate una per una).
+  - Güira tolta da batteria e «Altro» con **una sola maschera** calcolata sulla loro somma: prima due maschere separate potevano togliere fino al doppio della stima. Effetto misurato piccolo (bongo +0,3–0,4 dB sopra i 2 kHz).
+  - «Riprova» dopo un salvataggio fallito non toglie più il piano da «Altro» una seconda volta.
+  - Il piano, quando è una traccia sua, entra nell'analisi degli accordi che trova l'1.
+  - Allenamento: un tocco perfettamente a tempo non può più essere contato due volte.
+  - Il nome dello strumento in «Altro» non può più passare da un progetto al successivo.
+  - Tracce Opus: il ritardo del decoder viene misurato prima della prima decodifica della sessione.
+  - Se si avvia una separazione subito dopo averne annullata una, l'app aspetta che la precedente finisca invece di dare errore.
+  - Se un passaggio con due pezzi alla volta fallisce (memoria), riparte da solo con uno.
+  - Tolto codice irraggiungibile; aggiunto `THIRD_PARTY_NOTICES.md` con le licenze di modelli e librerie.
+
 - **27/11/2026 (branch `modelli-mit`)**: separazione MIT più veloce senza perdere qualità. Sul PC di prova 171 s per minuto di brano invece di 232 (−27%).
   - Mega 53 riesportato con l'attenzione e la normalizzazione come operatori unici di ONNX Runtime (stessi calcoli, senza la matrice di attenzione da ~0,4 GB per strato) e pesi int8 con una scala per canale invece di una per matrice. Rispetto al modello a piena precisione, a parità di lavoro, il risultato è più fedele: chitarra 32,5 dB invece di 25,5, «Altro» 30,1 invece di 23,1, güira 33,8 invece di 30,2. File da 85 a 61 MB, −0,3 GB di memoria.
   - Due pezzi di brano alla volta, ognuno con metà dei thread, per SCNet, Mega e güira: i pezzi vengono comunque sommati in ordine, quindi il risultato è identico a farli uno per volta. Serve memoria (due pezzi di Mega insieme occupano circa 3,4 GB): l'app li fa insieme solo se in quel momento il telefono ha abbastanza memoria libera (Mega 5,5 GB, SCNet 4,5 GB, güira 3 GB), altrimenti uno alla volta. Anche uno alla volta: 188 s invece di 232 (−19%).

@@ -369,6 +369,50 @@ public final class Separator {
         }, cc);
     }
 
+    /** Güira taken out of drums and "altro" together, with ONE mask computed on their sum (what AudioSep heard):
+     *  k = min(1, |G| / |D + O|), then güira = k (D + O), bongo = (1 - k) D, altro = (1 - k) O.
+     *  Two separate masks (one per track) could take up to twice the güira estimate out of them: the drums
+     *  (bongo) lost too much of their high end. fLo..fHi: below fLo nothing moves, a linear ramp up to fHi. */
+    static void splitJoint(FloatBuffer[] drums, FloatBuffer[] other, float[] guira44, FloatBuffer[] gu, FloatBuffer[] bo, FloatBuffer[] al,
+                           double fLo, double fHi, Cancel cc) throws Exception {
+        int n = drums[0].capacity(), blocks = (n + SPLIT_SEG - 1) / SPLIT_SEG;
+        Par.ordered(blocks, javaThreads, (w, k) -> {
+            int s = k * SPLIT_SEG, a = Math.max(0, s - SPLIT_PAD), b = Math.min(n, s + SPLIT_SEG + SPLIT_PAD);
+            return splitBlockJoint(new float[][]{range(drums[0], a, b), range(drums[1], a, b)}, new float[][]{range(other[0], a, b), range(other[1], a, b)},
+                                   java.util.Arrays.copyOfRange(guira44, a, b), fLo, fHi);
+        }, (k, r) -> {
+            int s = k * SPLIT_SEG, a = Math.max(0, s - SPLIT_PAD), cnt = Math.min(SPLIT_SEG, n - s);
+            FloatBuffer[][] dst = {gu, bo, al};
+            for (int t = 0; t < 3; t++) for (int c = 0; c < 2; c++) { FloatBuffer g = dst[t][c].duplicate(); g.position(s); g.put(r[t][c], s - a, cnt); }
+        }, cc);
+    }
+    static float[][][] splitBlockJoint(float[][] drums, float[][] other, float[] guira44, double fLo, double fHi) {
+        int nfft = 2048, hop = 512, n = drums[0].length;
+        Spec g = stft(guira44, nfft, hop, false);
+        float[] gm = new float[g.re.length];
+        for (int i = 0; i < gm.length; i++) gm[i] = (float) Math.hypot(g.re[i], g.im[i]);
+        g = null;
+        Spec[] zd = stft2(drums[0], drums[1], nfft, hop, false), zo = stft2(other[0], other[1], nfft, hop, false);
+        int m = zd[0].re.length, F = zd[0].F, T = zd[0].T;
+        float[][] gr = new float[2][m], gi = new float[2][m], dr = new float[2][m], di = new float[2][m], or = new float[2][m], oi = new float[2][m];
+        for (int c = 0; c < 2; c++) {
+            Spec d = zd[c], o = zo[c];
+            for (int i = 0; i < m; i++) {
+                float sr = d.re[i] + o.re[i], si = d.im[i] + o.im[i];
+                float k = (float) Math.min(1, gm[i] / (Math.hypot(sr, si) + 1e-8));
+                if (fHi > 0) { double hz = (i / T) * (double) SR / nfft; k *= (float) Math.max(0, Math.min(1, (hz - fLo) / (fHi - fLo))); }
+                gr[c][i] = sr * k; gi[c][i] = si * k;
+                dr[c][i] = d.re[i] * (1 - k); di[c][i] = d.im[i] * (1 - k);
+                or[c][i] = o.re[i] * (1 - k); oi[c][i] = o.im[i] * (1 - k);
+            }
+        }
+        zd = null; zo = null;
+        return new float[][][]{
+            istft2(gr[0], gi[0], gr[1], gi[1], F, T, nfft, hop, n, false),
+            istft2(dr[0], di[0], dr[1], di[1], F, T, nfft, hop, n, false),
+            istft2(or[0], oi[0], or[1], oi[1], F, T, nfft, hop, n, false)};
+    }
+
     static float[][][] splitBlock(float[][] drums, float[] guira44) { return splitBlock(drums, guira44, 0, 0); }
     static float[][][] splitBlock(float[][] drums, float[] guira44, double fLo, double fHi) {
         int nfft = 2048, hop = 512, n = drums[0].length;

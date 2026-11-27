@@ -153,9 +153,9 @@ public class SeparatorPlugin extends Plugin {
             java.util.Map<String, File> modelFiles = new java.util.HashMap<>();
             modelFiles.put("scnet", sm); modelFiles.put("mega", mm); if (gm != null) modelFiles.put("guira", gm);
             // each model is opened just before its step (one session per worker) and closed after it
-            MitSeparator.Models models = name -> {
+            MitSeparator.Models models = (name, max) -> {
                 File f = modelFiles.get(name); if (f == null) return null;
-                int w = workersFor(ctx, name); if (name.equals("mega")) workers = w;
+                int w = Math.min(max, workersFor(ctx, name)); if (name.equals("mega")) workers = w;
                 OrtSession[] ss = new OrtSession[w];
                 try {
                     for (int k = 0; k < w; k++) {

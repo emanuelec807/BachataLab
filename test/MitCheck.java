@@ -32,7 +32,7 @@ public class MitCheck {
     String megaPath = System.getProperty("mega", M + "mega.onnx");
     Map<String, String> paths = new HashMap<>(); paths.put("scnet", M + "scnet.onnx"); paths.put("mega", megaPath); paths.put("guira", "/home/claude/bachata/onnx/guira_h.onnx");
     int MW = Integer.parseInt(System.getProperty("megaWorkers", "" + W));
-    MitSeparator.Models models = name -> { int nw = name.equals("mega") ? MW : W; OrtSession[] ss = new OrtSession[nw];
+    MitSeparator.Models models = (name, max) -> { int nw = Math.min(max, name.equals("mega") ? MW : W); OrtSession[] ss = new OrtSession[nw];
       for (int w = 0; w < nw; w++) { OrtSession.SessionOptions so = new OrtSession.SessionOptions(); so.setIntraOpNumThreads(Math.max(1, TH / nw + (w < TH % nw ? 1 : 0)));
         so.setCPUArenaAllocator(false); so.setMemoryPatternOptimization(false); so.setOptimizationLevel(OrtSession.SessionOptions.OptLevel.ALL_OPT);
         ss[w] = env.createSession(paths.get(name), so); }

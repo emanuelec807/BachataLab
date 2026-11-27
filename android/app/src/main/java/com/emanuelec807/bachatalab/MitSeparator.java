@@ -40,7 +40,7 @@ public final class MitSeparator {
 
     /** Opens the sessions of one model, one per worker (null: model not available). Each model is opened just
      *  before its step and closed right after, so only one model at a time takes memory. */
-    public interface Models { OrtSession[] open(String name) throws Exception; }
+    public interface Models { OrtSession[] open(String name, int maxWorkers) throws Exception; }
 
     private final OrtEnvironment env;
     private final Models models;
@@ -48,7 +48,7 @@ public final class MitSeparator {
     public MitSeparator(OrtEnvironment env, Models models) { this.env = env; this.models = models; }
     /** single sessions, kept open (desktop checks) */
     public MitSeparator(OrtEnvironment env, OrtSession scnet, OrtSession mega, OrtSession guira) {
-        this(env, name -> { OrtSession s = name.equals("scnet") ? scnet : name.equals("mega") ? mega : guira;
+        this(env, (name, max) -> { OrtSession s = name.equals("scnet") ? scnet : name.equals("mega") ? mega : guira;
                             return s == null ? null : new OrtSession[]{s}; });
         keepOpen = true;
     }
@@ -56,6 +56,22 @@ public final class MitSeparator {
     private void close(OrtSession[] ss) {
         if (keepOpen || ss == null) return;
         for (OrtSession x : ss) try { if (x != null) x.close(); } catch (Exception ignored) {}
+    }
+
+    interface Stage<R> { R run(OrtSession[] ss) throws Exception; }
+    /** Opens a model, runs its step and closes it. If the step fails with two sessions at a time (memory can
+     *  run short on the phone), it is redone from the start with one session. */
+    private <R> R withModel(String name, Stage<R> st) throws Exception {
+        OrtSession[] ss = models.open(name, 2);
+        if (ss == null) return null;
+        try { return st.run(ss); }
+        catch (InterruptedException e) { throw e; }
+        catch (Exception | OutOfMemoryError e) {
+            if (ss.length < 2) throw e;
+            close(ss); ss = null; System.gc();
+            OrtSession[] one = models.open(name, 1);
+            try { return st.run(one); } finally { close(one); }
+        } finally { close(ss); }
     }
 
     interface ChunkModel { float[][][] run(int worker, float[][] chunk) throws Exception; }   // [stems][2][len]
@@ -172,47 +188,41 @@ public final class MitSeparator {
         final float mean = (float) (sum / n), std = (float) Math.max(1e-8, Math.sqrt(Math.max(0, sq / n - (sum / n) * (sum / n))));
         // SCNet: input normalized (inference.normalize in its config), output brought back to the original scale
         pr.on("scnet", 0, 1);
-        final OrtSession[] scs = models.open("scnet");
-        FloatBuffer[][] sc;
-        try {
-            sc = demix(mix, n, SC_CH, scStep, 4, scs.length, (w, ch) -> {
+        final FloatBuffer[] mixF = mix;
+        FloatBuffer[][] sc = withModel("scnet", scs -> demix(mixF, n, SC_CH, scStep, 4, scs.length, (w, ch) -> {
                 for (float[] x : ch) for (int i = 0; i < x.length; i++) x[i] = (x[i] - mean) / std;
                 float[][][] y = scnetChunk(scs[w], ch);
                 for (float[][] s : y) for (float[] x : s) for (int i = 0; i < x.length; i++) x[i] = x[i] * std + mean;
                 return y;
-            }, "scnet", pr, cc);
-        } finally { close(scs); }
+            }, "scnet", pr, cc));
         FloatBuffer[] drums = sc[0], bass = sc[1], other = sc[2], vocals = sc[3];
         { FloatBuffer[] src = megaOnOther ? other : mix; double e = 0; for (FloatBuffer c : src) for (int i = 0; i < n; i++) { float v = c.get(i); e += v * v; }
           megaGate = 0.03 * Math.sqrt(e / (2.0 * n)); }   // -30 dB under the song's level
         pr.on("mega", 0, 1);
-        final OrtSession[] mgs = models.open("mega");
-        FloatBuffer[][] mg;
-        try { mg = demix(megaOnOther ? other : mix, n, mgChunk, mgStep, MG_HEADS.length, mgs.length, (w, ch) -> megaChunk(mgs[w], ch), "mega", pr, cc); }
-        finally { close(mgs); }
+        final FloatBuffer[] mgIn = megaOnOther ? other : mix;
+        FloatBuffer[][] mg = withModel("mega", mgs -> demix(mgIn, n, mgChunk, mgStep, MG_HEADS.length, mgs.length, (w, ch) -> megaChunk(mgs[w], ch), "mega", pr, cc));
         mix = null;
         FloatBuffer[] guitar = mg[0], piano = mg[1];
         for (int c = 0; c < 2; c++) for (int i = 0; i < n; i++) other[c].put(i, other[c].get(i) - guitar[c].get(i));   // altro = other - guitar
         pr.on("resample", 0, 0);
         FloatBuffer[] bongo, guiraSt;
-        OrtSession[] gss = withGuira ? models.open("guira") : null;
-        if (gss == null) { bongo = drums; guiraSt = new FloatBuffer[]{Separator.newBuf(n), Separator.newBuf(n)}; }
-        else {
+        float[] g32 = null; final float[] m32;
+        if (withGuira) {
             // SCNet does not know the güira: part of its scraping lands in "other". AudioSep listens to drums and
             // "altro" together, and the güira it finds is taken out of both: güira = both parts, bongo and altro clean.
             float[] mono = new float[n]; for (int i = 0; i < n; i++) mono[i] = 0.5f * (drums[0].get(i) + drums[1].get(i) + other[0].get(i) + other[1].get(i));
-            float[] m32 = Separator.resample(mono, SR, Separator.GSR); mono = null;
-            float[] g32;
-            try { g32 = Separator.guiraAll(env, gss, m32, pr, cc); } finally { close(gss); }
-            m32 = null;
+            m32 = Separator.resample(mono, SR, Separator.GSR); mono = null;
+            g32 = withModel("guira", gss -> Separator.guiraAll(env, gss, m32, pr, cc));
+        }
+        if (g32 == null) { bongo = drums; guiraSt = new FloatBuffer[]{Separator.newBuf(n), Separator.newBuf(n)}; }
+        else {
             float[] g44 = java.util.Arrays.copyOf(Separator.resample(g32, Separator.GSR, SR), n); g32 = null;
             pr.on("split", 0, 0);
             guiraSt = new FloatBuffer[]{Separator.newBuf(n), Separator.newBuf(n)}; bongo = new FloatBuffer[]{Separator.newBuf(n), Separator.newBuf(n)};
-            // the güira is a scrape above ~2 kHz: below that nothing moves (otherwise guitar and bongo slipped into it)
-            Separator.splitDrums(drums, g44, guiraSt, bongo, GLO, GHI, cc);
-            FloatBuffer[] gOther = {Separator.newBuf(n), Separator.newBuf(n)}, altroClean = {Separator.newBuf(n), Separator.newBuf(n)};
-            Separator.splitDrums(other, g44, gOther, altroClean, GLO, GHI, cc);
-            for (int c = 0; c < 2; c++) for (int i = 0; i < n; i++) guiraSt[c].put(i, guiraSt[c].get(i) + gOther[c].get(i));
+            FloatBuffer[] altroClean = {Separator.newBuf(n), Separator.newBuf(n)};
+            // one mask on drums + altro together (what AudioSep listened to); the güira is a scrape above ~2 kHz:
+            // below that nothing moves (otherwise guitar and bongo slipped into it)
+            Separator.splitJoint(drums, other, g44, guiraSt, bongo, altroClean, GLO, GHI, cc);
             other = altroClean;
         }
         Map<String, FloatBuffer[]> res = new LinkedHashMap<>();
