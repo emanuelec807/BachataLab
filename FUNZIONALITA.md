@@ -358,6 +358,10 @@ Il conteggio sparisce: si ascolta e si tocca.
 
 ## Registro modifiche
 
+- **27/11/2026 (branch `modelli-mit`)**: güira che non cambia più spegnendo la voce, meno bongo nella güira.
+  - SCNet lasciava parecchia güira nella voce (misurata con AudioSep sopra 2 kHz: +2,8 dB rispetto alla traccia güira; con Demucs −7,9 dB): spegnendo la voce la güira calava. Ora AudioSep ascolta batteria + «Altro» + voce e cerca güira, bongo e voce; la güira viene tolta anche dalla voce, che però la divide con la stima della voce, così le «s» restano nella voce. Su Frío: güira nella voce da +2,8 a −10,3 dB, voce tra 4 e 10 kHz −0,8 dB, bongo dentro la güira da −0,3 a −7,9 dB, somma di tutte le tracce identica. Il passaggio AudioSep richiede circa un terzo in più (sul PC 66 s invece di 50 per minuto di brano).
+  - Test GPU: corretto il calcolo della lunghezza dello strato di prova (chiedeva 1,8 GB di memoria).
+
 - **27/11/2026 (branch `modelli-mit`)**: primo test GPU sul Vivo X300 (Dimensity 9500): Mega 53 sul processore 6,4 s per pezzo di 5 s (7 thread); LiteRT sulla CPU 12,3 s; sulla GPU il modello non si compila («Failed to compile model»), anche se l'analisi statica lo dà compatibile. Il test ora prova anche un solo strato del modello (431 e 64 frame, pesi float32) e più modi di caricarlo sulla GPU (OpenCL con buffer, float32, OpenGL), per capire cosa la blocca. Il messaggio di fine separazione mostra anche i secondi di ogni passaggio (SCNet, Mega, AudioSep, resto) e resta 10 s.
 
 - **27/11/2026 (branch `modelli-mit`)**: bongo più brillante e test della GPU.

@@ -60,8 +60,10 @@ final class GpuTest {
         }
         // 2) one transformer layer (float32 weights) at full size and small: does the GPU take it at all, and how?
         for (File part : parts) {
-            String nm = part.getName().replace("mega_layer_", "strato ").replace(".tflite", " frame");
-            int T = Integer.parseInt(part.getName().replaceAll("\\D+", ""));
+            // the stored file is "<app version>.mega_layer_<frames>.tflite": the frames come after "mega_layer_"
+            String fn = part.getName(), fr = fn.substring(fn.indexOf("mega_layer_") + 11, fn.indexOf(".tflite"));
+            String nm = "strato " + fr + " frame";
+            int T = Integer.parseInt(fr);
             float[] x = new float[T * 62 * 256]; long seed = 7;
             for (int i = 0; i < x.length; i++) { seed = seed * 6364136223846793005L + 1442695040888963407L; x[i] = ((seed >>> 40) / (float) (1 << 24) - 0.5f); }
             float[] cpu = null;

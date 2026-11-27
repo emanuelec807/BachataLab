@@ -33,7 +33,7 @@ public class MitCheck {
     Map<String, String> paths = new HashMap<>(); paths.put("scnet", M + "scnet.onnx"); paths.put("mega", megaPath); paths.put("asep", System.getProperty("asep", "/home/claude/bachatalab/models-mit/asep.onnx"));
     java.util.function.Function<String, float[]> rf = f -> { try { FloatBuffer fb = ByteBuffer.wrap(Files.readAllBytes(Paths.get(f))).order(ByteOrder.LITTLE_ENDIAN).asFloatBuffer(); float[] x = new float[fb.remaining()]; fb.get(x); return x; } catch (Exception e) { return null; } };
     MitSeparator.condGuira = rf.apply("/home/claude/bachatalab/models-mit/cond_guira.f32");
-    if (!"0".equals(System.getProperty("bongo", "1"))) MitSeparator.condBongo = rf.apply("/home/claude/bachatalab/models-mit/cond_bongo.f32");
+    if (!"0".equals(System.getProperty("bongo", "1"))) MitSeparator.condBongo = rf.apply("/home/claude/bachatalab/models-mit/cond_bongo.f32"); if (!"0".equals(System.getProperty("voce", "1"))) MitSeparator.condVoce = rf.apply("/home/claude/bachatalab/models-mit/cond_voce.f32");
     int MW = Integer.parseInt(System.getProperty("megaWorkers", "" + W));
     MitSeparator.Models models = (name, max) -> { int nw = Math.min(max, name.equals("mega") ? MW : W); OrtSession[] ss = new OrtSession[nw];
       for (int w = 0; w < nw; w++) { OrtSession.SessionOptions so = new OrtSession.SessionOptions(); so.setIntraOpNumThreads(Math.max(1, TH / nw + (w < TH % nw ? 1 : 0)));

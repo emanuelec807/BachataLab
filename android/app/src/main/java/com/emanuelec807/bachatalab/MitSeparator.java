@@ -37,7 +37,7 @@ public final class MitSeparator {
     // songs the subtraction other - guitar then leaves no negative copy of the guitar in "altro".
     public static boolean megaOnOther = true;
     /** AudioSep text conditions (512 values each, from tools/mit/export_audiosep.py); the bongo one may be null. */
-    public static float[] condGuira, condBongo;
+    public static float[] condGuira, condBongo, condVoce;
     public static double GLO = 1000, GHI = 2000;
 
     /** Opens the sessions of one model, one per worker (null: model not available). Each model is opened just
@@ -219,22 +219,28 @@ public final class MitSeparator {
             // SCNet does not know the güira: part of its scraping lands in "other". AudioSep listens to drums and
             // "altro" together, once asked for the güira and once for the bongo; the güira is taken out of both tracks
             // with one mask, shared with the bongo where both claim the same frequencies (the bongo keeps its slaps).
-            float[] mono = new float[n]; for (int i = 0; i < n; i++) mono[i] = 0.5f * (drums[0].get(i) + drums[1].get(i) + other[0].get(i) + other[1].get(i));
+            // the voice too: SCNet leaves part of the güira in its vocals (heard as güira that drops when the voice is muted)
+            final boolean voice = condBongo != null && condVoce != null;
+            float[] mono = new float[n];
+            for (int i = 0; i < n; i++) mono[i] = 0.5f * (drums[0].get(i) + drums[1].get(i) + other[0].get(i) + other[1].get(i) + (voice ? vocals[0].get(i) + vocals[1].get(i) : 0));
             m32 = Separator.resample(mono, SR, Separator.GSR); mono = null;
-            final float[][] conds = condBongo != null ? new float[][]{condGuira, condBongo} : new float[][]{condGuira};
+            final float[][] conds = voice ? new float[][]{condGuira, condBongo, condVoce} : condBongo != null ? new float[][]{condGuira, condBongo} : new float[][]{condGuira};
             est = withModel("asep", ss -> Separator.asepAll(env, ss, m32, conds, pr, cc));
         }
         if (est == null) { bongo = drums; guiraSt = new FloatBuffer[]{Separator.newBuf(n), Separator.newBuf(n)}; }
         else {
             float[] g44 = java.util.Arrays.copyOf(Separator.resample(est[0], Separator.GSR, SR), n);
             float[] b44 = est.length > 1 ? java.util.Arrays.copyOf(Separator.resample(est[1], Separator.GSR, SR), n) : null;
+            float[] v44 = est.length > 2 ? java.util.Arrays.copyOf(Separator.resample(est[2], Separator.GSR, SR), n) : null;
             est = null;
             pr.on("split", 0, 0);
             guiraSt = new FloatBuffer[]{Separator.newBuf(n), Separator.newBuf(n)}; bongo = new FloatBuffer[]{Separator.newBuf(n), Separator.newBuf(n)};
             FloatBuffer[] altroClean = {Separator.newBuf(n), Separator.newBuf(n)};
             // below ~1-2 kHz nothing moves (otherwise guitar and bongo slipped into the güira)
-            Separator.splitJoint(drums, other, g44, b44, guiraSt, bongo, altroClean, GLO, GHI, cc);
+            FloatBuffer[] voClean = v44 != null ? new FloatBuffer[]{Separator.newBuf(n), Separator.newBuf(n)} : null;
+            Separator.splitJoint(drums, other, v44 != null ? vocals : null, g44, b44, v44, guiraSt, bongo, altroClean, voClean, GLO, GHI, cc);
             other = altroClean;
+            if (voClean != null) vocals = voClean;
         }
         Map<String, FloatBuffer[]> res = new LinkedHashMap<>();
         res.put("vocals", vocals); res.put("guitar", guitar); res.put("bass", bass);

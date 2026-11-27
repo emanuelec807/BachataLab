@@ -185,7 +185,7 @@ public class SeparatorPlugin extends Plugin {
             File sm = modelFile(ctx, "scnet"); pi = 1;
             File mm = modelFile(ctx, "mega"); pi = 2;
             File gm = withGuira ? modelFile(ctx, "asep") : null; pi = pn;
-            if (withGuira) { MitSeparator.condGuira = assetFloats(ctx, "cond_guira.f32"); MitSeparator.condBongo = assetFloats(ctx, "cond_bongo.f32"); }
+            if (withGuira) { MitSeparator.condGuira = assetFloats(ctx, "cond_guira.f32"); MitSeparator.condBongo = assetFloats(ctx, "cond_bongo.f32"); MitSeparator.condVoce = assetFloats(ctx, "cond_voce.f32"); }
             OrtEnvironment env = OrtEnvironment.getEnvironment();
             threads = cpuPlan()[0];
             Separator.javaThreads = Math.min(4, threads);

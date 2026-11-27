@@ -13,7 +13,7 @@ from numpy.core.multiarray import scalar as _np_scalar
 torch.serialization.add_safe_globals([(_np_scalar, 'numpy.core.multiarray.scalar'), _np_scalar, np.dtype, type(np.dtype('float64'))])
 from pipeline import build_audiosep
 
-QUERIES = {'guira': 'guiro scraping metal scraper', 'bongo': 'bongo drums hand percussion'}
+QUERIES = {'guira': 'guiro scraping metal scraper', 'bongo': 'bongo drums hand percussion', 'voce': 'singing voice'}
 WIN = 160000  # NL+NC+NR = 1+3+1 s at 32 kHz, same window as chunk_inference
 OUT = sys.argv[1] if len(sys.argv) > 1 else '/home/claude/mit/onnx'
 os.makedirs(OUT, exist_ok=True)

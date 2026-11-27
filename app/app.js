@@ -48,7 +48,7 @@ const COST = { demucs: 2.4, guira: 2.4 };
 // Android app, MIT models (branch modelli-mit): seconds per second of audio measured on a 2-core PC (Java + ONNX Runtime):
 // SCNet 1.0, Mega 53 (guitar, piano; int8, 5 s chunks with only the fade in common) 1.95, güira 0.42.
 // The phone's own factor is learned after the first project.
-const NCOST = { scnet: 1.0, mega: 1.95, guira: 0.84 };   // güira: AudioSep asked twice (güira, bongo)
+const NCOST = { scnet: 1.0, mega: 1.95, guira: 1.26 };   // AudioSep asked three times (güira, bongo, voice)
 const MARK_NAMES = ['Intro', 'Derecho', 'Majao', 'Mambo', 'Break', T('Finale')];
 const PIANO_MIX = 0.03, PIANO_ALTRO = 0.35; // piano share of the whole song and of Altro to show it as a track
 const SR = 44100, MAX_FILE = 350e6, TAP_LAG = 0.15;
