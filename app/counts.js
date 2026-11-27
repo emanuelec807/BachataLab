@@ -1,6 +1,6 @@
 /* Counts: where the 1 falls, phrase by phrase.
    In bachata the chords change on the 1 and on the 5. For every beat we measure how much the harmony
-   (guitar + bass + other) changes there, and how strong the bass is. A Viterbi pass over the beats then
+   (guitar + bass + other + piano) changes there, and how strong the bass is. A Viterbi pass over the beats then
    follows the count 1..8: normally each beat is the next count, but the count may jump (a 2- or 4-beat
    break, a bar added or skipped) when several phrases in a row clearly agree on the new position.
    Result: anchors [{i, c}] = beat i has count c (0 = the 1), the count goes on from there. */
@@ -8,7 +8,8 @@
   'use strict';
   function features(stems, beats, n, SR, Sep) {
     const harm = new Float32Array(n);
-    for (const id of ['guitar', 'bass', 'altro']) { const [L, R] = stems[id]; for (let i = 0; i < n; i++) harm[i] += (L[i] + R[i]) * 0.5; }
+    // the piano too when it is a track of its own (it was taken out of Altro)
+    for (const id of ['guitar', 'bass', 'altro', 'piano']) { if (!stems[id]) continue; const [L, R] = stems[id]; for (let i = 0; i < n; i++) harm[i] += (L[i] + R[i]) * 0.5; }
     const NF = 8192, HOP = 2048, z = Sep.stft(harm, NF, HOP, false), bins = [];
     for (let f = 1; f < z.F; f++) { const hz = f * SR / NF; if (hz >= 55 && hz <= 1800) bins.push([f, ((Math.round(12 * Math.log2(hz / 440)) % 12) + 12) % 12]); }
     const chroma = (t0, t1) => { const c = new Float64Array(12), f0 = Math.max(0, Math.floor(t0 * SR / HOP)), f1 = Math.min(z.T, Math.ceil(t1 * SR / HOP));

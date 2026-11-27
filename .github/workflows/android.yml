@@ -1,9 +1,9 @@
-name: APK Android
+name: APK Android (veloce)
 
 # Builds the Android app (Capacitor) from app/ and publishes the APK as a GitHub Release.
 on:
   push:
-    branches: [main]
+    branches: [veloce]
     paths:
       - 'app/**'
       - 'android/**'
@@ -17,7 +17,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: apk
+  group: apk-veloce
   cancel-in-progress: true
 
 jobs:
@@ -25,7 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 40
     env:
-      VERSION_NAME: 5.0.${{ github.run_number }}
+      VERSION_NAME: 7.0.${{ github.run_number }}-veloce
     steps:
       - uses: actions/checkout@v4
 
@@ -89,6 +89,12 @@ jobs:
               print(name, len(parts), 'parti ->', len(raw), 'byte')
           PY
 
+      - name: App di prova separata (si installa accanto a quella normale)
+        run: |
+          sed -i 's/applicationId "com.emanuelec807.bachatalab"/applicationId "com.emanuelec807.bachatalab.veloce"/' android/app/build.gradle
+          sed -i 's#<string name="app_name">Bachata Lab</string>#<string name="app_name">Bachata Lab Veloce</string>#; s#<string name="title_activity_main">Bachata Lab</string>#<string name="title_activity_main">Bachata Lab Veloce</string>#' android/app/src/main/res/values/strings.xml
+          grep -n applicationId android/app/build.gradle; grep app_name android/app/src/main/res/values/strings.xml
+
       - name: Compila l'APK
         working-directory: android
         run: |
@@ -129,10 +135,11 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: apk-${{ env.VERSION_NAME }}
-          name: Bachata Lab ${{ env.VERSION_NAME }} (APK Android)
+          name: Bachata Lab Veloce ${{ env.VERSION_NAME }} (APK di prova)
           body: |
             APK Android costruito da `${{ github.sha }}`.
             Scarica il file `.apk` qui sotto dal telefono e aprilo per installarlo
             (la prima volta Android chiede di consentire l'installazione da questa fonte).
           files: BachataLab-*.apk
-          make_latest: true
+          make_latest: false
+          prerelease: true

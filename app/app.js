@@ -78,7 +78,7 @@ const vibrate = ms => { try { navigator.vibrate && navigator.vibrate(ms); } catc
 
 // ---------- toast, busy overlay, dialog ----------
 let toastT;
-function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), 2200); }
+function toast(msg, ms) { const t = $('toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), ms || 2200); }
 function busy(msg) { $('busyT').textContent = msg || ''; $('busy').classList.toggle('on', !!msg); }
 let dlgResolve = null;
 function closeDialog(val) { if (!dlgResolve) return; const r = dlgResolve; dlgResolve = null; $('dlg').classList.remove('on'); r(val); }
@@ -194,6 +194,7 @@ async function opusOK() {
 // Stored tracks -> float tracks, whatever the format (old projects: 16-bit PCM)
 async function stemsF32(st, ids) {
   // all tracks decoded at the same time: the browser decodes in parallel, opening is several times faster
+  if (st.codec === 'opus') await opusOK();   // the decoder delay is measured before the first decode of the session
   const out = {}, list = (ids || Object.keys(st.data)).filter(id => st.data[id]);
   const res = await Promise.all(list.map(id => st.codec === 'opus' ? decodeStem(st.data[id], st.n) : [toF32(st.data[id][0]), toF32(st.data[id][1])]));
   list.forEach((id, k) => { out[id] = res[k]; });
@@ -431,7 +432,7 @@ async function renderSettings() {
   try { models = (await caches.keys()).filter(k => k.startsWith('bachata-models')); } catch (e) {}
   const row = (a, b) => `<div class="setrow"><span class="grow">${a}</span><b>${b}</b></div>`;
   $('setInfo').innerHTML = row(T('Progetti'), n + ' · ' + mb(est.usage || 0)) + row(T('Modelli di separazione'), NATIVE ? T("dentro l'app") : models.length ? T('scaricati') : T('non ancora')) +
-    row(T('Versione'), 'Bachata Lab 6' + (NATIVE ? ' · Android' : '')) + (!NATIVE && models.length ? '<div class="setrow"><span class="grow">' + T('Libera circa 160 MB (si riscaricano al prossimo progetto)') + '</span><button class="pill" id="delModels">' + T('Elimina modelli') + '</button></div>' : '');
+    row(T('Versione'), 'Bachata Lab 7' + (NATIVE ? ' · Android · veloce' : '')) + (!NATIVE && models.length ? '<div class="setrow"><span class="grow">' + T('Libera circa 160 MB (si riscaricano al prossimo progetto)') + '</span><button class="pill" id="delModels">' + T('Elimina modelli') + '</button></div>' : '');
   const ok = await opusOK();
   $('setInfo').insertAdjacentHTML('beforeend', row(T('Compressione delle tracce'), ok ? T('attiva (Opus 128 kb/s)') : T('non disponibile qui')));
   if (ok) $('setInfo').insertAdjacentHTML('beforeend', '<div class="setrow"><span class="grow">' + T('I progetti nuovi sono già compressi (circa 10 volte meno spazio). Quelli fatti prima si comprimono quando li apri, oppure tutti qui.') + '</span><button class="pill" id="packAll">' + T('Comprimi') + '</button></div>');
@@ -657,13 +658,15 @@ $('createBtn').addEventListener('click', async () => {
     }
     if (m.type === 'error') {
       if (worker) { worker.terminate(); worker = null; } procRunning = false; releaseWake(); clearInterval(procClock);
-      const net = /download|fetch|network|Failed/i.test(m.message);
+      // only a real download problem says so ("Failed to allocate" is memory, not network)
+      const net = /download|fetch|network|Failed to fetch/i.test(m.message) && !/memory|allocat/i.test(m.message);
       await dialog(T('Qualcosa è andato storto'), textEl(net ? T('Non riesco a scaricare i modelli: controlla la connessione e riprova.') : T('La separazione si è fermata ({x}). Prova con una parte più corta.', { x: m.message })), [['OK', 0, true]]);
       go('home');
     }
     if (m.type === 'done') try {
       if (worker) { worker.terminate(); worker = null; }
       const workS = (Date.now() - tWork) / 1000; ls.set(SPEED_KEY(), Math.max(0.05, Math.min(10, workS / (dur * (wD + wG)))));
+      if (NATIVE) setTimeout(() => toast(T('Separato in {t} ({x} per minuto di brano)', { t: fmt(workS), x: fmt(workS * 60 / dur) }) + (m.threads ? ' · ' + T('{n} thread, {w} pezzi alla volta', { n: m.threads, w: m.workers || 1 }) : '') + (m.times ? ' · ' + m.times : ''), 10000), 1500);
       clearInterval(procClock); setSteps(steps, steps.length - 1); $('procStage').textContent = T('Trovo il ritmo e salvo…'); $('procWhat').textContent = T('Ritmo'); $('procLeft').textContent = T('quasi fatto'); setProgress(1, 0.5);
       const args = { name, stems: m.stems, dur, offset, srcDur, withG, kind, file, thumb };
       for (;;) {
@@ -692,7 +695,12 @@ function nativeWorker() {
     async postMessage(msg) {
       const emit = d => { if (!w.stopped && w.onmessage) w.onmessage({ data: d }); };
       try {
-        const n = msg.left.length, CH = 1 << 19; await call('begin', { frames: n });
+        const n = msg.left.length, CH = 1 << 19;
+        // a separation just cancelled may still be finishing its current piece: wait for it (up to 2 minutes)
+        for (let k = 0; ; k++) {
+          try { await call('begin', { frames: n }); break; }
+          catch (e) { if (!/busy/.test(String(e && e.message || e)) || k >= 240 || w.stopped) throw e; await new Promise(r => setTimeout(r, 500)); }
+        }
         emit({ type: 'loading' });
         for (const [ch, x] of [[0, msg.left], [1, msg.right]]) for (let off = 0; off < n; off += CH) {
           if (w.stopped) return;
@@ -715,7 +723,7 @@ function nativeWorker() {
               stems[id] = [toF32(a.subarray(0, h)), toF32(a.subarray(h))];
             }
             call('cleanup').catch(() => {});
-            return emit({ type: 'done', stems });
+            return emit({ type: 'done', stems, threads: s.threads, workers: s.workers, times: s.times });
           }
         }
       } catch (e) { fallback(String(e && e.message || e)); }
@@ -789,6 +797,7 @@ function splitPiano(stems, n) {
 let lastAltroParts = null; // what nameAltro heard, moment by moment (saved in the project)
 // YAMNet (tagworker.js) says which instrument family plays in Altro; null when no family clearly wins.
 async function nameAltro(altro, n) {
+  lastAltroParts = null;   // never carry over what the previous project heard
   try {
     const buf = new AudioBuffer({ length: n, numberOfChannels: 1, sampleRate: SR }), ch = buf.getChannelData(0), [L, R] = altro;
     for (let i = 0; i < n; i++) ch[i] = (L[i] + R[i]) * 0.5;
@@ -803,9 +812,12 @@ async function nameAltro(altro, n) {
     return r.name || null;
   } catch (e) { return null; }
 }
+const pianoSplitDone = new WeakMap();   // stems -> piano kept as a track (decided once per separation)
 async function saveNew({ name, stems, dur, offset, srcDur, withG, kind, file, thumb }) {
   const n = stems.vocals[0].length, id = 'p' + Date.now().toString(36);
-  const piano = splitPiano(stems, n), altroName = await nameAltro(stems.altro, n); useStems(piano, altroName);
+  // the piano is taken out of Altro once: a second save attempt ("Riprova") must not subtract it again
+  if (!pianoSplitDone.has(stems)) pianoSplitDone.set(stems, splitPiano(stems, n));
+  const piano = pianoSplitDone.get(stems), altroName = await nameAltro(stems.altro, n); useStems(piano, altroName);
   let bt = { bpm: 0, beats: new Float64Array(0), confidence: 0 };
   try { bt = BeatTracker.analyze(rhythmMono(stems, n), SR); } catch (e) {}
   const beats = Array.from(bt.beats);
@@ -1706,7 +1718,7 @@ $('tpad').addEventListener('pointerdown', e => {
   tr.taps++;
   const per = 60 / cur.bpm, i = nearestBeat(t), dt = t - beatTime(i), target = tr.targets.find(x => x.i === i);
   const pad = $('tpad'); pad.classList.remove('hit', 'miss'); void pad.offsetWidth;
-  if (target && !target.hit && Math.abs(dt) < per * 0.3) {
+  if (target && target.hit == null && Math.abs(dt) < per * 0.3) {   // hit 0 (perfectly on time) counts as taken
     target.hit = dt; tr.errs.push(dt * 1000); pad.classList.add('hit');
     const ms = Math.round(dt * 1000), ok = Math.abs(dt) <= PERFECT;
     $('tMsg').textContent = ok ? T('Perfetto!') : dt < 0 ? T('In anticipo') : T('In ritardo');
@@ -1715,7 +1727,7 @@ $('tpad').addEventListener('pointerdown', e => {
     $('tLast').textContent = T('Ultimo tocco sul {c}', { c: countOf(i) });
   } else {
     tr.wrong++; pad.classList.add('miss'); const ms = Math.round(dt * 1000);
-    if (target && target.hit) $('tMsg').textContent = T('Già preso');
+    if (target && target.hit != null) $('tMsg').textContent = T('Già preso');
     else if (target) { // right count, too far from it: say how far, so a late tap on the 1 is not reported as "not the 1"
       const ci = countOf(i); $('tMsg').textContent = T(dt < 0 ? 'Era {n}, ma troppo presto' : 'Era {n}, ma troppo tardi', { n: countName(ci) });
       $('tLateTxt').textContent = dt < 0 ? T('In anticipo di {n} ms', { n: -ms }) : T('In ritardo di {n} ms', { n: ms });

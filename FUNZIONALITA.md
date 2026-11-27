@@ -358,6 +358,15 @@ Il conteggio sparisce: si ascolta e si tocca.
 
 ## Registro modifiche
 
+- **27/11/2026 (branch `veloce`, APK di prova «Bachata Lab Veloce»)**: la versione con Demucs (quella di `main`) più veloce, senza cambiare il risultato.
+  - Thread scelti sui core veri del telefono (core grandi e medi; uno libero se sono tutti grandi): sul Vivo X300 7 invece di 4.
+  - Due pezzi di Demucs (e di AudioSep) alla volta, ognuno con metà dei thread, quando il telefono ha abbastanza memoria libera (Demucs 6 GB, AudioSep 3 GB: ogni pezzo di Demucs occupa circa 1,9 GB); i pezzi si sommano in ordine, risultato identico. Se con due pezzi qualcosa fallisce, il passaggio riparte con uno.
+  - Ogni modello si carica solo per il suo passaggio e poi si chiude.
+  - Trasformate dei due canali in un solo calcolo, ricampionamento con coefficienti precalcolati, divisione güira/bongo a blocchi di 10 s su più thread entro la memoria Java.
+  - Sul PC di prova (2 core): 65 s invece di 78 per un minuto di brano, tracce identiche (oltre 114 dB). Sul telefono il guadagno principale viene dai thread in più.
+  - Correzioni della revisione: piano non tolto due volte con «Riprova», piano nell'analisi degli accordi, tocco perfetto non contato due volte, nome di «Altro» non ereditato, ritardo Opus misurato prima della prima decodifica, attesa invece dell'errore «busy» dopo un annullamento, errore di memoria non scambiato per un problema di download.
+  - Il messaggio di fine separazione dice tempo, thread, pezzi alla volta e secondi di ogni passaggio.
+
 - **26/11/2026**: interfaccia in inglese e spagnolo oltre all'italiano: al primo avvio la lingua del telefono (inglese per le altre lingue), scelta nelle Impostazioni, tutti i testi tradotti (anche messaggi, errori, guide ed esercizi). La traduzione dei testi delle canzoni segue la lingua dell'app finché non ne scegli una tu. Corretta la traduzione verso e dal portoghese (prima non funzionava: non esistono modelli diretti). Tema e tasto «Sezioni» non tagliano più le scritte lunghe.
 
 - **26/11/2026**: tolti i pulsanti "L'1 è qui!" e "Da qui in poi": il conteggio viene solo dall'analisi.
