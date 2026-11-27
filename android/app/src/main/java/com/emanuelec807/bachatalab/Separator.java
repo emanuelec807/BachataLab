@@ -299,10 +299,92 @@ public final class Separator {
         float[] a = new float[b.remaining()]; b.get(a); return a;
     }
 
-    /** Demucs on 7.8 s pieces overlapping by a quarter. With two sessions, two pieces run at a time (each with half
-     *  the threads) and the STFT/ISTFT of one overlaps the network of the other; the pieces are still added up in
-     *  order, so the result is the same as one at a time. */
+    // ---------- Demucs on the phone GPU ----------
+    /** Demucs on another engine (the phone GPU, through LiteRT): same inputs and outputs as the ONNX model,
+     *  mix [2·L] and spec [4·2048·T] in, {zout, xt} out. An engine is used by one thread at a time. */
+    public interface Engine extends AutoCloseable { float[][] run(float[] mix, float[] spec, int T) throws Exception; @Override void close(); }
+    public interface Gpu {
+        Engine open() throws Exception;
+        /** null: not checked yet (on this phone and app version); otherwise the verdict of the check */
+        Boolean verified();
+        void verdict(boolean ok, String why);
+        /** how many of the open processor sessions may work at the same time as the GPU (free memory) */
+        int cpuWorkers(int open);
+    }
+    /** the phone GPU, or null (desktop, no GPU) */
+    public Gpu gpu = null;
+    /** how Demucs ran, for the final message: "GPU 8 + CPU 3 pezzi", "" when only on the processor */
+    public volatile String demucsHow = "";
+    /** a GPU result is accepted only if every instrument matches the processor's to at least this (dB) */
+    static final double GPU_MIN_DB = 30;
+    private static final class GpuFailed extends Exception { GpuFailed(Throwable t) { super(t); } }
+
+    private static float[][] pieceInput(float[] left, float[] right, int s, int total, int[] T) {
+        int e = Math.min(s + L, total), len = e - s;
+        float[] cl = new float[L], cr = new float[L];
+        System.arraycopy(left, s, cl, 0, len); System.arraycopy(right, s, cr, 0, len);
+        float[] mix = new float[2 * L]; System.arraycopy(cl, 0, mix, 0, L); System.arraycopy(cr, 0, mix, L, L);
+        return new float[][]{mix, demucsSpec(new float[][]{cl, cr}, T)};
+    }
+    private float[][] ortPiece(OrtSession s, float[] mix, float[] spec, int T) throws Exception {
+        Map<String, OnnxTensor> feeds = new LinkedHashMap<>();
+        try (OnnxTensor tm = OnnxTensor.createTensor(env, FloatBuffer.wrap(mix), new long[]{1, 2, L});
+             OnnxTensor ts = OnnxTensor.createTensor(env, FloatBuffer.wrap(spec), new long[]{1, 4, NFFT / 2, T})) {
+            feeds.put("mix", tm); feeds.put("spec", ts);
+            try (OrtSession.Result r = s.run(feeds)) {
+                return new float[][]{toArray((OnnxTensor) r.get("zout").get()), toArray((OnnxTensor) r.get("xt").get())};
+            }
+        }
+    }
+    /** The lowest, over the six instruments, of how close two results of the same piece are (dB). */
+    static double minStemDb(float[][] a, float[][] b, int T) {
+        float[][][] wa = demucsIspec(a[0], SOURCES.length, T), wb = demucsIspec(b[0], SOURCES.length, T);
+        double min = Double.MAX_VALUE;
+        for (int k = 0; k < SOURCES.length; k++) {
+            double sg = 0, er = 0;
+            for (int c = 0; c < 2; c++) {
+                int tb = (k * 2 + c) * L;
+                for (int j = 0; j < L; j++) {
+                    double x = wa[k][c][j] + a[1][tb + j], y = wb[k][c][j] + b[1][tb + j];
+                    if (Double.isNaN(y) || Double.isInfinite(y)) return -999;
+                    sg += x * x; er += (x - y) * (x - y);
+                }
+            }
+            min = Math.min(min, 10 * Math.log10(Math.max(sg, 1e-30) / Math.max(er, 1e-30)));
+        }
+        return min;
+    }
+
+    /** Demucs on 7.8 s pieces overlapping by a quarter. Each worker takes the next piece as soon as it is free: the
+     *  processor sessions (two pieces at a time with half the threads each, memory permitting) and, when the phone
+     *  has a GPU that passed the check, the GPU too. The pieces are still added up in order, so the result does not
+     *  depend on who computed what. If the GPU fails, Demucs is redone on the processor alone. */
     Map<String, FloatBuffer[]> demucsAll(float[] left, float[] right, OrtSession[] ss, Progress pr, Cancel cc) throws Exception {
+        if (gpu == null || Boolean.FALSE.equals(gpu.verified())) { demucsHow = ""; return demucsAll(left, right, ss, false, null, pr, cc); }
+        float[][] first = null;
+        if (gpu.verified() == null) {   // first time on this phone: piece 0 on both, compared instrument by instrument
+            int[] T = new int[1]; float[][] in = pieceInput(left, right, 0, left.length, T);
+            float[][] c = ortPiece(ss[0], in[0], in[1], T[0]), g = null; String why;
+            try (Engine e = gpu.open()) { g = e.run(in[0], in[1], T[0]); why = null; }
+            catch (Throwable t) { why = t.getClass().getSimpleName() + ": " + t.getMessage(); }
+            if (cc.cancelled()) throw new InterruptedException("cancelled");
+            double db = g == null ? -999 : minStemDb(c, g, T[0]);
+            boolean ok = g != null && db >= GPU_MIN_DB;
+            gpu.verdict(ok, why != null ? why : String.format(java.util.Locale.ROOT, "%.0f dB", db));
+            if (!ok) { demucsHow = ""; return demucsAll(left, right, ss, false, null, pr, cc); }
+            first = new float[][]{c[0], c[1], {T[0]}};
+        }
+        try { return demucsAll(left, right, ss, true, first, pr, cc); }
+        catch (GpuFailed e) {   // the GPU failed during this song: the processor does it all again
+            if (cc.cancelled()) throw new InterruptedException("cancelled");
+            System.gc();
+            demucsHow = "GPU non riuscita, solo CPU";
+            return demucsAll(left, right, ss, false, null, pr, cc);
+        }
+    }
+
+    private Map<String, FloatBuffer[]> demucsAll(float[] left, float[] right, OrtSession[] ss, boolean useGpu, float[][] first,
+                                                  Progress pr, Cancel cc) throws Exception {
         int total = left.length, overlap = (int) Math.floor(L * OVERLAP), stride = L - overlap;
         final int n = Math.max(1, (int) Math.ceil((double) total / stride));
         float[] win = new float[L]; java.util.Arrays.fill(win, 1f);
@@ -310,33 +392,39 @@ public final class Separator {
         FloatBuffer[][] out = new FloatBuffer[SOURCES.length][2];
         for (int k = 0; k < SOURCES.length; k++) for (int c = 0; c < 2; c++) out[k][c] = newBuf(total);
         float[] wsum = new float[total];
-        Par.ordered(n, ss.length, (w, i) -> {
-            int s = i * stride, e = Math.min(s + L, total), len = e - s;
-            float[] cl = new float[L], cr = new float[L];
-            System.arraycopy(left, s, cl, 0, len); System.arraycopy(right, s, cr, 0, len);
-            float[] mix = new float[2 * L]; System.arraycopy(cl, 0, mix, 0, L); System.arraycopy(cr, 0, mix, L, L);
-            int[] T = new int[1]; float[] spec = demucsSpec(new float[][]{cl, cr}, T);
-            Map<String, OnnxTensor> feeds = new LinkedHashMap<>();
-            float[] zout, xt;
-            try (OnnxTensor tm = OnnxTensor.createTensor(env, FloatBuffer.wrap(mix), new long[]{1, 2, L});
-                 OnnxTensor ts = OnnxTensor.createTensor(env, FloatBuffer.wrap(spec), new long[]{1, 4, NFFT / 2, T[0]})) {
-                feeds.put("mix", tm); feeds.put("spec", ts);
-                try (OrtSession.Result r = ss[w].run(feeds)) {
-                    zout = toArray((OnnxTensor) r.get("zout").get()); xt = toArray((OnnxTensor) r.get("xt").get());
+        // workers 0..nCpu-1: processor sessions; worker nCpu: the GPU
+        final int nCpu = useGpu ? Math.max(0, Math.min(ss.length, gpu.cpuWorkers(ss.length))) : ss.length;
+        final Engine[] eng = new Engine[1];
+        final java.util.concurrent.atomic.AtomicInteger onGpu = new java.util.concurrent.atomic.AtomicInteger(), onCpu = new java.util.concurrent.atomic.AtomicInteger();
+        try {
+            Par.ordered(n, nCpu + (useGpu ? 1 : 0), (w, i) -> {
+                if (i == 0 && first != null) { onCpu.incrementAndGet(); return new Object[]{demucsIspec(first[0], SOURCES.length, (int) first[2][0]), first[1]}; }
+                int[] T = new int[1]; float[][] in = pieceInput(left, right, i * stride, total, T);
+                float[][] r;
+                if (w < nCpu) { r = ortPiece(ss[w], in[0], in[1], T[0]); onCpu.incrementAndGet(); }
+                else {
+                    try {
+                        if (eng[0] == null) eng[0] = gpu.open();
+                        r = eng[0].run(in[0], in[1], T[0]);
+                        for (float v : r[1]) if (Float.isNaN(v) || Float.isInfinite(v)) throw new IllegalStateException("GPU: valori non validi");
+                    } catch (InterruptedException e) { throw e; }
+                    catch (Throwable t) { throw new GpuFailed(t); }
+                    onGpu.incrementAndGet();
                 }
-            }
-            spec = null; mix = null;
-            return new Object[]{demucsIspec(zout, SOURCES.length, T[0]), xt};
-        }, (i, r) -> {
-            float[][][] wav = (float[][][]) r[0]; float[] xt = (float[]) r[1];
-            int s = i * stride, e = Math.min(s + L, total), len = e - s;
-            for (int k = 0; k < SOURCES.length; k++) for (int c = 0; c < 2; c++) {
-                FloatBuffer o = out[k][c]; float[] wv = wav[k][c]; int tb = (k * 2 + c) * L;
-                for (int j = 0; j < len; j++) o.put(s + j, o.get(s + j) + (wv[j] + xt[tb + j]) * win[j]);
-            }
-            for (int j = 0; j < len; j++) wsum[s + j] += win[j];
-            pr.on("demucs", i + 1, n);
-        }, cc);
+                in = null;
+                return new Object[]{demucsIspec(r[0], SOURCES.length, T[0]), r[1]};
+            }, (i, r) -> {
+                float[][][] wav = (float[][][]) r[0]; float[] xt = (float[]) r[1];
+                int s = i * stride, e = Math.min(s + L, total), len = e - s;
+                for (int k = 0; k < SOURCES.length; k++) for (int c = 0; c < 2; c++) {
+                    FloatBuffer o = out[k][c]; float[] wv = wav[k][c]; int tb = (k * 2 + c) * L;
+                    for (int j = 0; j < len; j++) o.put(s + j, o.get(s + j) + (wv[j] + xt[tb + j]) * win[j]);
+                }
+                for (int j = 0; j < len; j++) wsum[s + j] += win[j];
+                pr.on("demucs", i + 1, n);
+            }, cc);
+        } finally { if (eng[0] != null) eng[0].close(); }
+        if (useGpu) demucsHow = "GPU " + onGpu.get() + (onCpu.get() > 0 ? " + CPU " + onCpu.get() : "") + " pezzi";
         for (FloatBuffer[] st : out) for (FloatBuffer ch : st) for (int j = 0; j < total; j++) ch.put(j, ch.get(j) / Math.max(wsum[j], 1e-8f));
         Map<String, FloatBuffer[]> stems = new HashMap<>();
         for (int k = 0; k < SOURCES.length; k++) stems.put(SOURCES[k], out[k]);

@@ -119,12 +119,15 @@ public class SeparatorPlugin extends Plugin {
         }, "gputest").start();
     }
 
+    static long appVersion(Context ctx) {
+        try { android.content.pm.PackageInfo p = ctx.getPackageManager().getPackageInfo(ctx.getPackageName(), 0);
+              return android.os.Build.VERSION.SDK_INT >= 28 ? p.getLongVersionCode() : p.versionCode; } catch (Exception e) { return 0; }
+    }
+
     /** Copies a web-asset file into app storage once per app version (like the models). */
     private File assetFile(Context ctx, String name) throws Exception {
         File dir = new File(ctx.getFilesDir(), "models"); dir.mkdirs();
-        long ver = 0;
-        try { android.content.pm.PackageInfo p = ctx.getPackageManager().getPackageInfo(ctx.getPackageName(), 0);
-              ver = android.os.Build.VERSION.SDK_INT >= 28 ? p.getLongVersionCode() : p.versionCode; } catch (Exception ignored) {}
+        long ver = appVersion(ctx);
         File out = new File(dir, ver + "." + name);
         if (out.exists() && out.length() > 10_000) return out;
         File[] olds = dir.listFiles((d, f) -> f.endsWith("." + name)); if (olds != null) for (File f : olds) f.delete();
@@ -225,7 +228,13 @@ public class SeparatorPlugin extends Plugin {
             float[][] in = input; input = null; // the separator frees the channels after the first step
             final java.util.LinkedHashMap<String, Long> ms = new java.util.LinkedHashMap<>();
             final long[] last = {System.currentTimeMillis()}; final String[] cur = {"demucs"}; times = "";
-            Map<String, FloatBuffer[]> stems = new Separator(env, models).separate(in, withGuira,
+            Separator sep = new Separator(env, models);
+            GpuDemucs gd = null;
+            try {   // Demucs also on the GPU, when the app ships the GPU model (it does not on every branch)
+                File gf = assetFile(ctx, "demucs_gpu.tflite");
+                gd = new GpuDemucs(ctx, gf, appVersion(ctx)); sep.gpu = gd;
+            } catch (Throwable ignored) {}
+            Map<String, FloatBuffer[]> stems = sep.separate(in, withGuira,
                 (s, i, n) -> {
                     if (!s.equals(cur[0])) { long now = System.currentTimeMillis(); ms.merge(cur[0], now - last[0], Long::sum); last[0] = now; cur[0] = s; }
                     stage = s; pi = i; pn = n;
@@ -237,7 +246,10 @@ public class SeparatorPlugin extends Plugin {
                 if (k.equals("demucs") || k.equals("guira")) tb.append(tb.length() > 0 ? " · " : "").append(k.equals("guira") ? "AudioSep" : "Demucs").append(' ').append(Math.round(e.getValue() / 1000.0)).append(" s");
                 else other += e.getValue();
             }
-            times = tb.append(" · resto ").append(Math.round(other / 1000.0)).append(" s").toString();
+            tb.append(" · resto ").append(Math.round(other / 1000.0)).append(" s");
+            if (!sep.demucsHow.isEmpty()) tb.append(" · Demucs: ").append(sep.demucsHow);
+            if (gd != null && !gd.note.isEmpty()) tb.append(" · ").append(gd.note);
+            times = tb.toString();
             stage = "write"; pi = 0; pn = stems.size();
             File dir = new File(ctx.getFilesDir(), "sep"); dir.mkdirs();
             JSObject fl = new JSObject();

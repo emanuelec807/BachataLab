@@ -364,8 +364,12 @@ Il conteggio sparisce: si ascolta e si tocca.
   - Il test fa lo stesso pezzo da 7,8 s con il motore di oggi (ONNX Runtime) e con LiteRT su processore e GPU in vari modi (OpenCL, OpenGL, fp32, GPU con il processore dove serve): tempo per pezzo e somiglianza per strumento.
   - L'app ora dichiara la libreria OpenCL del telefono: da Android 12 senza questa dichiarazione la GPU non è raggiungibile in modo OpenCL.
   - Primo test sul Vivo X300 (7.0.33): la GPU compila tutto Demucs e fa un pezzo in 0,7–0,9 s invece di 2,7 s (circa 3,5 volte più veloce), ma il risultato era sbagliato. Causa trovata nel registro: in ogni strato del trasformatore uno dei livelli lineari passava da 3 a 2 dimensioni e la GPU lo calcolava male. Ora tutti i livelli lineari del trasformatore sono convoluzioni 1×1 (stessa matematica, stesso risultato sul PC).
-  - Il test prova anche due pezzi della rete da soli (il trasformatore; tutto tranne il trasformatore), per capire subito dove sta un eventuale errore rimasto.
-  - Strumenti: `tools/gpu/` (conversione, pezzi di prova, pesi float16, elenco operazioni).
+  - Secondo test (7.0.34): in float32 la GPU dà lo stesso risultato del processore (48 dB) in 1,67 s per pezzo invece di 2,49 s. In float16 (0,8 s) no: sul PC, simulando float16, gli strumenti bassi («altro», piano) scendono a 7–11 dB, quasi tutto nell'ultimo strato del decoder (le sue uscite sono piccole differenze di valori grandi). Quindi si usa float32.
+  - **Demucs sulla GPU nella separazione vera**: la GPU lavora come un aiutante in più, prende il pezzo successivo appena è libera; se c'è memoria (circa 5 GB liberi) lavora anche il processore su altri pezzi, altrimenti solo la GPU. I pezzi si sommano in ordine: il risultato non dipende da chi ha calcolato cosa.
+  - Controllo la prima volta (per versione dell'app): il primo pezzo viene fatto sia dalla GPU sia dal processore e confrontato strumento per strumento; sotto 30 dB la GPU viene esclusa e si usa solo il processore. Se la GPU si rompe durante un brano, Demucs riparte sul processore.
+  - Il messaggio di fine separazione dice quanti pezzi ha fatto la GPU e quanti il processore, e l'esito del controllo.
+  - Verificato sul PC con una «GPU» simulata: tracce identiche alla sola CPU in tutti i casi (GPU e CPU insieme, solo GPU, GPU che si rompe, GPU sbagliata al controllo, GPU esclusa).
+  - Strumenti: `tools/gpu/` (conversione, pesi float16, elenco operazioni; esperimento float16 con `fp16_where.py`).
 
 - **27/11/2026 (branch `veloce`, APK di prova «Bachata Lab Veloce»)**: la versione con Demucs (quella di `main`) più veloce, senza cambiare il risultato.
   - Thread scelti sui core veri del telefono (core grandi e medi; uno libero se sono tutti grandi): sul Vivo X300 7 invece di 4.

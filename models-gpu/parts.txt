@@ -1,2 +1,0 @@
-part_trasformatore.tflite|1032192,516096
-part_senza_trasformatore.tflite|687960,2752512
